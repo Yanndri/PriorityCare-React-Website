@@ -1,0 +1,14 @@
+/* Small global reset used before App.css loads. */
+
+html {
+  background: #f4f2ec;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
