@@ -39,10 +39,6 @@ export async function fetchDashboardDataFromSupabase(): Promise<DashboardData> {
   const centerRows = getSettledValue(centersResult)
   const recordRows = getSettledValue(recordsResult)
 
-  if (residentsRows.length === 0) {
-    throw new Error('No residents were loaded from Supabase.')
-  }
-
   const usersByUid = toMap(usersRows, ['uid', 'id', 'user_id'])
   const sitiosById = toMap(sitiosRows, ['sitio_id', 'id'])
   const centersById = toMap(centerRows, ['center_id', 'id'])

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-import { alerts, evacuationCenters, evacuationHistory, menuItems, residents } from './data/dashboardData'
+import { menuItems } from './data/dashboardData'
 import type { MenuKey, Resident, Status } from './types/dashboard'
 
 import { AppHeader } from './components/AppHeader'
@@ -15,7 +15,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { exportReport } from './utils/exportReport'
-import { fetchDashboardDataFromSupabase } from './api/dashboardApi'
+import { fetchDashboardDataFromSupabase, type DashboardData } from './api/dashboardApi'
 
 function App() {
   // Stores which sidebar page is currently selected.
@@ -27,12 +27,13 @@ function App() {
   // Stores the selected status filter for the resident table.
   const [statusFilter, setStatusFilter] = useState<'All' | Status>('All')
 
-  // This state starts with local sample data, then updates with Supabase data when available.
-  const [dashboardData, setDashboardData] = useState({
-    residents,
-    alerts,
-    evacuationCenters,
-    evacuationHistory,
+  // All dashboard records are loaded from Supabase.
+  // No static sample resident, alert, center, or evacuation-history data is used.
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    residents: [],
+    alerts: [],
+    evacuationCenters: [],
+    evacuationHistory: [],
   })
 
   const [isLoadingDatabase, setIsLoadingDatabase] = useState(true)
@@ -45,8 +46,8 @@ function App() {
         setDatabaseError(null)
       })
       .catch((error) => {
-        console.error('Failed to load Supabase data. Using sample fallback data:', error)
-        setDatabaseError('Unable to load Supabase data. Showing sample data.')
+        console.error('Failed to load Supabase data:', error)
+        setDatabaseError('Unable to load Supabase data. Please check the database connection, table names, and permissions.')
       })
       .finally(() => {
         setIsLoadingDatabase(false)
@@ -69,13 +70,10 @@ function App() {
   const stats = useMemo(() => {
     const pending = liveResidents.filter((resident) => resident.status === 'Pending').length
     const verified = liveResidents.filter((resident) => resident.status === 'Verified').length
-    const floodZone = liveResidents.filter((resident) => resident.floodZone).length
-
     return [
       { label: 'Total Registered', value: liveResidents.length, note: 'From current data', tone: 'black' },
       { label: 'Pending Verification', value: pending, note: 'Needs review', tone: 'orange' },
       { label: 'Verified Residents', value: verified, note: 'Plotted on geo map', tone: 'green' },
-      { label: 'In Flood-Prone Zones', value: floodZone, note: 'High priority', tone: 'red' },
     ]
   }, [liveResidents])
 
@@ -179,6 +177,10 @@ function matchesStatus(residentStatus: Status, selectedStatus: 'All' | Status) {
 
 // Converts the residents array into chart-friendly data.
 function getConstraintStats(allResidents: Resident[]) {
+  if (allResidents.length === 0) {
+    return []
+  }
+
   const counts = allResidents.reduce<Record<string, number>>((totals, resident) => {
     totals[resident.constraint] = (totals[resident.constraint] ?? 0) + 1
     return totals

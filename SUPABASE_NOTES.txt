@@ -1,0 +1,18 @@
+This version uses Supabase as the live data source.
+
+Live records are loaded from:
+- src/lib/supabaseClient.ts
+- src/api/dashboardApi.ts
+
+Required root file:
+.env.local
+
+Required contents:
+VITE_SUPABASE_URL=https://urioaayowijvhwbuxxaj.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_4U89GUwsifai0yHblicJ-w_iQifQfkS
+
+Required package:
+npm install @supabase/supabase-js
+
+Restart Vite after changing .env.local:
+npm run dev

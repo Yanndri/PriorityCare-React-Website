@@ -12,6 +12,3 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '')
-
-console.log("Supabase URL:", supabaseUrl);
-console.log("Supabase key starts with:", supabaseAnonKey?.slice(0, 14));
