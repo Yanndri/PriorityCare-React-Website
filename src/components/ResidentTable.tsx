@@ -1,4 +1,5 @@
 import type { Resident, Status } from '../types/dashboard'
+import Select from 'react-select'
 
 type ResidentTableProps = {
   title: string
@@ -26,11 +27,28 @@ export function ResidentTable({
 
       {/* Search and filter controls update state stored in App.tsx. */}
       <div className="filters">
-        <input
-          value={searchTerm}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search resident, sitio, or constraint..."
-        />
+       <Select
+  isClearable
+  value={
+    searchTerm
+      ? { value: searchTerm, label: searchTerm }
+      : { value: '', label: 'All Locations' }
+  }
+  options={[
+    { value: '', label: 'All Locations' },
+    { value: 'San Roque', label: 'Brgy. San Roque' },
+    { value: 'Mabolo', label: 'Brgy. Mabolo' },
+    { value: 'Lahug', label: 'Brgy. Lahug' },
+    { value: 'Sitio Pag-asa', label: 'Sitio Pag-asa' },
+    { value: 'Sitio Maligaya', label: 'Sitio Maligaya' },
+    { value: 'Sitio Rizal', label: 'Sitio Rizal' },
+    { value: 'Sitio Mabuhay', label: 'Sitio Mabuhay' },
+  ]}
+  placeholder="Search location..."
+  onChange={(selected) => {
+    onSearchChange(selected?.value || '')
+  }}
+/>
 
         <select
           value={statusFilter}
