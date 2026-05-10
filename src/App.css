@@ -779,3 +779,23 @@ td {
     width: 100%;
   }
 }
+
+
+/* Supabase database status message */
+
+.database-status {
+  margin: -8px 0 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #e9f2ff;
+  color: #24527f;
+  border: 1px solid #bedcff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.database-status.error {
+  background: #fff4d8;
+  color: #8c6200;
+  border-color: #f1d28a;
+}

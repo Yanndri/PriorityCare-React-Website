@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 import { alerts, evacuationCenters, evacuationHistory, menuItems, residents } from './data/dashboardData'
@@ -15,6 +15,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { exportReport } from './utils/exportReport'
+import { fetchDashboardDataFromSupabase } from './api/dashboardApi'
 
 function App() {
   // Stores which sidebar page is currently selected.
@@ -26,31 +27,62 @@ function App() {
   // Stores the selected status filter for the resident table.
   const [statusFilter, setStatusFilter] = useState<'All' | Status>('All')
 
-  // Recalculates the visible residents only when the search/filter changes.
+  // This state starts with local sample data, then updates with Supabase data when available.
+  const [dashboardData, setDashboardData] = useState({
+    residents,
+    alerts,
+    evacuationCenters,
+    evacuationHistory,
+  })
+
+  const [isLoadingDatabase, setIsLoadingDatabase] = useState(true)
+  const [databaseError, setDatabaseError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchDashboardDataFromSupabase()
+      .then((data) => {
+        setDashboardData(data)
+        setDatabaseError(null)
+      })
+      .catch((error) => {
+        console.error('Failed to load Supabase data. Using sample fallback data:', error)
+        setDatabaseError('Unable to load Supabase data. Showing sample data.')
+      })
+      .finally(() => {
+        setIsLoadingDatabase(false)
+      })
+  }, [])
+
+  const liveResidents = dashboardData.residents
+  const liveAlerts = dashboardData.alerts
+  const liveEvacuationCenters = dashboardData.evacuationCenters
+  const liveEvacuationHistory = dashboardData.evacuationHistory
+
+  // Recalculates the visible residents only when the search/filter/database data changes.
   const filteredResidents = useMemo(() => {
-    return residents.filter((resident) => {
+    return liveResidents.filter((resident) => {
       return matchesSearch(resident, searchTerm) && matchesStatus(resident.status, statusFilter)
     })
-  }, [searchTerm, statusFilter])
+  }, [liveResidents, searchTerm, statusFilter])
 
   // Builds the dashboard stat cards from the residents data.
   const stats = useMemo(() => {
-    const pending = residents.filter((resident) => resident.status === 'Pending').length
-    const verified = residents.filter((resident) => resident.status === 'Verified').length
-    const floodZone = residents.filter((resident) => resident.floodZone).length
+    const pending = liveResidents.filter((resident) => resident.status === 'Pending').length
+    const verified = liveResidents.filter((resident) => resident.status === 'Verified').length
+    const floodZone = liveResidents.filter((resident) => resident.floodZone).length
 
     return [
-      { label: 'Total Registered', value: residents.length, note: '+3 this week', tone: 'black' },
+      { label: 'Total Registered', value: liveResidents.length, note: 'From current data', tone: 'black' },
       { label: 'Pending Verification', value: pending, note: 'Needs review', tone: 'orange' },
       { label: 'Verified Residents', value: verified, note: 'Plotted on geo map', tone: 'green' },
       { label: 'In Flood-Prone Zones', value: floodZone, note: 'High priority', tone: 'red' },
     ]
-  }, [])
+  }, [liveResidents])
 
   // Counts residents by constraint type for the small bar chart.
   const constraintStats = useMemo(() => {
-    return getConstraintStats(residents)
-  }, [])
+    return getConstraintStats(liveResidents)
+  }, [liveResidents])
 
   const activeTitle = menuItems.find((item) => item.key === activeMenu)?.label ?? 'Dashboard'
 
@@ -67,20 +99,28 @@ function App() {
             onExportReport={() =>
               exportReport({
                 stats,
-                residents,
-                alerts,
-                evacuationCenters,
-                evacuationHistory,
+                residents: liveResidents,
+                alerts: liveAlerts,
+                evacuationCenters: liveEvacuationCenters,
+                evacuationHistory: liveEvacuationHistory,
               })
             }
           />
+
+          {isLoadingDatabase && (
+            <div className="database-status">Loading Supabase database...</div>
+          )}
+
+          {databaseError && (
+            <div className="database-status error">{databaseError}</div>
+          )}
 
           {/* Home page with stats, recent registrations, alerts, and chart. */}
           {activeMenu === 'home' && (
             <HomePage
               stats={stats}
               residents={filteredResidents}
-              alerts={alerts}
+              alerts={liveAlerts}
               constraintStats={constraintStats}
               searchTerm={searchTerm}
               statusFilter={statusFilter}
@@ -101,16 +141,16 @@ function App() {
           )}
 
           {/* Simple visual map page. */}
-          {activeMenu === 'geoMap' && <GeoMapPage residents={residents} />}
+          {activeMenu === 'geoMap' && <GeoMapPage residents={liveResidents} />}
 
           {/* Report cards page. */}
           {activeMenu === 'reports' && <ReportsPage stats={stats} />}
 
           {/* Data mining and historical analytics page. */}
-          {activeMenu === 'dataMining' && <DataMiningPage records={evacuationHistory} />}
+          {activeMenu === 'dataMining' && <DataMiningPage records={liveEvacuationHistory} />}
 
           {/* Evacuation center capacity page. */}
-          {activeMenu === 'evacCenters' && <EvacCentersPage centers={evacuationCenters} />}
+          {activeMenu === 'evacCenters' && <EvacCentersPage centers={liveEvacuationCenters} />}
         </main>
       </div>
     </div>
