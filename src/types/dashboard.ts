@@ -1,7 +1,13 @@
 // These types define the shape of the dashboard data.
 // TypeScript uses them to catch mistakes while coding.
 
-export type MenuKey = 'home' | 'verification' | 'geoMap' | 'reports' | 'evacCenters'
+export type MenuKey =
+  | 'home'
+  | 'verification'
+  | 'geoMap'
+  | 'reports'
+  | 'dataMining'
+  | 'evacCenters'
 
 export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
 
@@ -47,4 +53,18 @@ export type ConstraintStat = {
   label: string
   value: number
   percent: number
+}
+
+export type EvacuationHistoryRecord = {
+  id: number
+  residentName: string
+  sitio: string
+  constraint: Constraint
+  status: 'Safely Evacuated' | 'Missing / Relocated' | 'Pending' | 'In Transit'
+  evacuationCenter: string
+  disasterEvent: string
+  month: string
+  year: number
+  responseMinutes: number
+  floodZone: boolean
 }

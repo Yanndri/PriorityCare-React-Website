@@ -1,6 +1,7 @@
 import type {
   Alert,
   EvacuationCenter,
+  EvacuationHistoryRecord,
   MenuItem,
   Resident,
 } from '../types/dashboard'
@@ -17,6 +18,8 @@ export const menuItems: MenuItem[] = [
   { key: 'geoMap', label: 'Geo Map' },
 
   { key: 'reports', label: 'Reports' },
+
+  { key: 'dataMining', label: 'Data Mining' },
 
   { key: 'evacCenters', label: 'Evac Centers' },
 ]
@@ -286,5 +289,118 @@ export const evacuationCenters: EvacuationCenter[] = [
     occupied: 15,
 
     status: 'Standby',
+  },
+]
+
+// ==============================
+// EVACUATION HISTORY / DATA MINING
+// ==============================
+// This sample historical data powers the Data Mining page.
+// Later, you can replace this array with API data from your database.
+
+export const evacuationHistory: EvacuationHistoryRecord[] = [
+  {
+    id: 1,
+    residentName: 'Maria Santos',
+    sitio: 'Sitio Pag-asa',
+    constraint: 'Bedridden',
+    status: 'Safely Evacuated',
+    evacuationCenter: 'San Roque Covered Court',
+    disasterEvent: 'Typhoon Agaton',
+    month: 'June',
+    year: 2025,
+    responseMinutes: 38,
+    floodZone: true,
+  },
+  {
+    id: 2,
+    residentName: 'Pedro Bautista',
+    sitio: 'Sitio Mabuhay',
+    constraint: 'Bedridden',
+    status: 'Missing / Relocated',
+    evacuationCenter: 'Unassigned',
+    disasterEvent: 'Typhoon Agaton',
+    month: 'June',
+    year: 2025,
+    responseMinutes: 74,
+    floodZone: true,
+  },
+  {
+    id: 3,
+    residentName: 'Jose dela Cruz',
+    sitio: 'Sitio Maligaya',
+    constraint: 'Wheelchair',
+    status: 'In Transit',
+    evacuationCenter: 'Elementary School Gym',
+    disasterEvent: 'Habagat Flooding',
+    month: 'July',
+    year: 2025,
+    responseMinutes: 52,
+    floodZone: true,
+  },
+  {
+    id: 4,
+    residentName: 'Ramon Cruz',
+    sitio: 'Sitio Riverside',
+    constraint: 'Wheelchair',
+    status: 'Safely Evacuated',
+    evacuationCenter: 'Community Gymnasium',
+    disasterEvent: 'Habagat Flooding',
+    month: 'July',
+    year: 2025,
+    responseMinutes: 47,
+    floodZone: true,
+  },
+  {
+    id: 5,
+    residentName: 'Lourdes Reyes',
+    sitio: 'Sitio Rizal',
+    constraint: 'Visual',
+    status: 'Safely Evacuated',
+    evacuationCenter: 'Barangay Hall Annex',
+    disasterEvent: 'Typhoon Bising',
+    month: 'September',
+    year: 2025,
+    responseMinutes: 26,
+    floodZone: true,
+  },
+  {
+    id: 6,
+    residentName: 'Ana Garcia',
+    sitio: 'Sitio Pag-asa',
+    constraint: 'Walk Assist',
+    status: 'Safely Evacuated',
+    evacuationCenter: 'San Roque Covered Court',
+    disasterEvent: 'Typhoon Bising',
+    month: 'September',
+    year: 2025,
+    responseMinutes: 31,
+    floodZone: true,
+  },
+  {
+    id: 7,
+    residentName: 'Carlos Mendoza',
+    sitio: 'Sitio Riverside',
+    constraint: 'Walk Assist',
+    status: 'Safely Evacuated',
+    evacuationCenter: 'Community Gymnasium',
+    disasterEvent: 'Typhoon Odette Drill',
+    month: 'November',
+    year: 2025,
+    responseMinutes: 28,
+    floodZone: false,
+  },
+  {
+    id: 8,
+    residentName: 'Nina Lopez',
+    sitio: 'Sitio Greenfield',
+    constraint: 'Visual',
+    status: 'Pending',
+    evacuationCenter: 'Unassigned',
+    disasterEvent: 'Typhoon Odette Drill',
+    month: 'November',
+    year: 2025,
+    responseMinutes: 65,
+    floodZone: false,
   },
 ]

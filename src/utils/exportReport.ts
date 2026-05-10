@@ -1,10 +1,17 @@
-import type { Alert, EvacuationCenter, Resident, StatCardData } from '../types/dashboard'
+import type {
+  Alert,
+  EvacuationCenter,
+  EvacuationHistoryRecord,
+  Resident,
+  StatCardData,
+} from '../types/dashboard'
 
 type ExportReportArgs = {
   stats: StatCardData[]
   residents: Resident[]
   alerts: Alert[]
   evacuationCenters: EvacuationCenter[]
+  evacuationHistory?: EvacuationHistoryRecord[]
 }
 
 // Main export function called when the user clicks the Export Report button.
@@ -13,6 +20,7 @@ export function exportReport({
   residents,
   alerts,
   evacuationCenters,
+  evacuationHistory = [],
 }: ExportReportArgs) {
   // Each section becomes part of the same CSV file.
   const reportSections = [
@@ -20,6 +28,7 @@ export function exportReport({
     buildResidentsSection(residents),
     buildAlertsSection(alerts),
     buildEvacuationCentersSection(evacuationCenters),
+    buildEvacuationHistorySection(evacuationHistory),
   ]
 
   const csvContent = reportSections.join('\n\n')
@@ -78,6 +87,39 @@ function buildEvacuationCentersSection(evacuationCenters: EvacuationCenter[]) {
       String(center.capacity),
       String(center.occupied),
       center.status,
+    ]),
+  ]
+
+  return rows.map(formatCsvRow).join('\n')
+}
+
+// Creates the data mining history section of the CSV.
+function buildEvacuationHistorySection(evacuationHistory: EvacuationHistoryRecord[]) {
+  const rows = [
+    ['Evacuation History / Data Mining'],
+    [
+      'Resident',
+      'Sitio',
+      'Constraint',
+      'Status',
+      'Evacuation Center',
+      'Disaster Event',
+      'Month',
+      'Year',
+      'Response Minutes',
+      'Flood Zone',
+    ],
+    ...evacuationHistory.map((record) => [
+      record.residentName,
+      record.sitio,
+      record.constraint,
+      record.status,
+      record.evacuationCenter,
+      record.disasterEvent,
+      record.month,
+      String(record.year),
+      String(record.responseMinutes),
+      record.floodZone ? 'Yes' : 'No',
     ]),
   ]
 

@@ -632,3 +632,150 @@ td {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Data Mining page */
+
+.data-mining-page {
+  display: grid;
+  gap: 20px;
+}
+
+.mining-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mining-intro p,
+.mining-description {
+  margin: 8px 0 0;
+  color: #77707f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mining-intro select {
+  min-width: 190px;
+  border: 1px solid #d8d4cc;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: #ffffff;
+  color: #302a38;
+  outline: none;
+}
+
+.mining-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.mining-card {
+  min-height: 110px;
+  padding: 18px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  text-align: center;
+  background: #fffefa;
+  border: 1px solid #dedbd3;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(57, 46, 67, 0.08);
+}
+
+.mining-card strong {
+  color: #3a1768;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.mining-card span {
+  color: #302a38;
+  font-weight: 800;
+}
+
+.mining-card small {
+  color: #77707f;
+}
+
+.mining-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.mining-bar-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.mining-bar-row {
+  display: grid;
+  gap: 7px;
+}
+
+.mining-bar-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #4e4854;
+  font-size: 14px;
+}
+
+.mining-bar-row strong {
+  color: #3a1768;
+}
+
+.mining-track {
+  height: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f1ecd8;
+}
+
+.mining-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3a1768, #ff8a00);
+}
+
+.insights-panel ul {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  color: #4e4854;
+  line-height: 1.7;
+}
+
+.insights-panel li + li {
+  margin-top: 8px;
+}
+
+.insights-panel strong {
+  color: #3a1768;
+}
+
+@media (max-width: 1050px) {
+  .mining-summary-grid,
+  .mining-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .mining-intro {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mining-summary-grid,
+  .mining-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mining-intro select {
+    width: 100%;
+  }
+}

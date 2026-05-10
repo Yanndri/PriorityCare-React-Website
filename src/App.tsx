@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-import { alerts, evacuationCenters, menuItems, residents } from './data/dashboardData'
+import { alerts, evacuationCenters, evacuationHistory, menuItems, residents } from './data/dashboardData'
 import type { MenuKey, Resident, Status } from './types/dashboard'
 
 import { AppHeader } from './components/AppHeader'
@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage'
 import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { exportReport } from './utils/exportReport'
 
@@ -69,6 +70,7 @@ function App() {
                 residents,
                 alerts,
                 evacuationCenters,
+                evacuationHistory,
               })
             }
           />
@@ -103,6 +105,9 @@ function App() {
 
           {/* Report cards page. */}
           {activeMenu === 'reports' && <ReportsPage stats={stats} />}
+
+          {/* Data mining and historical analytics page. */}
+          {activeMenu === 'dataMining' && <DataMiningPage records={evacuationHistory} />}
 
           {/* Evacuation center capacity page. */}
           {activeMenu === 'evacCenters' && <EvacCentersPage centers={evacuationCenters} />}
