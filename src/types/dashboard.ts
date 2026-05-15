@@ -11,16 +11,35 @@ export type MenuKey =
 
 export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
 
-export type Status = 'Pending' | 'Verified'
+export type Status = 'Pending' | 'Verified' | 'Rejected'
+
+export type VerificationDocument = {
+  id: number | string
+  residentId: number | string
+  typeName: string
+  fileUrl: string
+  reviewStatus: 'Pending' | 'Approved' | 'Rejected'
+  uploadedAt: string
+  rejectionReason?: string | null
+}
 
 export type Resident = {
-  id: number
+  id: number | string
   name: string
   sitio: string
   constraint: Constraint
   status: Status
   floodZone: boolean
   lastUpdated: string
+  sex?: string
+  birthdate?: string
+  address?: string
+  landmark?: string
+  emergencyContactName?: string
+  emergencyContactNo?: string
+  gpsLat?: number | string | null
+  gpsLong?: number | string | null
+  documents?: VerificationDocument[]
 }
 
 export type Alert = {
@@ -30,11 +49,21 @@ export type Alert = {
   priority: 'high' | 'medium' | 'info'
 }
 
+export type EvacuationCenterResident = {
+  id: number | string
+  name: string
+  sitio: string
+  constraint: Constraint
+  evacuationStatus: string
+}
+
 export type EvacuationCenter = {
+  id?: number | string
   name: string
   capacity: number
   occupied: number
   status: string
+  residents?: EvacuationCenterResident[]
 }
 
 export type MenuItem = {
@@ -56,7 +85,7 @@ export type ConstraintStat = {
 }
 
 export type EvacuationHistoryRecord = {
-  id: number
+  id: number | string
   residentName: string
   sitio: string
   constraint: Constraint

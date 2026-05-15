@@ -9,7 +9,7 @@ export function PageTitle({ title, onExportReport }: PageTitleProps) {
     <section className="page-title">
       <div>
         <h2>{title}</h2>
-        <p>Data shown below is generated from the resident list in this React project.</p>
+        {/* <p>Data shown below is generated from the resident list in this React project.</p> */}
       </div>
 
       <button className="primary-button" onClick={onExportReport}>
