@@ -1,47 +1,31 @@
-<<<<<<< HEAD
-import type { Resident } from '../types/dashboard'
-=======
 import {
   useState,
   useEffect,
   useRef,
 } from 'react'
 
+import { hasSupabaseConfig, supabase } from '../lib/supabaseClient'
+
 import type {
   MouseEvent as ReactMouseEvent,
   TouchEvent as ReactTouchEvent,
 } from 'react'
->>>>>>> 81d987f (Make flood prediction panel draggable)
+import type { Resident } from '../types/dashboard'
 
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
+  Circle,
 } from 'react-leaflet'
 
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-type GeoMapPageProps = {
-  residents: Resident[]
-}
-
-<<<<<<< HEAD
-// Cebu default coordinates
-const CEBU_COORDINATES: [number, number] = [10.3157, 123.8854]
-
-// Fix Leaflet marker issue in Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl
-=======
 // ======================================================
 // 🌍 SUPABASE
 // ======================================================
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-)
 
 // ======================================================
 // 🌦️ WEATHER API
@@ -105,7 +89,6 @@ const barangays = [
 delete (
   L.Icon.Default.prototype as any
 )._getIconUrl
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -118,10 +101,6 @@ L.Icon.Default.mergeOptions({
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-<<<<<<< HEAD
-// Red marker for flood-prone residents
-const highRiskIcon = new L.Icon({
-=======
 // ======================================================
 // 🌊 FLOOD ICON
 // ======================================================
@@ -143,7 +122,6 @@ const floodIcon = new L.Icon({
 // ======================================================
 
 const fireIcon = new L.Icon({
->>>>>>> 81d987f (Make flood prediction panel draggable)
   iconUrl:
     'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
 
@@ -154,9 +132,6 @@ const fireIcon = new L.Icon({
   iconAnchor: [12, 41],
 })
 
-<<<<<<< HEAD
-// Green marker for evacuation centers
-=======
 // ======================================================
 // 🌎 EARTHQUAKE ICON
 // ======================================================
@@ -177,7 +152,6 @@ const earthquakeIcon = new L.Icon({
 // 🟢 EVACUATION ICON
 // ======================================================
 
->>>>>>> 81d987f (Make flood prediction panel draggable)
 const evacuationIcon = new L.Icon({
   iconUrl:
     'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
@@ -189,42 +163,24 @@ const evacuationIcon = new L.Icon({
   iconAnchor: [12, 41],
 })
 
-<<<<<<< HEAD
-// Sample evacuation centers
-const evacuationCenters = [
-  {
-    id: 1,
-    name: 'Barangay Hall',
-    position: [10.3185, 123.8851] as [number, number],
-  },
+const residentIcon = new L.Icon({
+  iconUrl:
+    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png',
+  shadowUrl:
+    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+})
 
-  {
-    id: 2,
-    name: 'Community Gym',
-    position: [10.3115, 123.8912] as [number, number],
-  },
-
-  {
-    id: 3,
-    name: 'Elementary School',
-    position: [10.3202, 123.8795] as [number, number],
-  },
-]
-
-export function GeoMapPage({
-  residents,
-}: GeoMapPageProps) {
-
-  // Only flood-prone residents
-  const residentsInFloodZones = residents.filter(
-    (resident) => resident.floodZone
-  )
-=======
 // ======================================================
 // 🗺️ COMPONENT
 // ======================================================
 
-export function GeoMapPage() {
+type GeoMapPageProps = {
+  residents?: Resident[]
+}
+
+export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
   // ====================================================
   // 🌍 MAP MODES
@@ -514,13 +470,16 @@ export function GeoMapPage() {
   // ====================================================
 
   async function fetchRequests() {
+    if (!hasSupabaseConfig) {
+      return
+    }
 
     try {
 
       const { data, error } =
         await supabase
           .from(
-            'emergency_requests',
+            'sos_alerts',
           )
           .select('*')
 
@@ -616,15 +575,18 @@ export function GeoMapPage() {
   // ====================================================
 
   useEffect(() => {
+    fetchWeather()
+
+    if (!hasSupabaseConfig) {
+      return
+    }
 
     fetchRequests()
-
-    fetchWeather()
 
     const channel =
       supabase
         .channel(
-          'emergency_requests',
+          'sos_alerts',
         )
         .on(
           'postgres_changes',
@@ -632,7 +594,7 @@ export function GeoMapPage() {
             event: '*',
             schema: 'public',
             table:
-              'emergency_requests',
+              'sos_alerts',
           },
           () => {
 
@@ -649,26 +611,23 @@ export function GeoMapPage() {
     }
 
   }, [])
->>>>>>> 81d987f (Make flood prediction panel draggable)
+
+  const mappedResidents = residents.flatMap((resident) => {
+    const latitude = Number(resident.gpsLat)
+    const longitude = Number(resident.gpsLong)
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return []
+    }
+
+    return [{ resident, position: [latitude, longitude] as [number, number] }]
+  })
 
   // ====================================================
   // 🎨 UI
   // ====================================================
 
   return (
-<<<<<<< HEAD
-    <section className="panel map-panel">
-      <h3>Geo Map</h3>
-
-      <MapContainer
-        center={CEBU_COORDINATES}
-        zoom={13}
-        scrollWheelZoom={true}
-        style={{
-          height: '500px',
-          width: '100%',
-          borderRadius: '18px',
-=======
 
     <section
       ref={mapSectionRef}
@@ -722,67 +681,8 @@ export function GeoMapPage() {
 
           pointerEvents:
             'none',
->>>>>>> 81d987f (Make flood prediction panel draggable)
         }}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-<<<<<<< HEAD
-        {/* Flood-prone residents */}
-        {residentsInFloodZones.map((resident, index) => {
-
-          // Temporary generated positions
-          const markerPosition: [number, number] = [
-            CEBU_COORDINATES[0] + index * 0.01,
-            CEBU_COORDINATES[1] + index * 0.01,
-          ]
-
-          return (
-            <Marker
-              key={resident.id}
-              position={markerPosition}
-              icon={highRiskIcon}
-            >
-              <Popup>
-                <strong>{resident.name}</strong>
-
-                <br />
-
-                {resident.sitio}
-
-                <br />
-
-                Flood-prone area
-              </Popup>
-            </Marker>
-          )
-        })}
-
-        {/* Evacuation Centers */}
-        {evacuationCenters.map((center) => (
-          <Marker
-            key={center.id}
-            position={center.position}
-            icon={evacuationIcon}
-          >
-            <Popup>
-              <strong>{center.name}</strong>
-
-              <br />
-
-              Evacuation Center
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-
-      <p className="panel-note">
-        🔴 Red markers = Flood-prone residents
-
-        <br />
-=======
         <button
           onClick={() =>
             setMapMode(
@@ -1240,6 +1140,27 @@ export function GeoMapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
+          {mappedResidents.map(({ resident, position }) => (
+            <Marker
+              key={`resident-${resident.id}`}
+              position={position}
+              icon={resident.floodZone ? floodIcon : residentIcon}
+            >
+              <Popup>
+                <strong>{resident.name}</strong>
+                <br />
+                {resident.status} · {resident.constraint}
+                <br />
+                {resident.sitio}
+                <br />
+                📍 {position[0]}, {position[1]}
+                <br />
+                ☎ {resident.emergencyContactName ?? 'No emergency contact'}
+                {resident.emergencyContactNo ? ` · ${resident.emergencyContactNo}` : ''}
+              </Popup>
+            </Marker>
+          ))}
+
           {/* 🟢 EVACUATION CENTER */}
 
           <Marker
@@ -1454,10 +1375,7 @@ export function GeoMapPage() {
 
         `}
       </style>
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
-        🟢 Green markers = Evacuation centers
-      </p>
     </section>
   )
 }

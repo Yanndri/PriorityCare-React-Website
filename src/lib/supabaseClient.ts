@@ -7,8 +7,15 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Missing Supabase environment variables. The app will use fallback sample data.')
+export const hasSupabaseConfig = Boolean(
+  supabaseUrl && supabaseAnonKey,
+)
+
+if (!hasSupabaseConfig) {
+  console.warn('Missing Supabase environment variables. Add them to .env.local before starting the app.')
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '')
+export const supabase = createClient(
+  supabaseUrl ?? 'https://invalid.local',
+  supabaseAnonKey ?? 'missing-anon-key',
+)

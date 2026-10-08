@@ -18,13 +18,19 @@ import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
+import { EditResidentModal } from './components/EditResidentModal'
 
 import { exportReport } from './utils/exportReport'
 
 import {
+  deleteResidentProfile,
   fetchDashboardDataFromSupabase,
+  rejectResidentUser,
+  updateResidentProfile,
+  verifyResidentUser,
   type DashboardData,
 } from './api/dashboardApi'
+import { hasSupabaseConfig } from './lib/supabaseClient'
 
 function App() {
   const [activeMenu, setActiveMenu] =
@@ -45,17 +51,36 @@ function App() {
     })
 
   const [isLoadingDatabase, setIsLoadingDatabase] =
-    useState(true)
+    useState(hasSupabaseConfig)
 
   const [databaseError, setDatabaseError] =
-    useState<string | null>(null)
+    useState<string | null>(
+      hasSupabaseConfig
+        ? null
+        : 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.',
+    )
+
+  const [verifyingResidentId, setVerifyingResidentId] =
+    useState<number | string | null>(null)
+
+  const [editingResident, setEditingResident] =
+    useState<Resident | null>(null)
+
+  const [savingResidentId, setSavingResidentId] =
+    useState<number | string | null>(null)
+
+  async function reloadDashboardData() {
+    const data = await fetchDashboardDataFromSupabase()
+    setDashboardData(data)
+    setDatabaseError(null)
+  }
 
   useEffect(() => {
-    fetchDashboardDataFromSupabase()
-      .then((data) => {
-        setDashboardData(data)
-        setDatabaseError(null)
-      })
+    if (!hasSupabaseConfig) {
+      return
+    }
+
+    reloadDashboardData()
       .catch((error) => {
         console.error(
           'Failed to load Supabase data:',
@@ -70,6 +95,66 @@ function App() {
         setIsLoadingDatabase(false)
       })
   }, [])
+
+  async function handleVerifyResident(residentId: number | string) {
+    setVerifyingResidentId(residentId)
+
+    try {
+      await verifyResidentUser(residentId)
+      await reloadDashboardData()
+    } catch (error) {
+      console.error('Failed to verify resident:', error)
+      window.alert('Unable to verify this resident. Please try again.')
+    } finally {
+      setVerifyingResidentId(null)
+    }
+  }
+
+  async function handleRejectResident(residentId: number | string, reason: string) {
+    setVerifyingResidentId(residentId)
+
+    try {
+      await rejectResidentUser(residentId, reason)
+      await reloadDashboardData()
+    } catch (error) {
+      console.error('Failed to reject resident:', error)
+      window.alert('Unable to reject this resident. Please try again.')
+    } finally {
+      setVerifyingResidentId(null)
+    }
+  }
+
+  async function handleSaveResident(
+    residentId: number | string,
+    updates: { name: string; constraint: Resident['constraint']; status: Status },
+  ) {
+    setSavingResidentId(residentId)
+
+    try {
+      await updateResidentProfile(residentId, updates)
+      setEditingResident(null)
+      await reloadDashboardData()
+    } catch (error) {
+      console.error('Failed to update resident:', error)
+      window.alert('Unable to save this resident. Please try again.')
+    } finally {
+      setSavingResidentId(null)
+    }
+  }
+
+  async function handleDeleteResident(resident: Resident) {
+    if (!window.confirm(`Delete ${resident.name} permanently?`)) {
+      return
+    }
+
+    try {
+      await deleteResidentProfile(resident.id)
+      await reloadDashboardData()
+    } catch (error) {
+      console.error('Failed to delete resident:', error)
+      window.alert('Unable to delete this resident. Please try again.')
+    }
+  }
 
   // All dashboard data now comes from Supabase.
   const liveResidents =
@@ -222,6 +307,7 @@ function App() {
               stats={stats}
               residents={filteredResidents}
               alerts={liveAlerts}
+              evacuationCenters={liveEvacuationCenters}
               constraintStats={
                 constraintStats
               }
@@ -247,11 +333,26 @@ function App() {
               onStatusFilterChange={
                 setStatusFilter
               }
+              verifyingResidentId={
+                verifyingResidentId
+              }
+              onVerifyResident={
+                handleVerifyResident
+              }
+              onRejectResident={
+                handleRejectResident
+              }
+              onEditResident={
+                setEditingResident
+              }
+              onDeleteResident={
+                handleDeleteResident
+              }
             />
           )}
 
           {activeMenu === 'geoMap' && (
-            <GeoMapPage />
+            <GeoMapPage residents={liveResidents} />
           )}
 
           {activeMenu === 'reports' && (
@@ -270,6 +371,13 @@ function App() {
 
         </main>
       </div>
+
+      <EditResidentModal
+        resident={editingResident}
+        isSaving={savingResidentId !== null}
+        onClose={() => setEditingResident(null)}
+        onSave={handleSaveResident}
+      />
     </div>
   )
 }
