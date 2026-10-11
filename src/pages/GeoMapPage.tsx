@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-import type { Resident } from '../types/dashboard'
-=======
 import {
   useState,
   useEffect,
@@ -11,29 +8,21 @@ import type {
   MouseEvent as ReactMouseEvent,
   TouchEvent as ReactTouchEvent,
 } from 'react'
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
+  Circle,
 } from 'react-leaflet'
 
 import * as L from 'leaflet'
+
 import 'leaflet/dist/leaflet.css'
 
-type GeoMapPageProps = {
-  residents: Resident[]
-}
+import { createClient } from '@supabase/supabase-js'
 
-<<<<<<< HEAD
-// Cebu default coordinates
-const CEBU_COORDINATES: [number, number] = [10.3157, 123.8854]
-
-// Fix Leaflet marker issue in Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl
-=======
 // ======================================================
 // 🌍 SUPABASE
 // ======================================================
@@ -105,7 +94,6 @@ const barangays = [
 delete (
   L.Icon.Default.prototype as any
 )._getIconUrl
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -118,10 +106,6 @@ L.Icon.Default.mergeOptions({
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-<<<<<<< HEAD
-// Red marker for flood-prone residents
-const highRiskIcon = new L.Icon({
-=======
 // ======================================================
 // 🌊 FLOOD ICON
 // ======================================================
@@ -143,20 +127,17 @@ const floodIcon = new L.Icon({
 // ======================================================
 
 const fireIcon = new L.Icon({
->>>>>>> 81d987f (Make flood prediction panel draggable)
   iconUrl:
     'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
 
   shadowUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [30, 48],
+
+  iconAnchor: [15, 48],
 })
 
-<<<<<<< HEAD
-// Green marker for evacuation centers
-=======
 // ======================================================
 // 🌎 EARTHQUAKE ICON
 // ======================================================
@@ -177,7 +158,6 @@ const earthquakeIcon = new L.Icon({
 // 🟢 EVACUATION ICON
 // ======================================================
 
->>>>>>> 81d987f (Make flood prediction panel draggable)
 const evacuationIcon = new L.Icon({
   iconUrl:
     'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
@@ -185,41 +165,11 @@ const evacuationIcon = new L.Icon({
   shadowUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [30, 48],
+
+  iconAnchor: [15, 48],
 })
 
-<<<<<<< HEAD
-// Sample evacuation centers
-const evacuationCenters = [
-  {
-    id: 1,
-    name: 'Barangay Hall',
-    position: [10.3185, 123.8851] as [number, number],
-  },
-
-  {
-    id: 2,
-    name: 'Community Gym',
-    position: [10.3115, 123.8912] as [number, number],
-  },
-
-  {
-    id: 3,
-    name: 'Elementary School',
-    position: [10.3202, 123.8795] as [number, number],
-  },
-]
-
-export function GeoMapPage({
-  residents,
-}: GeoMapPageProps) {
-
-  // Only flood-prone residents
-  const residentsInFloodZones = residents.filter(
-    (resident) => resident.floodZone
-  )
-=======
 // ======================================================
 // 🗺️ COMPONENT
 // ======================================================
@@ -261,7 +211,7 @@ export function GeoMapPage() {
     useState<any[]>([])
 
   // ====================================================
-  // 🖱️ DRAGGABLE FLOOD PANEL
+  // 🪟 PANEL POSITION
   // ====================================================
 
   const mapSectionRef =
@@ -276,8 +226,18 @@ export function GeoMapPage() {
       y: 90,
     })
 
+  // ====================================================
+  // 🖱️ DOUBLE-TAP / DOUBLE-CLICK DRAG SYSTEM
+  // ====================================================
+
   const [isDragging, setIsDragging] =
     useState(false)
+
+  const [isArmed, setIsArmed] =
+    useState(false)
+
+  const lastPointerDown =
+    useRef(0)
 
   const dragOffset =
     useRef({
@@ -285,15 +245,20 @@ export function GeoMapPage() {
       y: 0,
     })
 
+  const doubleTapDelay = 350
+
   // ====================================================
-  // 🖱️ START DRAGGING
+  // 🖱️ START / ARM DRAGGING
   // ====================================================
 
-  function startDragging(
+  function handlePanelPointerDown(
     event:
       | ReactMouseEvent<HTMLDivElement>
       | ReactTouchEvent<HTMLDivElement>,
   ) {
+
+    const now =
+      Date.now()
 
     const clientX =
       'touches' in event
@@ -305,6 +270,29 @@ export function GeoMapPage() {
         ? event.touches[0].clientY
         : event.clientY
 
+    const isSecondTap =
+      now -
+        lastPointerDown.current <
+      doubleTapDelay
+
+    lastPointerDown.current =
+      now
+
+    // First click/tap:
+    // arm the panel but don't move it.
+    if (!isSecondTap) {
+
+      setIsArmed(false)
+
+      return
+    }
+
+    // Second click/tap:
+    // activate dragging.
+    setIsArmed(true)
+
+    setIsDragging(true)
+
     dragOffset.current = {
       x:
         clientX -
@@ -314,12 +302,10 @@ export function GeoMapPage() {
         clientY -
         panelPosition.y,
     }
-
-    setIsDragging(true)
   }
 
   // ====================================================
-  // 🖱️ DRAGGING
+  // 🖱️ MOVE PANEL
   // ====================================================
 
   useEffect(() => {
@@ -364,7 +350,14 @@ export function GeoMapPage() {
     }
 
     function stopDragging() {
+
+      if (!isDragging) {
+        return
+      }
+
       setIsDragging(false)
+
+      setIsArmed(false)
     }
 
     window.addEventListener(
@@ -443,12 +436,6 @@ export function GeoMapPage() {
     const panelRect =
       panel.getBoundingClientRect()
 
-    const panelWidth =
-      panelRect.width
-
-    const panelHeight =
-      panelRect.height
-
     let newX =
       clientX -
       sectionRect.left -
@@ -463,7 +450,7 @@ export function GeoMapPage() {
       Math.max(
         10,
         sectionRect.width -
-          panelWidth -
+          panelRect.width -
           10,
       )
 
@@ -471,7 +458,7 @@ export function GeoMapPage() {
       Math.max(
         10,
         sectionRect.height -
-          panelHeight -
+          panelRect.height -
           10,
       )
 
@@ -498,7 +485,7 @@ export function GeoMapPage() {
   }
 
   // ====================================================
-  // 🔄 RESET PANEL POSITION
+  // 🔄 RESET PANEL
   // ====================================================
 
   function resetPanelPosition() {
@@ -507,10 +494,14 @@ export function GeoMapPage() {
       x: 18,
       y: 90,
     })
+
+    setIsDragging(false)
+
+    setIsArmed(false)
   }
 
   // ====================================================
-  // 🚨 FETCH EMERGENCY REQUESTS
+  // 🚨 FETCH REQUESTS
   // ====================================================
 
   async function fetchRequests() {
@@ -612,7 +603,7 @@ export function GeoMapPage() {
   }
 
   // ====================================================
-  // 🌍 REALTIME SUPABASE
+  // 🌍 REALTIME
   // ====================================================
 
   useEffect(() => {
@@ -649,26 +640,12 @@ export function GeoMapPage() {
     }
 
   }, [])
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
   // ====================================================
   // 🎨 UI
   // ====================================================
 
   return (
-<<<<<<< HEAD
-    <section className="panel map-panel">
-      <h3>Geo Map</h3>
-
-      <MapContainer
-        center={CEBU_COORDINATES}
-        zoom={13}
-        scrollWheelZoom={true}
-        style={{
-          height: '500px',
-          width: '100%',
-          borderRadius: '18px',
-=======
 
     <section
       ref={mapSectionRef}
@@ -717,72 +694,11 @@ export function GeoMapPage() {
           flexWrap:
             'wrap',
 
-          justifyContent:
-            'flex-start',
-
           pointerEvents:
             'none',
->>>>>>> 81d987f (Make flood prediction panel draggable)
         }}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
 
-<<<<<<< HEAD
-        {/* Flood-prone residents */}
-        {residentsInFloodZones.map((resident, index) => {
-
-          // Temporary generated positions
-          const markerPosition: [number, number] = [
-            CEBU_COORDINATES[0] + index * 0.01,
-            CEBU_COORDINATES[1] + index * 0.01,
-          ]
-
-          return (
-            <Marker
-              key={resident.id}
-              position={markerPosition}
-              icon={highRiskIcon}
-            >
-              <Popup>
-                <strong>{resident.name}</strong>
-
-                <br />
-
-                {resident.sitio}
-
-                <br />
-
-                Flood-prone area
-              </Popup>
-            </Marker>
-          )
-        })}
-
-        {/* Evacuation Centers */}
-        {evacuationCenters.map((center) => (
-          <Marker
-            key={center.id}
-            position={center.position}
-            icon={evacuationIcon}
-          >
-            <Popup>
-              <strong>{center.name}</strong>
-
-              <br />
-
-              Evacuation Center
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-
-      <p className="panel-note">
-        🔴 Red markers = Flood-prone residents
-
-        <br />
-=======
         <button
           onClick={() =>
             setMapMode(
@@ -793,15 +709,6 @@ export function GeoMapPage() {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🗺️ Default
@@ -817,15 +724,6 @@ export function GeoMapPage() {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌊 Flood
@@ -841,15 +739,6 @@ export function GeoMapPage() {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🔥 Fire
@@ -865,15 +754,6 @@ export function GeoMapPage() {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌎 Earthquake
@@ -889,15 +769,6 @@ export function GeoMapPage() {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌪️ Weather
@@ -913,7 +784,7 @@ export function GeoMapPage() {
 
         <>
 
-          {/* 🌪️ WINDY MAP */}
+          {/* 🌪️ WINDY */}
 
           <iframe
             title="Windy Weather Map"
@@ -936,7 +807,7 @@ export function GeoMapPage() {
           />
 
           {/* ==================================================
-              🌊 DRAGGABLE LIVE FLOOD PREDICTION
+              🌊 FLOATING FLOOD PANEL
               ================================================== */}
 
           <div
@@ -985,26 +856,23 @@ export function GeoMapPage() {
                 'border-box',
 
               boxShadow:
-                '0 10px 30px rgba(0,0,0,0.35)',
-
-              transition:
                 isDragging
-                  ? 'none'
-                  : 'box-shadow 0.2s',
+                  ? '0 15px 40px rgba(0,0,0,0.55)'
+                  : '0 10px 30px rgba(0,0,0,0.35)',
             }}
           >
 
-            {/* ==============================================
-                🖱️ DRAG HEADER
-                ============================================== */}
+            {/* ==================================================
+                🖱️ DOUBLE CLICK + HOLD HEADER
+                ================================================== */}
 
             <div
               onMouseDown={
-                startDragging
+                handlePanelPointerDown
               }
 
               onTouchStart={
-                startDragging
+                handlePanelPointerDown
               }
 
               style={{
@@ -1035,54 +903,82 @@ export function GeoMapPage() {
                   '12px',
 
                 padding:
-                  '8px',
+                  '10px',
 
                 borderRadius:
                   '10px',
 
                 background:
-                  'rgba(255,255,255,0.06)',
+                  isArmed
+                    ? 'rgba(59,130,246,0.22)'
+                    : 'rgba(255,255,255,0.06)',
 
                 border:
-                  '1px solid rgba(255,255,255,0.08)',
+                  isArmed
+                    ? '1px solid rgba(59,130,246,0.5)'
+                    : '1px solid rgba(255,255,255,0.08)',
+
+                transition:
+                  'background 0.15s, border 0.15s',
               }}
             >
 
-              <h2
-                style={{
-                  margin:
-                    0,
+              <div>
 
-                  fontSize:
-                    '20px',
+                <h2
+                  style={{
+                    margin:
+                      0,
 
-                  lineHeight:
-                    1.2,
-                }}
-              >
-                ⚠️ Live Flood Prediction
-              </h2>
+                    fontSize:
+                      '20px',
+
+                    lineHeight:
+                      1.2,
+                  }}
+                >
+                  ⚠️ Live Flood Prediction
+                </h2>
+
+                <span
+                  style={{
+                    display:
+                      'block',
+
+                    marginTop:
+                      '5px',
+
+                    fontSize:
+                      '11px',
+
+                    opacity:
+                      0.6,
+                  }}
+                >
+                  {isDragging
+                    ? '↔️ Moving...'
+                    : 'Double-click + hold to move'}
+                </span>
+
+              </div>
 
               <span
                 style={{
                   fontSize:
-                    '11px',
+                    '20px',
 
                   opacity:
-                    0.65,
-
-                  whiteSpace:
-                    'nowrap',
+                    0.55,
                 }}
               >
-                ⠿ Drag
+                ⠿
               </span>
 
             </div>
 
-            {/* ==============================================
-                🌧️ WEATHER INFORMATION
-                ============================================== */}
+            {/* ==================================================
+                🌧️ WEATHER
+                ================================================== */}
 
             <p>
               🌧️ Rainfall Level:{' '}
@@ -1115,22 +1011,13 @@ export function GeoMapPage() {
               📍 Possible Affected Areas
             </h3>
 
-            {/* 🌊 NO FLOOD RISK */}
-
             {affectedAreas.length === 0 && (
 
-              <p
-                style={{
-                  marginBottom:
-                    '10px',
-                }}
-              >
+              <p>
                 No flood risk detected.
               </p>
 
             )}
-
-            {/* 🌊 FLOOD RISK AREAS */}
 
             {affectedAreas.map(
               (area) => (
@@ -1174,9 +1061,9 @@ export function GeoMapPage() {
               ),
             )}
 
-            {/* ==============================================
-                🔄 RESET POSITION
-                ============================================== */}
+            {/* ==================================================
+                🔄 RESET
+                ================================================== */}
 
             <button
               onClick={
@@ -1184,17 +1071,17 @@ export function GeoMapPage() {
               }
 
               style={{
-                marginTop:
-                  '8px',
-
                 width:
                   '100%',
 
-                fontSize:
-                  '12px',
+                marginTop:
+                  '8px',
 
                 padding:
                   '9px 12px',
+
+                fontSize:
+                  '12px',
               }}
             >
               ↩️ Reset Panel Position
@@ -1207,7 +1094,7 @@ export function GeoMapPage() {
       ) : (
 
         /* ==================================================
-           🗺️ NORMAL LEAFLET MAP
+           🗺️ LEAFLET MAP
            ================================================== */
 
         <MapContainer
@@ -1298,7 +1185,7 @@ export function GeoMapPage() {
             ),
           )}
 
-          {/* 🚨 REALTIME REQUESTS */}
+          {/* 🚨 EMERGENCY REQUESTS */}
 
           {requests.map(
             (request) => {
@@ -1399,7 +1286,7 @@ export function GeoMapPage() {
       )}
 
       {/* ==================================================
-          ✨ BUTTON STYLES
+          ✨ BUTTON STYLE
           ================================================== */}
 
       <style>
@@ -1454,10 +1341,7 @@ export function GeoMapPage() {
 
         `}
       </style>
->>>>>>> 81d987f (Make flood prediction panel draggable)
 
-        🟢 Green markers = Evacuation centers
-      </p>
     </section>
   )
 }
