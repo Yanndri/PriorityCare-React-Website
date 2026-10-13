@@ -53,11 +53,16 @@ async function requireSuperAdmin(req, res, next) {
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !authData.user) {
-      return res.status(401).json({
-        message: "Invalid or expired session. Please sign in again.",
-      });
-    }
+   if (authError || !authData.user) {
+  console.error(
+    "Supabase token verification failed:",
+    authError?.message || "No authenticated user returned"
+  );
+
+  return res.status(401).json({
+    message: "Invalid or expired session. Please sign in again.",
+  });
+}
 
     const { data: profile, error: profileError } =
       await supabaseAdmin
