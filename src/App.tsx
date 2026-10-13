@@ -30,15 +30,15 @@ import {
   verifyResidentUser,
   type DashboardData,
 } from './api/dashboardApi'
-import { hasSupabaseConfig } from './lib/supabaseClient'
+
+import {
+  hasSupabaseConfig,
+  supabase,
+} from './lib/supabaseClient'
 
 function App() {
-  const [activeMenu, setActiveMenu] =
-    useState<MenuKey>('home')
-
-  const [searchTerm, setSearchTerm] =
-    useState('')
-
+  const [activeMenu, setActiveMenu] = useState<MenuKey>('home')
+  const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] =
     useState<'All' | Status>('All')
 
@@ -60,6 +60,12 @@ function App() {
         : 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.',
     )
 
+  const [assignedSitioId, setAssignedSitioId] =
+    useState<string | null>(null)
+
+  const [assignedSitioName, setAssignedSitioName] =
+    useState('')
+
   const [verifyingResidentId, setVerifyingResidentId] =
     useState<number | string | null>(null)
 
@@ -69,34 +75,125 @@ function App() {
   const [savingResidentId, setSavingResidentId] =
     useState<number | string | null>(null)
 
+  // Load the authenticated Admin profile and its assigned sitio.
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAdminDashboard() {
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser()
+
+        if (authError) throw authError
+
+        if (!user) {
+          throw new Error(
+            'You must log in before accessing the Admin Dashboard.',
+          )
+        }
+
+        const { data: profile, error: profileError } =
+          await supabase
+            .from('users')
+            .select(
+              'uid, role, account_status, assigned_sitio_id',
+            )
+            .eq('uid', user.id)
+            .maybeSingle()
+
+        if (profileError) throw profileError
+
+        if (
+          !profile ||
+          profile.role !== 'admin' ||
+          profile.account_status !== 'active' ||
+          !profile.assigned_sitio_id
+        ) {
+          throw new Error(
+            'Your account is not an active Admin or has no assigned sitio.',
+          )
+        }
+
+        const sitioId = String(profile.assigned_sitio_id)
+
+        const { data: sitio, error: sitioError } =
+          await supabase
+            .from('sitios')
+            .select('sitio_id, sitio_name')
+            .eq('sitio_id', sitioId)
+            .maybeSingle()
+
+        if (sitioError) throw sitioError
+
+        if (!sitio) {
+          throw new Error(
+            'Your assigned sitio could not be found.',
+          )
+        }
+
+        const data =
+          await fetchDashboardDataFromSupabase(sitioId)
+
+        if (cancelled) return
+
+        setAssignedSitioId(sitioId)
+        setAssignedSitioName(
+          String(sitio.sitio_name ?? 'Assigned Sitio'),
+        )
+        setDashboardData(data)
+        setDatabaseError(null)
+      } catch (error) {
+        if (cancelled) return
+
+        console.error(
+          'Failed to load Admin Dashboard:',
+          error,
+        )
+
+        setDatabaseError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load the Admin Dashboard.',
+        )
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDatabase(false)
+        }
+      }
+    }
+
+    if (!hasSupabaseConfig) {
+      setIsLoadingDatabase(false)
+      return
+    }
+
+    void loadAdminDashboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Always refresh using the assigned sitio, never a browser-selected sitio.
   async function reloadDashboardData() {
-    const data = await fetchDashboardDataFromSupabase()
+    if (!assignedSitioId) {
+      throw new Error(
+        'No assigned sitio is available. Please log in again.',
+      )
+    }
+
+    const data =
+      await fetchDashboardDataFromSupabase(assignedSitioId)
+
     setDashboardData(data)
     setDatabaseError(null)
   }
 
-  useEffect(() => {
-    if (!hasSupabaseConfig) {
-      return
-    }
-
-    reloadDashboardData()
-      .catch((error) => {
-        console.error(
-          'Failed to load Supabase data:',
-          error
-        )
-
-        setDatabaseError(
-          'Unable to load Supabase data.'
-        )
-      })
-      .finally(() => {
-        setIsLoadingDatabase(false)
-      })
-  }, [])
-
-  async function handleVerifyResident(residentId: number | string) {
+  async function handleVerifyResident(
+    residentId: number | string,
+  ) {
     setVerifyingResidentId(residentId)
 
     try {
@@ -104,13 +201,19 @@ function App() {
       await reloadDashboardData()
     } catch (error) {
       console.error('Failed to verify resident:', error)
-      window.alert('Unable to verify this resident. Please try again.')
+
+      window.alert(
+        'Unable to verify this resident. Check your access permissions and try again.',
+      )
     } finally {
       setVerifyingResidentId(null)
     }
   }
 
-  async function handleRejectResident(residentId: number | string, reason: string) {
+  async function handleRejectResident(
+    residentId: number | string,
+    reason: string,
+  ) {
     setVerifyingResidentId(residentId)
 
     try {
@@ -118,7 +221,10 @@ function App() {
       await reloadDashboardData()
     } catch (error) {
       console.error('Failed to reject resident:', error)
-      window.alert('Unable to reject this resident. Please try again.')
+
+      window.alert(
+        'Unable to reject this resident. Check your access permissions and try again.',
+      )
     } finally {
       setVerifyingResidentId(null)
     }
@@ -126,7 +232,11 @@ function App() {
 
   async function handleSaveResident(
     residentId: number | string,
-    updates: { name: string; constraint: Resident['constraint']; status: Status },
+    updates: {
+      name: string
+      constraint: Resident['constraint']
+      status: Status
+    },
   ) {
     setSavingResidentId(residentId)
 
@@ -136,14 +246,21 @@ function App() {
       await reloadDashboardData()
     } catch (error) {
       console.error('Failed to update resident:', error)
-      window.alert('Unable to save this resident. Please try again.')
+
+      window.alert(
+        'Unable to save this resident. Check your access permissions and try again.',
+      )
     } finally {
       setSavingResidentId(null)
     }
   }
 
   async function handleDeleteResident(resident: Resident) {
-    if (!window.confirm(`Delete ${resident.name} permanently?`)) {
+    if (
+      !window.confirm(
+        `Delete ${resident.name} permanently? This action cannot be undone.`,
+      )
+    ) {
       return
     }
 
@@ -152,142 +269,117 @@ function App() {
       await reloadDashboardData()
     } catch (error) {
       console.error('Failed to delete resident:', error)
-      window.alert('Unable to delete this resident. Please try again.')
+
+      window.alert(
+        'Unable to delete this resident. Check your access permissions and try again.',
+      )
     }
   }
 
-  // All dashboard data now comes from Supabase.
-  const liveResidents =
-    dashboardData.residents
-
-  const liveAlerts =
-    dashboardData.alerts
-
+  const liveResidents = dashboardData.residents
+  const liveAlerts = dashboardData.alerts
   const liveEvacuationCenters =
     dashboardData.evacuationCenters
 
   const filteredResidents = useMemo(() => {
     return liveResidents.filter((resident) => {
       return (
-        matchesSearch(
-          resident,
-          searchTerm
-        ) &&
-        matchesStatus(
-          resident.status,
-          statusFilter
-        )
+        matchesSearch(resident, searchTerm) &&
+        matchesStatus(resident.status, statusFilter)
       )
     })
-  }, [
-    liveResidents,
-    searchTerm,
-    statusFilter,
-  ])
+  }, [liveResidents, searchTerm, statusFilter])
 
   const stats = useMemo(() => {
-    const pending =
-      liveResidents.filter(
-        (resident) =>
-          resident.status === 'Pending'
-      ).length
+    const pending = liveResidents.filter(
+      (resident) => resident.status === 'Pending',
+    ).length
 
-    const verified =
-      liveResidents.filter(
-        (resident) =>
-          resident.status === 'Verified'
-      ).length
+    const verified = liveResidents.filter(
+      (resident) => resident.status === 'Verified',
+    ).length
 
-    const floodZone =
-      liveResidents.filter(
-        (resident) =>
-          resident.floodZone
-      ).length
+    const floodZone = liveResidents.filter(
+      (resident) => resident.floodZone,
+    ).length
 
     return [
       {
         label: 'Total Registered',
         value: liveResidents.length,
-        note: 'From current data',
+        note: 'Assigned sitio',
         tone: 'black',
       },
-
       {
         label: 'Pending Verification',
         value: pending,
         note: 'Needs review',
         tone: 'orange',
       },
-
       {
         label: 'Verified Residents',
         value: verified,
-        note: 'Plotted on geo map',
+        note: 'Verified profiles',
         tone: 'green',
       },
-
       {
         label: 'Flood-Prone Residents',
         value: floodZone,
-        note: 'High risk areas',
+        note: 'Residents with mapped coordinates',
         tone: 'blue',
       },
     ]
   }, [liveResidents])
 
   const constraintStats = useMemo(() => {
-    return getConstraintStats(
-      liveResidents
-    )
+    return getConstraintStats(liveResidents)
   }, [liveResidents])
 
   const activeTitle =
-    menuItems.find(
-      (item) =>
-        item.key === activeMenu
-    )?.label ?? 'Dashboard'
+    menuItems.find((item) => item.key === activeMenu)?.label ??
+    'Dashboard'
 
   if (isLoadingDatabase) {
     return (
-      <div
-        style={{
-          color: 'white',
-          padding: '40px',
-          fontSize: '20px',
-        }}
-      >
-        Loading database...
+      <div className="dashboard-message">
+        Loading Admin Dashboard...
       </div>
     )
   }
 
   if (databaseError) {
     return (
-      <div
-        style={{
-          color: 'red',
-          padding: '40px',
-          fontSize: '18px',
-        }}
-      >
-        {databaseError}
+      <div className="dashboard-error">
+        <h2>Unable to open Admin Dashboard</h2>
+        <p>{databaseError}</p>
+        <p>
+          Confirm that you are logged in with an active Admin
+          account and that your assigned sitio is configured.
+        </p>
       </div>
     )
   }
 
   return (
     <div className="app">
-
       <AppHeader />
 
       <div className="app-layout">
-
         <Sidebar
           activeMenu={activeMenu}
           onMenuChange={setActiveMenu}
         />
 
         <main className="page-content">
+          <div className="admin-sitio-banner">
+            <div>
+              <span>Admin Dashboard</span>
+              <strong>{assignedSitioName}</strong>
+            </div>
+            <span className="sitio-status">
+              Assigned Sitio
+            </span>
+          </div>
 
           <PageTitle
             title={activeTitle}
@@ -296,8 +388,7 @@ function App() {
                 stats,
                 residents: liveResidents,
                 alerts: liveAlerts,
-                evacuationCenters:
-                  liveEvacuationCenters,
+                evacuationCenters: liveEvacuationCenters,
               })
             }
           />
@@ -308,17 +399,11 @@ function App() {
               residents={filteredResidents}
               alerts={liveAlerts}
               evacuationCenters={liveEvacuationCenters}
-              constraintStats={
-                constraintStats
-              }
+              constraintStats={constraintStats}
               searchTerm={searchTerm}
               statusFilter={statusFilter}
-              onSearchChange={
-                setSearchTerm
-              }
-              onStatusFilterChange={
-                setStatusFilter
-              }
+              onSearchChange={setSearchTerm}
+              onStatusFilterChange={setStatusFilter}
             />
           )}
 
@@ -327,27 +412,13 @@ function App() {
               residents={filteredResidents}
               searchTerm={searchTerm}
               statusFilter={statusFilter}
-              onSearchChange={
-                setSearchTerm
-              }
-              onStatusFilterChange={
-                setStatusFilter
-              }
-              verifyingResidentId={
-                verifyingResidentId
-              }
-              onVerifyResident={
-                handleVerifyResident
-              }
-              onRejectResident={
-                handleRejectResident
-              }
-              onEditResident={
-                setEditingResident
-              }
-              onDeleteResident={
-                handleDeleteResident
-              }
+              onSearchChange={setSearchTerm}
+              onStatusFilterChange={setStatusFilter}
+              verifyingResidentId={verifyingResidentId}
+              onVerifyResident={handleVerifyResident}
+              onRejectResident={handleRejectResident}
+              onEditResident={setEditingResident}
+              onDeleteResident={handleDeleteResident}
             />
           )}
 
@@ -356,19 +427,14 @@ function App() {
           )}
 
           {activeMenu === 'reports' && (
-            <ReportsPage
-              stats={stats}
-            />
+            <ReportsPage stats={stats} />
           )}
 
           {activeMenu === 'evacCenters' && (
             <EvacCentersPage
-              centers={
-                liveEvacuationCenters
-              }
+              centers={liveEvacuationCenters}
             />
           )}
-
         </main>
       </div>
 
@@ -384,37 +450,22 @@ function App() {
 
 function matchesSearch(
   resident: Resident,
-  searchTerm: string
+  searchTerm: string,
 ) {
-  const search =
-    searchTerm
-      .toLowerCase()
-      .trim()
+  const search = searchTerm.toLowerCase().trim()
 
-  if (!search) {
-    return true
-  }
+  if (!search) return true
 
   return (
-    resident.name
-      .toLowerCase()
-      .includes(search) ||
-
-    resident.sitio
-      .toLowerCase()
-      .includes(search) ||
-
-    resident.constraint
-      .toLowerCase()
-      .includes(search)
+    resident.name.toLowerCase().includes(search) ||
+    resident.sitio.toLowerCase().includes(search) ||
+    resident.constraint.toLowerCase().includes(search)
   )
 }
 
 function matchesStatus(
   residentStatus: Status,
-  selectedStatus:
-    | 'All'
-    | Status
+  selectedStatus: 'All' | Status,
 ) {
   return (
     selectedStatus === 'All' ||
@@ -422,42 +473,24 @@ function matchesStatus(
   )
 }
 
-function getConstraintStats(
-  allResidents: Resident[]
-) {
-  if (
-    allResidents.length === 0
-  ) {
-    return []
-  }
+function getConstraintStats(allResidents: Resident[]) {
+  if (allResidents.length === 0) return []
 
-  const counts =
-    allResidents.reduce<
-      Record<string, number>
-    >(
-      (totals, resident) => {
-        totals[
-          resident.constraint
-        ] =
-          (totals[
-            resident.constraint
-          ] ?? 0) + 1
+  const counts = allResidents.reduce<Record<string, number>>(
+    (totals, resident) => {
+      totals[resident.constraint] =
+        (totals[resident.constraint] ?? 0) + 1
 
-        return totals
-      },
-      {}
-    )
+      return totals
+    },
+    {},
+  )
 
-  return Object.entries(
-    counts
-  ).map(([label, value]) => ({
+  return Object.entries(counts).map(([label, value]) => ({
     label,
     value,
     percent: Math.round(
-      (
-        value /
-        allResidents.length
-      ) * 100
+      (value / allResidents.length) * 100,
     ),
   }))
 }

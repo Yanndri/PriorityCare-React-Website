@@ -2202,3 +2202,49 @@ tbody tr:hover {
   .priority-row { grid-template-columns: 32px minmax(0, 1fr); }
   .priority-row .status { grid-column: 2; justify-self: start; }
 }
+.admin-sitio-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border: 1px solid #dbe4ee;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-sitio-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-sitio-banner > div > span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.admin-sitio-banner strong {
+  color: #0f172a;
+  font-size: 1.1rem;
+}
+
+.sitio-status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.dashboard-message,
+.dashboard-error {
+  padding: 32px;
+  color: #0f172a;
+}
+
+.dashboard-error {
+  color: #b91c1c;
+}
