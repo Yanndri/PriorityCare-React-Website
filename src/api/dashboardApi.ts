@@ -16,43 +16,6 @@ export type DashboardData = {
 
 type AnyRow = Record<string, any>
 
-export type ResidentUpdateInput = {
-  name: string
-  constraint: Resident['constraint']
-  status: Resident['status']
-}
-
-// Update a resident's profile.
-export async function updateResidentProfile(
-  residentId: number | string,
-  updates: ResidentUpdateInput,
-) {
-  const nameParts = updates.name.trim().split(/\s+/)
-  const firstName = nameParts[0] || updates.name.trim()
-  const lastName =
-    nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
-
-  const { error: userError } = await supabase
-    .from('users')
-    .update({
-      f_name: firstName,
-      l_name: lastName,
-      is_verified: updates.status === 'Verified',
-    })
-    .eq('uid', residentId)
-
-  if (userError) throw userError
-
-  const { error: residentError } = await supabase
-    .from('residents')
-    .update({
-      mobility_status: mapConstraintToDatabase(updates.constraint),
-    })
-    .eq('uid', residentId)
-
-  if (residentError) throw residentError
-}
-
 // Delete a resident profile and its related records.
 export async function deleteResidentProfile(
   residentId: number | string,
@@ -288,6 +251,29 @@ export async function fetchDashboardDataFromSupabase(
       ),
   )
 
+  if (residentIds.length > 0) {
+    const { data: details, error } = await supabase.from('resident_profile_details')
+      .select('resident_uid,address,landmark,is_pregnant,vulnerability_needs,household_id')
+      .in('resident_uid', residentIds)
+    // Older deployments may not yet have the new table. Other errors must surface.
+    if (error && !['PGRST205', '42P01'].includes(error.code)) throw error
+    const householdResult = await supabase.from('households')
+      .select('household_id,household_name,head_uid,household_members').eq('sitio_id', selectedSitioId)
+    if (householdResult.error && !['PGRST205', '42P01'].includes(householdResult.error.code)) throw householdResult.error
+    for (const detail of details ?? []) {
+      const resident = residents.find((item) => String(item.id) === String(detail.resident_uid))
+      if (resident) {
+        resident.address = detail.address || resident.address
+        resident.landmark = detail.landmark || 'No landmark provided'
+        resident.isPregnant = detail.is_pregnant
+        resident.vulnerabilityNeeds = detail.vulnerability_needs
+        const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
+        resident.householdName = household?.household_name
+        resident.householdMembers = household?.household_members
+      }
+    }
+  }
+
   // 5. Map evacuation centers.
   // Occupancy is based on the records fetched for this Admin's
   // residents, not all residents in the system.
@@ -513,6 +499,7 @@ function mapResident(
     ),
 
     constraint: mapConstraint(mobility),
+    mobilityStatus: mobility,
 
     status:
       Boolean(Number(isVerified)) ||
@@ -542,12 +529,12 @@ function mapResident(
         'Not specified',
     ),
 
-    birthdate: formatDate(
+    birthdate: String(
       getField(residentRow, [
         'birthdate',
         'birth_date',
         'birthday',
-      ]),
+      ]) ?? '',
     ),
 
     address: String(
@@ -1054,16 +1041,6 @@ function getField(
   }
 
   return undefined
-}
-
-function mapConstraintToDatabase(
-  value: Resident['constraint'],
-) {
-  if (value === 'Bedridden') return 'Bedridden'
-  if (value === 'Wheelchair') return 'Wheelchair'
-  if (value === 'Visual') return 'Visual'
-
-  return 'Assisted'
 }
 
 function mapConstraint(

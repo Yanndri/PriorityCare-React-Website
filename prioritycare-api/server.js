@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
 const { createClient } = require("@supabase/supabase-js");
-require("dotenv").config();
+require("dotenv").config({ path: require("node:path").join(__dirname, ".env") });
 
 const app = express();
 

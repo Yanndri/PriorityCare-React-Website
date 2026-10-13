@@ -33,6 +33,18 @@ export type Resident = {
   lastUpdated: string
   sex?: string
   birthdate?: string
+  mobilityStatus?: string
+  isPregnant?: boolean
+  householdName?: string
+  vulnerabilityNeeds?: string
+  householdMembers?: {
+    name: string
+    relationship: string
+    birthdate: string
+    sex: string
+    is_pregnant: boolean
+    needs: string
+  }[]
   address?: string
   landmark?: string
   emergencyContactName?: string

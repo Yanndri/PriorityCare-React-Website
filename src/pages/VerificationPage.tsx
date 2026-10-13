@@ -123,7 +123,10 @@ function VerificationRequestModal({
           <DetailItem label="Sitio / Area" value={resident.sitio} />
           <DetailItem label="Submitted Address" value={resident.address ?? resident.sitio} />
           <DetailItem label="Landmark" value={resident.landmark ?? 'No landmark provided'} />
-          <DetailItem label="Mobility Constraint" value={resident.constraint} />
+          <DetailItem label="Mobility" value={resident.mobilityStatus?.replaceAll('_', ' ') || resident.constraint} />
+          <DetailItem label="Pregnant" value={resident.isPregnant === undefined ? 'Not recorded' : resident.isPregnant ? 'Yes' : 'No'} />
+          <DetailItem label="Assistance Needs" value={resident.vulnerabilityNeeds || 'Not recorded'} />
+          <DetailItem label="Household" value={resident.householdName || 'Not assigned'} />
           <DetailItem label="Sex" value={resident.sex ?? 'Not specified'} />
           <DetailItem label="Birthdate" value={resident.birthdate ?? 'Not provided'} />
           <DetailItem
@@ -133,12 +136,22 @@ function VerificationRequestModal({
           <DetailItem
             label="GPS Coordinates"
             value={
-              resident.gpsLat && resident.gpsLong
+              resident.gpsLat != null && resident.gpsLong != null
                 ? `${resident.gpsLat}, ${resident.gpsLong}`
                 : 'No coordinates provided'
             }
           />
         </div>
+
+        {resident.householdMembers && resident.householdMembers.length > 0 && <section className="submitted-documents">
+          <h4>Household dependents ({resident.householdMembers.length})</h4>
+          {resident.householdMembers.map((member, index) => <p key={index}>
+            <strong>{member.name}</strong> · {member.relationship}
+            {member.birthdate && ` · Born ${member.birthdate}`}
+            {member.is_pregnant && ' · Pregnant'}
+            {member.needs && ` · ${member.needs}`}
+          </p>)}
+        </section>}
 
         <section className="submitted-documents">
           <h4>Submitted ID / Verification Documents</h4>

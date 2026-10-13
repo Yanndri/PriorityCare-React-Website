@@ -26,10 +26,10 @@ import {
   deleteResidentProfile,
   fetchDashboardDataFromSupabase,
   rejectResidentUser,
-  updateResidentProfile,
   verifyResidentUser,
   type DashboardData,
 } from './api/dashboardApi'
+import { saveResidentProfile, type ResidentProfileInput } from './api/residentProfileApi'
 
 import {
   hasSupabaseConfig,
@@ -232,24 +232,18 @@ function App() {
 
   async function handleSaveResident(
     residentId: number | string,
-    updates: {
-      name: string
-      constraint: Resident['constraint']
-      status: Status
-    },
+    updates: ResidentProfileInput,
   ) {
     setSavingResidentId(residentId)
 
     try {
-      await updateResidentProfile(residentId, updates)
+      await saveResidentProfile(residentId, updates)
       setEditingResident(null)
       await reloadDashboardData()
     } catch (error) {
       console.error('Failed to update resident:', error)
 
-      window.alert(
-        'Unable to save this resident. Check your access permissions and try again.',
-      )
+      throw error
     } finally {
       setSavingResidentId(null)
     }
