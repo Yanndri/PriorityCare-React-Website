@@ -3,8 +3,14 @@ export function AppHeader() {
   return (
     <header className="app-header">
       <div>
-        <h1>Dashboard Overview</h1>
-        <p>Thursday, Mar 26, 2026 — Brgy. San Roque</p>
+        <div className="header-eyebrow">PRIORITYCARE OPERATIONS</div>
+        <h1>Emergency response dashboard</h1>
+        <p>Cebu City · Live resident and evacuation data</p>
+      </div>
+
+      <div className="header-status">
+        <span className="live-dot" />
+        <span>Live system</span>
       </div>
 
       <div className="admin-box">

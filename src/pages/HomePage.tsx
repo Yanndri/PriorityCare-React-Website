@@ -3,11 +3,14 @@ import { AlertsPanel } from '../components/AlertsPanel'
 import { ConstraintChart } from '../components/ConstraintChart'
 import { ResidentTable } from '../components/ResidentTable'
 import { StatsGrid } from '../components/StatsGrid'
+import { OperationsOverview } from '../components/OperationsOverview'
+import type { EvacuationCenter } from '../types/dashboard'
 
 type HomePageProps = {
   stats: StatCardData[]
   residents: Resident[]
   alerts: Alert[]
+  evacuationCenters: EvacuationCenter[]
   constraintStats: ConstraintStat[]
   searchTerm: string
   statusFilter: 'All' | Status
@@ -19,6 +22,7 @@ export function HomePage({
   stats,
   residents,
   alerts,
+  evacuationCenters,
   constraintStats,
   searchTerm,
   statusFilter,
@@ -29,6 +33,12 @@ export function HomePage({
   return (
     <>
       <StatsGrid stats={stats} />
+
+      <OperationsOverview
+        residents={residents}
+        alerts={alerts}
+        centers={evacuationCenters}
+      />
 
       <section className="dashboard-grid">
         <ResidentTable

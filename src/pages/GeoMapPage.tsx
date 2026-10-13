@@ -4,10 +4,13 @@ import {
   useRef,
 } from 'react'
 
+import { hasSupabaseConfig, supabase } from '../lib/supabaseClient'
+
 import type {
   MouseEvent as ReactMouseEvent,
   TouchEvent as ReactTouchEvent,
 } from 'react'
+import type { Resident } from '../types/dashboard'
 
 import {
   MapContainer,
@@ -21,16 +24,9 @@ import * as L from 'leaflet'
 
 import 'leaflet/dist/leaflet.css'
 
-import { createClient } from '@supabase/supabase-js'
-
 // ======================================================
 // 🌍 SUPABASE
 // ======================================================
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-)
 
 // ======================================================
 // 🌦️ WEATHER API
@@ -170,11 +166,24 @@ const evacuationIcon = new L.Icon({
   iconAnchor: [15, 48],
 })
 
+const residentIcon = new L.Icon({
+  iconUrl:
+    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png',
+  shadowUrl:
+    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+})
+
 // ======================================================
 // 🗺️ COMPONENT
 // ======================================================
 
-export function GeoMapPage() {
+type GeoMapPageProps = {
+  residents?: Resident[]
+}
+
+export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
   // ====================================================
   // 🌍 MAP MODES
@@ -505,13 +514,16 @@ export function GeoMapPage() {
   // ====================================================
 
   async function fetchRequests() {
+    if (!hasSupabaseConfig) {
+      return
+    }
 
     try {
 
       const { data, error } =
         await supabase
           .from(
-            'emergency_requests',
+            'sos_alerts',
           )
           .select('*')
 
@@ -607,15 +619,18 @@ export function GeoMapPage() {
   // ====================================================
 
   useEffect(() => {
+    fetchWeather()
+
+    if (!hasSupabaseConfig) {
+      return
+    }
 
     fetchRequests()
-
-    fetchWeather()
 
     const channel =
       supabase
         .channel(
-          'emergency_requests',
+          'sos_alerts',
         )
         .on(
           'postgres_changes',
@@ -623,7 +638,7 @@ export function GeoMapPage() {
             event: '*',
             schema: 'public',
             table:
-              'emergency_requests',
+              'sos_alerts',
           },
           () => {
 
@@ -640,6 +655,17 @@ export function GeoMapPage() {
     }
 
   }, [])
+
+  const mappedResidents = residents.flatMap((resident) => {
+    const latitude = Number(resident.gpsLat)
+    const longitude = Number(resident.gpsLong)
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return []
+    }
+
+    return [{ resident, position: [latitude, longitude] as [number, number] }]
+  })
 
   // ====================================================
   // 🎨 UI
@@ -698,7 +724,6 @@ export function GeoMapPage() {
             'none',
         }}
       >
-
         <button
           onClick={() =>
             setMapMode(
@@ -1126,6 +1151,27 @@ export function GeoMapPage() {
 
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+
+          {mappedResidents.map(({ resident, position }) => (
+            <Marker
+              key={`resident-${resident.id}`}
+              position={position}
+              icon={resident.floodZone ? floodIcon : residentIcon}
+            >
+              <Popup>
+                <strong>{resident.name}</strong>
+                <br />
+                {resident.status} · {resident.constraint}
+                <br />
+                {resident.sitio}
+                <br />
+                📍 {position[0]}, {position[1]}
+                <br />
+                ☎ {resident.emergencyContactName ?? 'No emergency contact'}
+                {resident.emergencyContactNo ? ` · ${resident.emergencyContactNo}` : ''}
+              </Popup>
+            </Marker>
+          ))}
 
           {/* 🟢 EVACUATION CENTER */}
 
