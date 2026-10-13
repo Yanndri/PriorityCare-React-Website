@@ -21,6 +21,7 @@ import {
 } from 'react-leaflet'
 
 import * as L from 'leaflet'
+
 import 'leaflet/dist/leaflet.css'
 
 // ======================================================
@@ -128,8 +129,9 @@ const fireIcon = new L.Icon({
   shadowUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [30, 48],
+
+  iconAnchor: [15, 48],
 })
 
 // ======================================================
@@ -159,8 +161,9 @@ const evacuationIcon = new L.Icon({
   shadowUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [30, 48],
+
+  iconAnchor: [15, 48],
 })
 
 const residentIcon = new L.Icon({
@@ -217,7 +220,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     useState<any[]>([])
 
   // ====================================================
-  // 🖱️ DRAGGABLE FLOOD PANEL
+  // 🪟 PANEL POSITION
   // ====================================================
 
   const mapSectionRef =
@@ -232,8 +235,18 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       y: 90,
     })
 
+  // ====================================================
+  // 🖱️ DOUBLE-TAP / DOUBLE-CLICK DRAG SYSTEM
+  // ====================================================
+
   const [isDragging, setIsDragging] =
     useState(false)
+
+  const [isArmed, setIsArmed] =
+    useState(false)
+
+  const lastPointerDown =
+    useRef(0)
 
   const dragOffset =
     useRef({
@@ -241,15 +254,20 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       y: 0,
     })
 
+  const doubleTapDelay = 350
+
   // ====================================================
-  // 🖱️ START DRAGGING
+  // 🖱️ START / ARM DRAGGING
   // ====================================================
 
-  function startDragging(
+  function handlePanelPointerDown(
     event:
       | ReactMouseEvent<HTMLDivElement>
       | ReactTouchEvent<HTMLDivElement>,
   ) {
+
+    const now =
+      Date.now()
 
     const clientX =
       'touches' in event
@@ -261,6 +279,29 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
         ? event.touches[0].clientY
         : event.clientY
 
+    const isSecondTap =
+      now -
+        lastPointerDown.current <
+      doubleTapDelay
+
+    lastPointerDown.current =
+      now
+
+    // First click/tap:
+    // arm the panel but don't move it.
+    if (!isSecondTap) {
+
+      setIsArmed(false)
+
+      return
+    }
+
+    // Second click/tap:
+    // activate dragging.
+    setIsArmed(true)
+
+    setIsDragging(true)
+
     dragOffset.current = {
       x:
         clientX -
@@ -270,12 +311,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
         clientY -
         panelPosition.y,
     }
-
-    setIsDragging(true)
   }
 
   // ====================================================
-  // 🖱️ DRAGGING
+  // 🖱️ MOVE PANEL
   // ====================================================
 
   useEffect(() => {
@@ -320,7 +359,14 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     }
 
     function stopDragging() {
+
+      if (!isDragging) {
+        return
+      }
+
       setIsDragging(false)
+
+      setIsArmed(false)
     }
 
     window.addEventListener(
@@ -399,12 +445,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     const panelRect =
       panel.getBoundingClientRect()
 
-    const panelWidth =
-      panelRect.width
-
-    const panelHeight =
-      panelRect.height
-
     let newX =
       clientX -
       sectionRect.left -
@@ -419,7 +459,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       Math.max(
         10,
         sectionRect.width -
-          panelWidth -
+          panelRect.width -
           10,
       )
 
@@ -427,7 +467,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       Math.max(
         10,
         sectionRect.height -
-          panelHeight -
+          panelRect.height -
           10,
       )
 
@@ -454,7 +494,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   }
 
   // ====================================================
-  // 🔄 RESET PANEL POSITION
+  // 🔄 RESET PANEL
   // ====================================================
 
   function resetPanelPosition() {
@@ -463,10 +503,14 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       x: 18,
       y: 90,
     })
+
+    setIsDragging(false)
+
+    setIsArmed(false)
   }
 
   // ====================================================
-  // 🚨 FETCH EMERGENCY REQUESTS
+  // 🚨 FETCH REQUESTS
   // ====================================================
 
   async function fetchRequests() {
@@ -571,7 +615,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   }
 
   // ====================================================
-  // 🌍 REALTIME SUPABASE
+  // 🌍 REALTIME
   // ====================================================
 
   useEffect(() => {
@@ -676,9 +720,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           flexWrap:
             'wrap',
 
-          justifyContent:
-            'flex-start',
-
           pointerEvents:
             'none',
         }}
@@ -693,15 +734,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🗺️ Default
@@ -717,15 +749,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌊 Flood
@@ -741,15 +764,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🔥 Fire
@@ -765,15 +779,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌎 Earthquake
@@ -789,15 +794,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           style={{
             pointerEvents:
               'auto',
-
-            fontSize:
-              '12px',
-
-            padding:
-              '8px 10px',
-
-            whiteSpace:
-              'nowrap',
           }}
         >
           🌪️ Weather
@@ -813,7 +809,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
         <>
 
-          {/* 🌪️ WINDY MAP */}
+          {/* 🌪️ WINDY */}
 
           <iframe
             title="Windy Weather Map"
@@ -836,7 +832,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           />
 
           {/* ==================================================
-              🌊 DRAGGABLE LIVE FLOOD PREDICTION
+              🌊 FLOATING FLOOD PANEL
               ================================================== */}
 
           <div
@@ -885,26 +881,23 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                 'border-box',
 
               boxShadow:
-                '0 10px 30px rgba(0,0,0,0.35)',
-
-              transition:
                 isDragging
-                  ? 'none'
-                  : 'box-shadow 0.2s',
+                  ? '0 15px 40px rgba(0,0,0,0.55)'
+                  : '0 10px 30px rgba(0,0,0,0.35)',
             }}
           >
 
-            {/* ==============================================
-                🖱️ DRAG HEADER
-                ============================================== */}
+            {/* ==================================================
+                🖱️ DOUBLE CLICK + HOLD HEADER
+                ================================================== */}
 
             <div
               onMouseDown={
-                startDragging
+                handlePanelPointerDown
               }
 
               onTouchStart={
-                startDragging
+                handlePanelPointerDown
               }
 
               style={{
@@ -935,54 +928,82 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                   '12px',
 
                 padding:
-                  '8px',
+                  '10px',
 
                 borderRadius:
                   '10px',
 
                 background:
-                  'rgba(255,255,255,0.06)',
+                  isArmed
+                    ? 'rgba(59,130,246,0.22)'
+                    : 'rgba(255,255,255,0.06)',
 
                 border:
-                  '1px solid rgba(255,255,255,0.08)',
+                  isArmed
+                    ? '1px solid rgba(59,130,246,0.5)'
+                    : '1px solid rgba(255,255,255,0.08)',
+
+                transition:
+                  'background 0.15s, border 0.15s',
               }}
             >
 
-              <h2
-                style={{
-                  margin:
-                    0,
+              <div>
 
-                  fontSize:
-                    '20px',
+                <h2
+                  style={{
+                    margin:
+                      0,
 
-                  lineHeight:
-                    1.2,
-                }}
-              >
-                ⚠️ Live Flood Prediction
-              </h2>
+                    fontSize:
+                      '20px',
+
+                    lineHeight:
+                      1.2,
+                  }}
+                >
+                  ⚠️ Live Flood Prediction
+                </h2>
+
+                <span
+                  style={{
+                    display:
+                      'block',
+
+                    marginTop:
+                      '5px',
+
+                    fontSize:
+                      '11px',
+
+                    opacity:
+                      0.6,
+                  }}
+                >
+                  {isDragging
+                    ? '↔️ Moving...'
+                    : 'Double-click + hold to move'}
+                </span>
+
+              </div>
 
               <span
                 style={{
                   fontSize:
-                    '11px',
+                    '20px',
 
                   opacity:
-                    0.65,
-
-                  whiteSpace:
-                    'nowrap',
+                    0.55,
                 }}
               >
-                ⠿ Drag
+                ⠿
               </span>
 
             </div>
 
-            {/* ==============================================
-                🌧️ WEATHER INFORMATION
-                ============================================== */}
+            {/* ==================================================
+                🌧️ WEATHER
+                ================================================== */}
 
             <p>
               🌧️ Rainfall Level:{' '}
@@ -1015,22 +1036,13 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               📍 Possible Affected Areas
             </h3>
 
-            {/* 🌊 NO FLOOD RISK */}
-
             {affectedAreas.length === 0 && (
 
-              <p
-                style={{
-                  marginBottom:
-                    '10px',
-                }}
-              >
+              <p>
                 No flood risk detected.
               </p>
 
             )}
-
-            {/* 🌊 FLOOD RISK AREAS */}
 
             {affectedAreas.map(
               (area) => (
@@ -1074,9 +1086,9 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               ),
             )}
 
-            {/* ==============================================
-                🔄 RESET POSITION
-                ============================================== */}
+            {/* ==================================================
+                🔄 RESET
+                ================================================== */}
 
             <button
               onClick={
@@ -1084,17 +1096,17 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               }
 
               style={{
-                marginTop:
-                  '8px',
-
                 width:
                   '100%',
 
-                fontSize:
-                  '12px',
+                marginTop:
+                  '8px',
 
                 padding:
                   '9px 12px',
+
+                fontSize:
+                  '12px',
               }}
             >
               ↩️ Reset Panel Position
@@ -1107,7 +1119,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       ) : (
 
         /* ==================================================
-           🗺️ NORMAL LEAFLET MAP
+           🗺️ LEAFLET MAP
            ================================================== */
 
         <MapContainer
@@ -1219,7 +1231,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
             ),
           )}
 
-          {/* 🚨 REALTIME REQUESTS */}
+          {/* 🚨 EMERGENCY REQUESTS */}
 
           {requests.map(
             (request) => {
@@ -1320,7 +1332,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       )}
 
       {/* ==================================================
-          ✨ BUTTON STYLES
+          ✨ BUTTON STYLE
           ================================================== */}
 
       <style>
