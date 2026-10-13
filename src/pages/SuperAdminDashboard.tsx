@@ -51,8 +51,12 @@ export function SuperAdminDashboard() {
         }
 
         // Ask the backend to verify the Super Admin and load data.
+        const apiBaseUrl =
+          import.meta.env.VITE_API_BASE_URL ||
+          'http://localhost:3000'
+
         const response = await fetch(
-          'http://localhost:3000/api/super-admin/dashboard',
+          `${apiBaseUrl}/api/super-admin/dashboard`,
           {
             method: 'GET',
             headers: {
