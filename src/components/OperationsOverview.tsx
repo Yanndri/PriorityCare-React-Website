@@ -1,4 +1,5 @@
 import type { Alert, EvacuationCenter, Resident } from '../types/dashboard'
+import { VpiPanel } from './VpiPanel'
 
 type OperationsOverviewProps = {
   residents: Resident[]
@@ -7,16 +8,13 @@ type OperationsOverviewProps = {
 }
 
 export function OperationsOverview({ residents, alerts, centers }: OperationsOverviewProps) {
-  const atRiskResidents = residents.filter((resident) => resident.floodZone)
   const criticalAlerts = alerts.filter((alert) => alert.priority === 'high').length
-  const totalCapacity = centers.reduce((sum, center) => sum + center.capacity, 0)
-  const occupiedCapacity = centers.reduce((sum, center) => sum + center.occupied, 0)
-  const availableSlots = Math.max(0, totalCapacity - occupiedCapacity)
-  const fullCenters = centers.filter((center) => center.capacity > 0 && center.occupied >= center.capacity).length
-
-  const priorityResidents = [...atRiskResidents]
-    .sort((a, b) => vulnerabilityScore(b) - vulnerabilityScore(a))
-    .slice(0, 3)
+  const knownCenters = centers.filter((center) => center.capacityConfirmed && center.occupancyKnown)
+  const unknownCenters = centers.length - knownCenters.length
+  const totalCapacity = knownCenters.reduce((sum, center) => sum + center.capacity, 0)
+  const occupiedCapacity = knownCenters.reduce((sum, center) => sum + center.occupied, 0)
+  const availableSlots = knownCenters.reduce((sum, center) => sum + Math.max(0, center.capacity - center.occupied), 0)
+  const fullCenters = knownCenters.filter((center) => center.occupied >= center.capacity).length
 
   return (
     <section className="operations-overview">
@@ -33,39 +31,14 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
       </div>
 
       <div className="operations-metrics">
-        <Metric label="Priority residents" value={atRiskResidents.length} detail="Flood-risk profiles" tone="danger" />
+        <Metric label="Resident profiles" value={residents.length} detail="Available for assessment" tone="info" />
         <Metric label="Critical alerts" value={criticalAlerts} detail="Requires responder review" tone="warning" />
-        <Metric label="Available shelter slots" value={availableSlots} detail={`${fullCenters} center(s) at capacity`} tone="success" />
+        <Metric label="Known shelter slots" value={availableSlots} detail={`${fullCenters} full · ${unknownCenters} awaiting capacity/count`} tone="success" />
         <Metric label="Registered centers" value={centers.length} detail="Ready for assignment" tone="info" />
       </div>
 
       <div className="operations-grid">
-        <section className="panel priority-queue">
-          <div className="section-header">
-            <div>
-              <span className="panel-kicker">VULNERABILITY PRIORITY INDEX</span>
-              <h3>Residents needing attention</h3>
-            </div>
-            <span>{atRiskResidents.length} flagged</span>
-          </div>
-
-          {priorityResidents.length === 0 ? (
-            <p className="empty-state">No flood-risk residents are currently flagged.</p>
-          ) : (
-            <div className="priority-list">
-              {priorityResidents.map((resident) => (
-                <article className="priority-row" key={resident.id}>
-                  <span className="priority-marker">{vulnerabilityScore(resident)}</span>
-                  <div>
-                    <strong>{resident.name}</strong>
-                    <span>{resident.sitio} · {resident.constraint}</span>
-                  </div>
-                  <span className={`status ${resident.status.toLowerCase()}`}>{resident.status}</span>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        <VpiPanel residents={residents} />
 
         <section className="panel shelter-readiness">
           <div className="section-header">
@@ -82,6 +55,7 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
             <strong>{occupiedCapacity} occupied</strong>
             <span>{totalCapacity} total capacity</span>
           </div>
+          {unknownCenters > 0 && <p>{unknownCenters} center(s) excluded until their capacity and facility-wide count are available.</p>}
           <p className="readiness-note">
             When a center reaches capacity, responders should assign the next available center and
             record the transfer for all teams to see.
@@ -90,17 +64,6 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
       </div>
     </section>
   )
-}
-
-function vulnerabilityScore(resident: Resident) {
-  const constraintPoints: Record<Resident['constraint'], number> = {
-    Bedridden: 4,
-    Wheelchair: 3,
-    Visual: 2,
-    'Walk Assist': 1,
-  }
-
-  return 5 + constraintPoints[resident.constraint] + (resident.status === 'Pending' ? 2 : 0)
 }
 
 type MetricProps = {

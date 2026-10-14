@@ -426,6 +426,7 @@ function App() {
 
           {activeMenu === 'evacCenters' && (
             <EvacCentersPage
+              onReload={reloadDashboardData}
               centers={liveEvacuationCenters}
             />
           )}

@@ -252,6 +252,17 @@ export async function fetchDashboardDataFromSupabase(
   )
 
   if (residentIds.length > 0) {
+    const { data: disabilityRows, error: disabilityError } = await supabase
+      .from('resident_disabilities').select('resident_uid,disability_id').in('resident_uid', residentIds)
+    if (disabilityError) throw disabilityError
+    const counts = new Map<string, Set<number>>()
+    for (const row of disabilityRows ?? []) {
+      const key = String(row.resident_uid)
+      const ids = counts.get(key) ?? new Set<number>()
+      ids.add(row.disability_id)
+      counts.set(key, ids)
+    }
+    for (const resident of residents) resident.disabilityCount = counts.get(String(resident.id))?.size
     const { data: details, error } = await supabase.from('resident_profile_details')
       .select('resident_uid,address,landmark,is_pregnant,vulnerability_needs,household_id')
       .in('resident_uid', residentIds)
@@ -266,6 +277,7 @@ export async function fetchDashboardDataFromSupabase(
         resident.address = detail.address || resident.address
         resident.landmark = detail.landmark || 'No landmark provided'
         resident.isPregnant = detail.is_pregnant
+        resident.disabilityCount ??= 0 // A saved assessment with no selected categories.
         resident.vulnerabilityNeeds = detail.vulnerability_needs
         const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
         resident.householdName = household?.household_name
@@ -288,6 +300,18 @@ export async function fetchDashboardDataFromSupabase(
         index,
       ),
   )
+
+  const { data: facilityCatalog, error: facilityCatalogError } = await supabase.rpc('get_evacuation_facility_catalog')
+  if (facilityCatalogError && facilityCatalogError.code !== 'PGRST202') throw facilityCatalogError
+  for (const entry of (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number }[]) {
+    const center = evacuationCenters.find((item) => String(item.id) === String(entry.center_id))
+    if (center) {
+      center.capacity = entry.capacity ?? 0
+      center.capacityConfirmed = entry.capacity !== null
+      center.occupied = entry.occupied
+      center.occupancyKnown = true
+    }
+  }
 
   // 6. Map evacuation history.
   const evacuationHistory = recordRows.map(
@@ -825,10 +849,15 @@ function mapEvacuationCenter(
       getField(centerRow, [
         'capacity',
         'max_capacity',
-      ]) ?? 100,
+      ]) ?? 0,
     ),
 
     occupied: assignedResidents.length,
+    capacityConfirmed: Number(centerRow.capacity) > 0,
+    occupancyKnown: false,
+    facilityType: centerRow.center_type,
+    gpsLat: Number(centerRow.gps_lat),
+    gpsLong: Number(centerRow.gps_long),
 
     status: String(
       getField(centerRow, [

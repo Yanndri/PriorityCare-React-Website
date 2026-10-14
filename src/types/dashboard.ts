@@ -34,6 +34,7 @@ export type Resident = {
   sex?: string
   birthdate?: string
   mobilityStatus?: string
+  disabilityCount?: number
   isPregnant?: boolean
   householdName?: string
   vulnerabilityNeeds?: string
@@ -70,6 +71,11 @@ export type EvacuationCenterResident = {
 }
 
 export type EvacuationCenter = {
+  capacityConfirmed?: boolean
+  occupancyKnown?: boolean
+  facilityType?: string
+  gpsLat?: number
+  gpsLong?: number
   id?: number | string
   name: string
   capacity: number
