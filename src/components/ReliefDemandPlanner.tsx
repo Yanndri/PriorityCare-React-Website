@@ -15,7 +15,7 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
   const [message, setMessage] = useState('')
   const rates: ReliefRates = { ffpPerHousehold: count(rateInputs.ffpPerHousehold), waterPerPerson: count(rateInputs.waterPerPerson), kitsPerHousehold: count(rateInputs.kitsPerHousehold) }
   const rateError = validateReliefRates(rates)
-  const rows = centers.map((center) => {
+  const rows = centers.filter((center) => center.status.toLowerCase() !== 'closed').map((center) => {
     const key = String(center.id ?? center.name)
     const draft = drafts[key] ?? emptyDraft
     const manualPeople = draft.people.trim() !== ''
@@ -77,7 +77,7 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
     </div>
     <p>People may start from the current recorded facility occupancy. Household counts must be confirmed at the desk; resident accounts are not automatically treated as separate households. For another date, enter the population for that date.</p>
     {rateError && <p className="vpi-missing">Enter all three rates to calculate demand. No official rate is assumed.</p>}
-    {rows.length === 0 && <p>No registered facilities available.</p>}
+    {rows.length === 0 && <p>No active facilities available. Closed centers are excluded from daily planning.</p>}
     {rows.map((row) => <details className="relief-facility" key={row.key} open>
       <summary><strong>{row.center.name}</strong> · {excluded[row.key] ? 'Excluded' : row.demand ? 'Calculated' : 'Needs input'}</summary>
       <label className="resident-check"><input type="checkbox" checked={!excluded[row.key]} onChange={(e) => setExcluded({ ...excluded, [row.key]: !e.target.checked })} /><span>Include in this day’s draft</span></label>

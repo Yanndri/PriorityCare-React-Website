@@ -71,6 +71,8 @@ export type EvacuationCenterResident = {
 }
 
 export type EvacuationCenter = {
+  closedAt?: string | null
+  closureReason?: string | null
   capacityConfirmed?: boolean
   occupancyKnown?: boolean
   facilityType?: string

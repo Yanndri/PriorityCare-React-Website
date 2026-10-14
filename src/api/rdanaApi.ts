@@ -1,0 +1,49 @@
+import { supabase } from '../lib/supabaseClient'
+import { makeReportWindow, readReportPages, type RdanaData, type ReportSection, type ResidentReportRow, type SosReportRow, type EvacReportRow, type ProfileReportRow, type ShelterReportRow } from '../utils/rdana'
+
+async function optional<T>(read: () => Promise<T>, reason: string): Promise<ReportSection<T>> {
+  try { return { available: true, data: await read() } }
+  catch { return { available: false, reason } }
+}
+async function byResidentChunks<T>(ids: string[], read: (ids: string[], from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  const rows: T[] = []
+  for (let index = 0; index < ids.length; index += 100) {
+    const chunk = ids.slice(index, index + 100)
+    rows.push(...await readReportPages((from, to) => read(chunk, from, to)))
+  }
+  return rows
+}
+export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
+  const window = makeReportWindow(hours)
+  const { data: auth, error: authError } = await supabase.auth.getUser()
+  if (authError || !auth.user) throw new Error('Sign in again before generating a report.')
+  const { data: actor, error: actorError } = await supabase.from('users')
+    .select('role,account_status,assigned_sitio_id').eq('uid', auth.user.id).single()
+  if (actorError || !actor || actor.account_status !== 'active' || !['admin','super_admin'].includes(actor.role)) throw new Error('Active administrator access is required.')
+  if (actor.assigned_sitio_id == null) throw new Error('A sitio assignment is required for this scoped report.')
+  const { data: sitio, error: sitioError } = await supabase.from('sitios').select('sitio_name').eq('sitio_id', actor.assigned_sitio_id).single()
+  if (sitioError || !sitio) throw new Error('Unable to verify the report’s sitio scope.')
+  const residents = await readReportPages<ResidentReportRow>((from, to) => supabase.from('residents')
+    .select('uid,birthdate,mobility_status').eq('sitio_id', actor.assigned_sitio_id).order('uid').range(from, to))
+  const ids = residents.map((resident) => resident.uid)
+  const columns = 'record_id,resident_uid,evac_status,logged_at,evacuated_at'
+  const [sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters] = await Promise.all([
+    optional(() => byResidentChunks<SosReportRow>(ids, (chunk, from, to) => supabase.from('sos_alerts')
+      .select('alert_id,resident_uid,status,created_at').in('resident_uid', chunk)
+      .gte('created_at', window.start).lt('created_at', window.end).order('created_at').order('alert_id').range(from, to)), 'SOS data could not be retrieved completely.'),
+    optional(() => byResidentChunks<EvacReportRow>(ids, (chunk, from, to) => supabase.from('evacuation_records').select(columns)
+      .in('resident_uid', chunk).gte('logged_at', window.start).lt('logged_at', window.end).order('logged_at').order('record_id').range(from, to)), 'Evacuation logging data could not be retrieved completely.'),
+    optional(() => byResidentChunks<EvacReportRow>(ids, (chunk, from, to) => supabase.from('evacuation_records').select(columns)
+      .in('resident_uid', chunk).gte('evacuated_at', window.start).lt('evacuated_at', window.end).order('evacuated_at').order('record_id').range(from, to)), 'Timestamped evacuation-completion data could not be retrieved completely.'),
+    optional(() => byResidentChunks<ProfileReportRow>(ids, (chunk, from, to) => supabase.from('resident_profile_details')
+      .select('resident_uid,is_pregnant,household_id,vulnerability_needs').in('resident_uid', chunk).order('resident_uid').range(from, to)), 'Supplemental resident assessments could not be retrieved completely.'),
+    optional(async () => (await byResidentChunks<{ resident_uid: string }>(ids, (chunk, from, to) => supabase.from('resident_disabilities')
+      .select('resident_uid,disability_id').in('resident_uid', chunk).order('resident_uid').order('disability_id').range(from, to))).map((row) => row.resident_uid), 'Disability records could not be retrieved completely.'),
+    optional(async () => {
+      const { data, error } = await supabase.rpc('get_evacuation_facility_catalog')
+      if (error || !Array.isArray(data)) throw new Error('Shelter catalog unavailable.')
+      return data as ShelterReportRow[]
+    }, 'Shared shelter catalog is unavailable; verify the facility migrations and permissions.'),
+  ])
+  return { window, scope: `${sitio.sitio_name} (sitio ${actor.assigned_sitio_id})`, fetchedAt: new Date().toISOString(), residents, sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters }
+}

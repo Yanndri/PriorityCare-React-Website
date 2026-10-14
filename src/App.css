@@ -1154,6 +1154,10 @@ td {
 .vpi-missing { color: #854d0e; }
 @media (max-width: 560px) { .vpi-resident summary { align-items: flex-start; flex-direction: column; } }
 
+.rdana-panel { margin-bottom: 20px; }
+.rdana-panel .resident-notes { margin: 14px 0; }
+.rdana-panel .resident-check { margin: 16px 0; }
+.rdana-panel textarea.rdana-preview { min-height: 560px; resize: vertical; font-family: ui-monospace, Consolas, monospace; line-height: 1.6; }
 .relief-planner { margin-top: 28px; padding-top: 20px; border-top: 2px solid #d8d4cc; }
 .relief-facility { padding: 16px 0; border-bottom: 1px solid #d8d4cc; }
 .relief-facility summary { cursor: pointer; margin-bottom: 12px; }

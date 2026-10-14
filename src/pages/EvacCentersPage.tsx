@@ -3,6 +3,7 @@ import Select from 'react-select'
 import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
 import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
+import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
 
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
@@ -12,6 +13,8 @@ type EvacCentersPageProps = {
 export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [form, setForm] = useState<{ center: EvacuationCenter | null } | null>(null)
+  const [statusCenter, setStatusCenter] = useState<EvacuationCenter | null>(null)
+  const [showClosed, setShowClosed] = useState(false)
 
   const searchOptions = useMemo(() => {
     const centerOptions = centers.map((center) => ({
@@ -33,7 +36,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
     if (!normalizedSearch) {
-      return centers
+      return centers.filter((center) => showClosed || center.status.toLowerCase() !== 'closed')
     }
 
     return centers.filter((center) => {
@@ -48,9 +51,9 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
         )
       })
 
-      return matchesCenter || matchesStatus || matchesResident
+      return (showClosed || center.status.toLowerCase() !== 'closed') && (matchesCenter || matchesStatus || matchesResident)
     })
-  }, [centers, searchTerm])
+  }, [centers, searchTerm, showClosed])
 
   return (
     <section className="panel evac-centers-panel">
@@ -77,6 +80,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
       </div>
 
       <div className="evac-center-list">
+        <label className="resident-check"><input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /><span>Include closed centers ({centers.filter((center) => center.status.toLowerCase() === 'closed').length})</span></label>
         <p>Occupancy uses each resident’s latest record marked safely evacuated. Resident names below are limited to your sitio.</p>
         {filteredCenters.length === 0 ? (
           <p className="empty-documents">No evacuation centers or assigned residents found.</p>
@@ -97,10 +101,12 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
                 </div>}
 
                 <p>{center.capacityConfirmed ? `Maximum safe capacity: ${center.capacity} people` : 'Capacity not set'}</p>
-                <p>{center.occupancyKnown ? `${center.occupied} recorded evacuees · ${center.capacityConfirmed ? `${Math.max(0, center.capacity - center.occupied)} slots remaining` : 'available slots unknown'}` : 'Facility-wide occupancy not available'}</p>
+                <p>{center.status.toLowerCase() === 'closed' ? 'Closed — unavailable for new admissions' : center.occupancyKnown ? `${center.occupied} recorded evacuees · ${center.capacityConfirmed ? `${Math.max(0, center.capacity - center.occupied)} slots remaining` : 'available slots unknown'}` : 'Facility-wide occupancy not available'}</p>
                 {center.capacityConfirmed && center.occupancyKnown && center.occupied >= center.capacity && <p role="status">{center.occupied > center.capacity ? 'Over recorded capacity' : 'At capacity'}</p>}
                 {center.facilityType && <p>Type: {center.facilityType.replaceAll('_', ' ')} · GPS: {center.gpsLat}, {center.gpsLong}</p>}
                 <button type="button" className="secondary-button" onClick={() => setForm({ center })}>Set Safe Capacity</button>
+                <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{center.status.toLowerCase() === 'closed' ? 'Reopen Center' : 'Close Center'}</button>
+                {center.closedAt && <p>Closed: {new Date(center.closedAt).toLocaleString()} · {center.closureReason}</p>}
 
                 <section className="assigned-residents">
                   <div className="assigned-residents-header">
@@ -141,6 +147,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
       </div>
       <ReliefDemandPlanner centers={centers} />
       {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} onClose={() => setForm(null)} onSaved={onReload} />}
+      {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
     </section>
   )
 }
