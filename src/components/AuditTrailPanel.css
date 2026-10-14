@@ -1,0 +1,14 @@
+.audit-panel p { line-height: 1.55; }
+.audit-range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin: 10px 0; }
+.audit-range label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.audit-range input, .audit-range select { padding: 9px 11px; border: 1px solid #c5cfdb; border-radius: 8px; font: inherit; color: #183153; background: #fff; }
+.audit-search { flex: 1 1 240px; }
+.audit-search input { width: 100%; box-sizing: border-box; }
+.audit-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.audit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #d8d4cc; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; }
+.audit-chip input { margin: 0; }
+.audit-meta { color: #64748b; font-size: 13px; }
+.audit-table { font-size: 13px; }
+.audit-table td { vertical-align: top; }
+.audit-table td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.audit-table td:last-child { min-width: 260px; }

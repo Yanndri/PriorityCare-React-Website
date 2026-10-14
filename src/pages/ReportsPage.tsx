@@ -1,6 +1,7 @@
 import type { StatCardData } from '../types/dashboard'
 import { RdanaSummaryPanel } from '../components/RdanaSummaryPanel'
 import { DromicExportPanel } from '../components/DromicExportPanel'
+import { AuditTrailPanel } from '../components/AuditTrailPanel'
 
 type ReportsPageProps = {
   stats: StatCardData[]
@@ -12,6 +13,7 @@ export function ReportsPage({ stats }: ReportsPageProps) {
     <>
     <DromicExportPanel />
     <RdanaSummaryPanel />
+    <AuditTrailPanel />
     <section className="panel reports-grid">
       {stats.map((stat) => (
         <article className="report-card" key={stat.label}>

@@ -24,6 +24,7 @@ import * as L from 'leaflet'
 
 import 'leaflet/dist/leaflet.css'
 import { DisasterEventMarkers } from '../components/DisasterEventMarkers'
+import { SpatialHeatmapLayer } from '../components/SpatialHeatmapLayer'
 
 // ======================================================
 // 🌍 SUPABASE
@@ -193,9 +194,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   const [mapMode, setMapMode] =
     useState<
       | 'default'
-      | 'flood'
-      | 'fire'
-      | 'earthquake'
       | 'weather'
     >('default')
 
@@ -743,51 +741,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
         <button
           onClick={() =>
             setMapMode(
-              'flood',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🌊 Flood
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
-              'fire',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🔥 Fire
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
-              'earthquake',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🌎 Earthquake
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
               'weather',
             )
           }
@@ -1146,6 +1099,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
         >
 
           <DisasterEventMarkers />
+          <SpatialHeatmapLayer residents={residents} />
           {/* 🗺️ OPENSTREETMAP */}
 
           <TileLayer

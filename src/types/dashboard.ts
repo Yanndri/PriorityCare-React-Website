@@ -6,6 +6,7 @@ export type MenuKey =
   | 'verification'
   | 'geoMap'
   | 'disasterEvents'
+  | 'rescueReconciliation'
   | 'reports'
   | 'dataMining'
   | 'evacCenters'

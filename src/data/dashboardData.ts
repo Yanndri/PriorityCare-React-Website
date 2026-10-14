@@ -7,6 +7,7 @@ export const menuItems: MenuItem[] = [
   { key: 'verification', label: 'Verification' },
   { key: 'geoMap', label: 'Geo Map' },
   { key: 'disasterEvents', label: 'Disaster Events' },
+  { key: 'rescueReconciliation', label: 'Missing Persons' },
   { key: 'reports', label: 'Reports' },
   { key: 'dataMining', label: 'Data Mining' },
   { key: 'evacCenters', label: 'Evac Centers' },

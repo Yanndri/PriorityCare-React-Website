@@ -17,6 +17,7 @@ import { HomePage } from './pages/HomePage'
 import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
 import { DisasterEventsPage } from './pages/DisasterEventsPage'
+import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { EditResidentModal } from './components/EditResidentModal'
@@ -422,6 +423,8 @@ function App() {
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
+
+          {activeMenu === 'rescueReconciliation' && <RescueReconciliationPage />}
 
           {activeMenu === 'reports' && (
             <ReportsPage stats={stats} />
