@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 type AdminAccount = {
@@ -17,9 +17,33 @@ type Sitio = {
 }
 
 type DashboardResponse = {
-  admins?: AdminAccount[]
-  sitios?: Sitio[]
+  admins?: unknown
+  sitios?: unknown
   message?: string
+}
+
+function isAdminAccount(value: unknown): value is AdminAccount {
+  if (!value || typeof value !== 'object') return false
+
+  const admin = value as Record<string, unknown>
+
+  return (
+    typeof admin.uid === 'string' &&
+    typeof admin.email === 'string' &&
+    (admin.account_status === 'active' ||
+      admin.account_status === 'suspended')
+  )
+}
+
+function isSitio(value: unknown): value is Sitio {
+  if (!value || typeof value !== 'object') return false
+
+  const sitio = value as Record<string, unknown>
+
+  return (
+    typeof sitio.sitio_id === 'number' &&
+    typeof sitio.sitio_name === 'string'
+  )
 }
 
 export function SuperAdminDashboard() {
@@ -28,80 +52,95 @@ export function SuperAdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    setError('')
 
-    async function loadDashboard() {
-      setLoading(true)
-      setError('')
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession()
+
+      if (sessionError) throw sessionError
+
+      if (!session?.access_token) {
+        throw new Error(
+          'Your session has expired. Please sign in again.',
+        )
+      }
+
+      const apiBaseUrl = (
+        import.meta.env.VITE_API_BASE_URL ||
+        'http://localhost:3000'
+      ).replace(/\/+$/, '')
+
+      const response = await fetch(
+        `${apiBaseUrl}/api/super-admin/dashboard`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            Accept: 'application/json',
+          },
+        },
+      )
+
+      const responseText = await response.text()
+      let result: DashboardResponse
 
       try {
-        // Get the current authenticated Supabase session.
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
+        result = JSON.parse(responseText) as DashboardResponse
+      } catch {
+        throw new Error(
+          `The server returned an invalid response (HTTP ${response.status}). Check the backend.`,
+        )
+      }
 
-        if (sessionError) throw sessionError
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            `Unable to load dashboard (HTTP ${response.status}).`,
+        )
+      }
 
-        if (!session?.access_token) {
-          throw new Error(
-            'Your session has expired. Please sign in again.',
-          )
-        }
-
-        // Ask the backend to verify the Super Admin and load data.
-        const apiBaseUrl =
-          import.meta.env.VITE_API_BASE_URL ||
-          'http://localhost:3000'
-
-        const response = await fetch(
-          `${apiBaseUrl}/api/super-admin/dashboard`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              Accept: 'application/json',
-            },
-          },
+      if (
+        !Array.isArray(result.admins) ||
+        !Array.isArray(result.sitios)
+      ) {
+        console.error(
+          'Unexpected dashboard API response structure:',
+          result,
         )
 
-        const result =
-          (await response.json()) as DashboardResponse
-
-        if (!response.ok) {
-          throw new Error(
-            result.message || 'Unable to load dashboard data.',
-          )
-        }
-
-        if (!cancelled) {
-          setAdmins(result.admins ?? [])
-          setSitios(result.sitios ?? [])
-        }
-      } catch (err) {
-        console.error('Dashboard load failed:', err)
-
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Unable to load dashboard data.',
-          )
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        throw new Error(
+          'The dashboard API did not return valid admins and sitios arrays. Check the backend response.',
+        )
       }
-    }
 
-    void loadDashboard()
+      const validAdmins = result.admins.filter(isAdminAccount)
+      const validSitios = result.sitios.filter(isSitio)
 
-    return () => {
-      cancelled = true
+      setAdmins(validAdmins)
+      setSitios(validSitios)
+    } catch (err) {
+      console.error('Dashboard load failed:', err)
+      setAdmins([])
+      setSitios([])
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load dashboard data.',
+      )
+    } finally {
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadDashboard()
+  }, [loadDashboard])
 
   const activeAdmins = admins.filter(
     (admin) => admin.account_status === 'active',
@@ -134,14 +173,12 @@ export function SuperAdminDashboard() {
       {error && (
         <section role="alert" className="dashboard-error">
           <p>{error}</p>
-
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => void loadDashboard()}
           >
             Retry
           </button>
-
           {error.toLowerCase().includes('session') && (
             <p>
               Please sign in again using your Super Admin account.
@@ -202,7 +239,11 @@ export function SuperAdminDashboard() {
                       admin.f_name,
                       admin.l_name,
                     ]
-                      .filter(Boolean)
+                      .filter(
+                        (part): part is string =>
+                          typeof part === 'string' &&
+                          part.trim().length > 0,
+                      )
                       .join(' ')
 
                     return (
@@ -232,6 +273,45 @@ export function SuperAdminDashboard() {
                       <td colSpan={4}>
                         No Admin accounts found.
                       </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <h2>Sitio Overview</h2>
+            <p>Registered Sitios returned by the backend.</p>
+
+            <div className="super-admin-table-wrap">
+              <table className="super-admin-table">
+                <thead>
+                  <tr>
+                    <th>Sitio ID</th>
+                    <th>Sitio Name</th>
+                    <th>Assigned Admins</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {sitios.map((sitio) => (
+                    <tr key={sitio.sitio_id}>
+                      <td>{sitio.sitio_id}</td>
+                      <td>{sitio.sitio_name}</td>
+                      <td>
+                        {
+                          admins.filter(
+                            (admin) =>
+                              admin.assigned_sitio_id ===
+                              sitio.sitio_id,
+                          ).length
+                        }
+                      </td>
+                    </tr>
+                  ))}
+
+                  {sitios.length === 0 && (
+                    <tr>
+                      <td colSpan={3}>No Sitios found.</td>
                     </tr>
                   )}
                 </tbody>
