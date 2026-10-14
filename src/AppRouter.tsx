@@ -12,17 +12,12 @@ import App from './App'
 
 export default function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         {/* Default page */}
         <Route
           path="/"
-          element={
-            <Navigate
-              to="/admin/login"
-              replace
-            />
-          }
+          element={<Navigate to="/admin/login" replace />}
         />
 
         {/* Admin login */}
@@ -37,7 +32,7 @@ export default function AppRouter() {
           element={<LoginPage role="super_admin" />}
         />
 
-        {/* Admin dashboard */}
+        {/* Existing Admin dashboard */}
         <Route
           path="/admin"
           element={<App />}
@@ -52,12 +47,7 @@ export default function AppRouter() {
         {/* Unknown URL */}
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/admin/login"
-              replace
-            />
-          }
+          element={<Navigate to="/admin/login" replace />}
         />
       </Routes>
     </BrowserRouter>
