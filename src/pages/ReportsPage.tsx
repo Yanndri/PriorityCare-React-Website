@@ -1,5 +1,6 @@
 import type { StatCardData } from '../types/dashboard'
 import { RdanaSummaryPanel } from '../components/RdanaSummaryPanel'
+import { DromicExportPanel } from '../components/DromicExportPanel'
 
 type ReportsPageProps = {
   stats: StatCardData[]
@@ -9,6 +10,7 @@ export function ReportsPage({ stats }: ReportsPageProps) {
   // Uses the same stat data as the dashboard, but in a report-card layout.
   return (
     <>
+    <DromicExportPanel />
     <RdanaSummaryPanel />
     <section className="panel reports-grid">
       {stats.map((stat) => (

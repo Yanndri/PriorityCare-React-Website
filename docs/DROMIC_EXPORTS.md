@@ -1,0 +1,15 @@
+# DROMIC-style population and relief exports
+
+Reports → DROMIC-style PDF / Excel Reports → choose 24 or 48 hours → Prepare Export Preview → review the tables and acknowledge → Download PDF or Download Excel.
+
+Both files remain prototype drafts. No official DSWD-DROMIC form/template was supplied, so these are not certified standard-form submissions. The report uses a Summary, Population, Shelters, and Relief layout. Missing affected-family/population, damage, casualty, actual-distribution, and assistance-cost fields are explicitly Not assessed or Not recorded. No database migration or AI key is required.
+
+Population is the current assigned-sitio registered-account snapshot, not total affected people. Household linkages are deduplicated and dependents without accounts are not silently counted. Shelter records are current facility-wide figures across all sitios. Period activity uses timestamped records within the chosen rolling window. Scope, retrieval time, and these distinctions travel with the exports.
+
+To attach relief demand: open Evacuation Centers → Relief requisition demand, finish its rates/counts/stock, then Save Draft for Reports. A validated aggregate copy is stored in sessionStorage in the same browser tab; it is not a shared/permanent database record. Return to Reports and include it when preparing the preview. The attached planning date, chosen facilities, and rates are independent of the period-activity scope. Its quantities are estimated requests after dedicated usable stock, never actual distributions. Without a saved draft, exports show Not available instead of zero.
+
+Excel contains typed numbers, actual date values displayed as UTC, headers, freeze panes, and print settings. Relief input rates and stocks remain visible in a calculation schedule; ROUNDUP/MAX/SUM formulas link into its request summary. Formula results are cached for readers and recalculation is enabled. Literal facility names remain string cells, including names beginning with '='. The relief schedule uses legal landscape printing so its columns remain readable. PDF uses embedded open-license Noto Sans and repeated table headings/page numbers.
+
+Browser-side exporters are dynamically imported only when downloading. They do not submit reports or modify inventory or resident records. Export libraries are ExcelJS, jsPDF, and jsPDF-AutoTable. Noto Sans is bundled with its license in src/assets/fonts; font source: https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans.
+
+Validation: production build and targeted lint; existing RDANA/relief unit tests; tests/dromic-export.mjs generates synthetic samples, reopens the XLSX, checks cached formulas/totals, dates, literal text safety and missing-data behavior, and exercises the PDF builder. Samples are rendered with Poppler and the bundled spreadsheet renderer for visual QA. The spreadsheet formula engine is also checked by changing an input and restoring it; native Microsoft Excel has not been automated for verification.

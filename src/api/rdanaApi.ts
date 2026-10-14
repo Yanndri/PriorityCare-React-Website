@@ -24,7 +24,7 @@ export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
   const { data: sitio, error: sitioError } = await supabase.from('sitios').select('sitio_name').eq('sitio_id', actor.assigned_sitio_id).single()
   if (sitioError || !sitio) throw new Error('Unable to verify the report’s sitio scope.')
   const residents = await readReportPages<ResidentReportRow>((from, to) => supabase.from('residents')
-    .select('uid,birthdate,mobility_status').eq('sitio_id', actor.assigned_sitio_id).order('uid').range(from, to))
+    .select('uid,birthdate,sex,mobility_status').eq('sitio_id', actor.assigned_sitio_id).order('uid').range(from, to))
   const ids = residents.map((resident) => resident.uid)
   const columns = 'record_id,resident_uid,evac_status,logged_at,evacuated_at'
   const [sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters] = await Promise.all([
@@ -42,7 +42,10 @@ export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
     optional(async () => {
       const { data, error } = await supabase.rpc('get_evacuation_facility_catalog')
       if (error || !Array.isArray(data)) throw new Error('Shelter catalog unavailable.')
-      return data as ShelterReportRow[]
+      const names = await readReportPages<{ center_id: number; center_name: string }>((from, to) => supabase
+        .from('evacuation_centers').select('center_id,center_name').order('center_id').range(from, to))
+      const nameMap = new Map(names.map((row) => [row.center_id, row.center_name]))
+      return (data as ShelterReportRow[]).map((row) => ({ ...row, center_name: nameMap.get(row.center_id) ?? `Facility ${row.center_id}` }))
     }, 'Shared shelter catalog is unavailable; verify the facility migrations and permissions.'),
   ])
   return { window, scope: `${sitio.sitio_name} (sitio ${actor.assigned_sitio_id})`, fetchedAt: new Date().toISOString(), residents, sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters }
