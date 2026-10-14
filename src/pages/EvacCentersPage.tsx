@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import Select from 'react-select'
 import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
+import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
@@ -138,6 +139,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
           })
         )}
       </div>
+      <ReliefDemandPlanner centers={centers} />
       {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} onClose={() => setForm(null)} onSaved={onReload} />}
     </section>
   )
