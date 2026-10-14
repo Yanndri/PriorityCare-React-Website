@@ -30,9 +30,14 @@ export type CreateAdminInput = {
   f_name: string
   m_name?: string
   l_name: string
-  contact_no?: string
+  contact_no: string
   assigned_sitio_id: number
+  /** Optional custom User ID (UUID). Leave blank to auto-generate. */
+  uid?: string
 }
+
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 async function getAccessToken(): Promise<string> {
   const {
@@ -110,7 +115,7 @@ export async function getSuperAdminDashboard(): Promise<DashboardData> {
 
 export async function createAdmin(
   input: CreateAdminInput,
-): Promise<{ message?: string; uid?: string }> {
+): Promise<{ message?: string; admin?: AdminAccount }> {
   if (!input.email.trim() || !input.password) {
     throw new Error('Email and password are required.')
   }
@@ -122,11 +127,19 @@ export async function createAdmin(
     throw new Error('Please select a valid Sitio.')
   }
 
-  return apiRequest<{ message?: string; uid?: string }>(
+  const uid = input.uid?.trim()
+
+  if (uid && !UUID_PATTERN.test(uid)) {
+    throw new Error(
+      'User ID must be a valid UUID, or left blank to auto-generate.',
+    )
+  }
+
+  return apiRequest<{ message?: string; admin?: AdminAccount }>(
     '/api/super-admin/admins',
     {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, uid: uid || undefined }),
     },
   )
 }

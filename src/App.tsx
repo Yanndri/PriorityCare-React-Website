@@ -16,6 +16,7 @@ import { PageTitle } from './components/PageTitle'
 import { HomePage } from './pages/HomePage'
 import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
+import { DisasterEventsPage } from './pages/DisasterEventsPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { EditResidentModal } from './components/EditResidentModal'
@@ -419,6 +420,8 @@ function App() {
           {activeMenu === 'geoMap' && (
             <GeoMapPage residents={liveResidents} />
           )}
+
+          {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
 
           {activeMenu === 'reports' && (
             <ReportsPage stats={stats} />

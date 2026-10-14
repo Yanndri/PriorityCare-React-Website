@@ -23,6 +23,7 @@ import {
 import * as L from 'leaflet'
 
 import 'leaflet/dist/leaflet.css'
+import { DisasterEventMarkers } from '../components/DisasterEventMarkers'
 
 // ======================================================
 // 🌍 SUPABASE
@@ -1144,6 +1145,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           }}
         >
 
+          <DisasterEventMarkers />
           {/* 🗺️ OPENSTREETMAP */}
 
           <TileLayer

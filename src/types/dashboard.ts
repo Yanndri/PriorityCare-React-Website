@@ -5,6 +5,7 @@ export type MenuKey =
   | 'home'
   | 'verification'
   | 'geoMap'
+  | 'disasterEvents'
   | 'reports'
   | 'dataMining'
   | 'evacCenters'

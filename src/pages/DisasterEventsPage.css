@@ -1,0 +1,19 @@
+.disaster-events-page { display: grid; gap: 20px; }
+.disaster-events-page .panel { padding: 24px; }
+.disaster-events-page h3, .disaster-events-page h4 { margin: 0 0 12px; }
+.disaster-intro p { max-width: 85ch; color: #526174; line-height: 1.6; }
+.disaster-intro button { margin-left: 20px; }
+.disaster-form { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.disaster-events-page label { display: grid; gap: 7px; font-size: 14px; font-weight: 600; }
+.disaster-events-page input, .disaster-events-page select, .disaster-events-page textarea { width: 100%; box-sizing: border-box; border: 1px solid #c5cfdb; border-radius: 8px; padding: 10px 12px; font: inherit; color: #183153; background: #fff; }
+.disaster-wide { grid-column: 1 / -1; }
+.disaster-error { padding: 16px; background: #fff1f1; color: #9c2222; border-radius: 8px; }
+.disaster-list-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.disaster-event-card { border-top: 1px solid #dce3eb; padding: 20px 0; overflow-wrap: anywhere; }
+.disaster-event-card p { color: #526174; line-height: 1.5; }
+.disaster-status { border-radius: 20px; padding: 6px 12px; font-size: 13px; background: #fff0db; color: #874405; }
+.disaster-status.resolved { background: #e5f5ef; color: #216749; }
+.disaster-notes { white-space: pre-wrap; }
+.disaster-resolution { max-width: 650px; margin-top: 16px; }
+.disaster-resolution button { margin: 8px 10px 0 0; }
+@media (max-width: 650px) { .disaster-form { grid-template-columns: 1fr; } .disaster-intro button { margin: 12px 0 0; display: block; } }

@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { CreateAdminForm } from '../components/CreateAdminForm'
 
 type AdminAccount = {
   uid: string
@@ -211,6 +212,11 @@ export function SuperAdminDashboard() {
             </article>
           </section>
 
+          <CreateAdminForm
+            sitios={sitios}
+            onCreated={() => loadDashboard()}
+          />
+
           <section className="super-admin-section">
             <h2>Admin Accounts</h2>
             <p>
@@ -222,6 +228,7 @@ export function SuperAdminDashboard() {
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>User ID</th>
                     <th>Email</th>
                     <th>Assigned Sitio</th>
                     <th>Status</th>
@@ -249,6 +256,9 @@ export function SuperAdminDashboard() {
                     return (
                       <tr key={admin.uid}>
                         <td>{name || 'Not provided'}</td>
+                        <td>
+                          <code className="admin-uid">{admin.uid}</code>
+                        </td>
                         <td>{admin.email}</td>
                         <td>
                           {sitio?.sitio_name ?? 'Unassigned'}
@@ -270,7 +280,7 @@ export function SuperAdminDashboard() {
 
                   {admins.length === 0 && (
                     <tr>
-                      <td colSpan={4}>
+                      <td colSpan={5}>
                         No Admin accounts found.
                       </td>
                     </tr>

@@ -350,6 +350,7 @@ app.post(
         l_name,
         contact_no,
         assigned_sitio_id,
+        uid,
       } = req.body || {};
 
       // Validate required fields.
@@ -410,6 +411,44 @@ app.post(
         });
       }
 
+      // Optional custom User ID (UUID). Blank = auto-generated.
+      let requestedUid = null;
+
+      if (uid !== undefined && uid !== null && uid !== "") {
+        const uuidPattern =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (typeof uid !== "string" || !uuidPattern.test(uid.trim())) {
+          return res.status(400).json({
+            message:
+              "User ID must be a valid UUID (e.g. 123e4567-e89b-12d3-a456-426614174000), or left blank to auto-generate.",
+          });
+        }
+
+        requestedUid = uid.trim().toLowerCase();
+
+        const { data: existingUid, error: uidError } =
+          await supabaseAdmin
+            .from("users")
+            .select("uid")
+            .eq("uid", requestedUid)
+            .maybeSingle();
+
+        if (uidError) {
+          console.error("User ID lookup failed:", uidError.message);
+
+          return res.status(500).json({
+            message: "Unable to verify the User ID.",
+          });
+        }
+
+        if (existingUid) {
+          return res.status(409).json({
+            message: "An account with this User ID already exists.",
+          });
+        }
+      }
+
       // Confirm the selected sitio exists.
       const { data: sitio, error: sitioError } =
         await supabaseAdmin
@@ -460,6 +499,31 @@ app.post(
         });
       }
 
+      // contact_no is UNIQUE in public.users.
+      const { data: existingContact, error: contactError } =
+        await supabaseAdmin
+          .from("users")
+          .select("uid")
+          .eq("contact_no", contact_no.trim())
+          .maybeSingle();
+
+      if (contactError) {
+        console.error(
+          "Contact number lookup failed:",
+          contactError.message
+        );
+
+        return res.status(500).json({
+          message: "Unable to verify the contact number.",
+        });
+      }
+
+      if (existingContact) {
+        return res.status(409).json({
+          message: "An account with this contact number already exists.",
+        });
+      }
+
       // Create the Supabase Auth user.
       // This is a trusted, Super Admin-created account.
       // Email is marked confirmed so the account can sign in
@@ -469,6 +533,7 @@ app.post(
           email: normalizedEmail,
           password,
           email_confirm: true,
+          ...(requestedUid ? { id: requestedUid } : {}),
         });
 
       if (authError || !authResult.user) {
