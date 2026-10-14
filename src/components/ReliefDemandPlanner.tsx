@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { EvacuationCenter } from '../types/dashboard'
 import { calculateReliefDemand, reliefCsvCell, validateReliefPopulation, validateReliefRates, type ReliefRates } from '../utils/reliefDemand'
+import { RELIEF_REPORT_KEY, type ReliefReportDraft } from '../utils/reliefReportDraft'
 
 type Draft = { people: string; households: string; ffps: string; waterLiters: string; hygieneKits: string }
 const emptyDraft: Draft = { people: '', households: '', ffps: '0', waterLiters: '0', hygieneKits: '0' }
@@ -66,6 +67,18 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     setMessage('Draft exported. No stock was deducted and no requisition was submitted.')
   }
+  function saveForReports() {
+    if (!canExport) return
+    const draft: ReliefReportDraft = {
+      date, savedAt: new Date().toISOString(), scope: 'Selected shared facilities; manual counts and rates', rates,
+      rows: included.map((row) => ({ centerId: String(row.center.id ?? row.center.name), centerName: row.center.name,
+        people: row.people, households: row.households, stock: row.stock,
+        source: row.manualPeople ? 'Manual planning population' : 'Current recorded occupancy' })),
+      excludedCenters: rows.filter((row) => excluded[row.key]).map((row) => row.center.name),
+    }
+    try { sessionStorage.setItem(RELIEF_REPORT_KEY, JSON.stringify(draft)); setMessage('Relief draft saved for Reports in this browser tab. It remains a planning estimate, not a distribution record.') }
+    catch { setMessage('This browser could not save the draft for Reports. CSV export remains available.') }
+  }
   return <section className="relief-planner">
     <div className="section-header"><div><span className="panel-kicker">DAILY RELIEF PLANNING · PROTOTYPE</span><h3>Relief requisition demand</h3></div></div>
     <p>Calculate Family Food Packs (FFPs), potable-water liters, and hygiene kits using your approved daily rates. A kit’s daily rate can be zero on days it is not distributed. This is a draft calculator; it does not submit orders or change inventory.</p>
@@ -100,7 +113,8 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
     <p>Assign warehouse stock to only one center’s row. Supplies and liters are rounded up per center before totals are added.</p>
     <p className="relief-total"><strong>{pending > 0 ? `Partial subtotal — ${pending} included facility/facilities still need input` : 'Total draft request'}:</strong> {totals.ffps} FFPs · {totals.waterLiters} L water · {totals.hygieneKits} hygiene kits</p>
     <button type="button" className="verify-button" disabled={!canExport} onClick={exportDraft}>Export Daily Requisition Draft (CSV)</button>
+    <button type="button" className="secondary-button" disabled={!canExport} onClick={saveForReports}>Save Draft for Reports</button>
     {message && <p role="status">{message}</p>}
-    <p>Inputs stay in this page’s draft and reset when you leave it. Changing the date does not fetch historical occupancy.</p>
+    <p>Inputs reset when you leave this page. Save Draft for Reports keeps an aggregate copy in this browser tab for export. Changing the date does not fetch historical occupancy.</p>
   </section>
 }

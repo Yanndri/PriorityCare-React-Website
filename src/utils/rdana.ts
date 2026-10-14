@@ -2,8 +2,8 @@ export type ReportWindow = { hours: 24 | 48; start: string; end: string }
 export type ReportSection<T> = { available: true; data: T } | { available: false; reason: string }
 export type SosReportRow = { alert_id: string; resident_uid: string; status: string | null; created_at: string }
 export type EvacReportRow = { record_id: string; resident_uid: string; evac_status: string; logged_at: string | null; evacuated_at: string | null }
-export type ShelterReportRow = { center_id: number; capacity: number | null; occupied: number; status?: string }
-export type ResidentReportRow = { uid: string; birthdate: string | null; mobility_status: string | null }
+export type ShelterReportRow = { center_id: number; center_name?: string; capacity: number | null; occupied: number; status?: string }
+export type ResidentReportRow = { uid: string; birthdate: string | null; sex?: string | null; mobility_status: string | null }
 export type ProfileReportRow = { resident_uid: string; is_pregnant: boolean; household_id: string | null; vulnerability_needs: string }
 export type RdanaData = {
   window: ReportWindow
@@ -41,7 +41,7 @@ function manila(value: string) {
   return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 function unavailable(reason: string) { return `Not available — ${reason}` }
-function ageAt(birthdate: string | null, end: string) {
+export function ageAt(birthdate: string | null, end: string) {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(end))
   if (!birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > day) return null
   const parsed = new Date(`${birthdate}T00:00:00Z`)
