@@ -9,8 +9,9 @@ type OperationsOverviewProps = {
 
 export function OperationsOverview({ residents, alerts, centers }: OperationsOverviewProps) {
   const criticalAlerts = alerts.filter((alert) => alert.priority === 'high').length
-  const knownCenters = centers.filter((center) => center.capacityConfirmed && center.occupancyKnown)
-  const unknownCenters = centers.length - knownCenters.length
+  const activeCenters = centers.filter((center) => center.status.toLowerCase() !== 'closed')
+  const knownCenters = activeCenters.filter((center) => center.capacityConfirmed && center.occupancyKnown)
+  const unknownCenters = activeCenters.length - knownCenters.length
   const totalCapacity = knownCenters.reduce((sum, center) => sum + center.capacity, 0)
   const occupiedCapacity = knownCenters.reduce((sum, center) => sum + center.occupied, 0)
   const availableSlots = knownCenters.reduce((sum, center) => sum + Math.max(0, center.capacity - center.occupied), 0)
@@ -34,7 +35,7 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
         <Metric label="Resident profiles" value={residents.length} detail="Available for assessment" tone="info" />
         <Metric label="Critical alerts" value={criticalAlerts} detail="Requires responder review" tone="warning" />
         <Metric label="Known shelter slots" value={availableSlots} detail={`${fullCenters} full · ${unknownCenters} awaiting capacity/count`} tone="success" />
-        <Metric label="Registered centers" value={centers.length} detail="Ready for assignment" tone="info" />
+        <Metric label="Active centers" value={activeCenters.length} detail={`${centers.length - activeCenters.length} closed`} tone="info" />
       </div>
 
       <div className="operations-grid">

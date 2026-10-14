@@ -303,13 +303,16 @@ export async function fetchDashboardDataFromSupabase(
 
   const { data: facilityCatalog, error: facilityCatalogError } = await supabase.rpc('get_evacuation_facility_catalog')
   if (facilityCatalogError && facilityCatalogError.code !== 'PGRST202') throw facilityCatalogError
-  for (const entry of (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number }[]) {
+  for (const entry of (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number; status?: string; closed_at?: string | null; closure_reason?: string | null }[]) {
     const center = evacuationCenters.find((item) => String(item.id) === String(entry.center_id))
     if (center) {
       center.capacity = entry.capacity ?? 0
       center.capacityConfirmed = entry.capacity !== null
       center.occupied = entry.occupied
       center.occupancyKnown = true
+      center.status = entry.status ?? center.status
+      center.closedAt = entry.closed_at
+      center.closureReason = entry.closure_reason
     }
   }
 
@@ -855,6 +858,8 @@ function mapEvacuationCenter(
     occupied: assignedResidents.length,
     capacityConfirmed: Number(centerRow.capacity) > 0,
     occupancyKnown: false,
+    closedAt: centerRow.closed_at,
+    closureReason: centerRow.closure_reason,
     facilityType: centerRow.center_type,
     gpsLat: Number(centerRow.gps_lat),
     gpsLong: Number(centerRow.gps_long),

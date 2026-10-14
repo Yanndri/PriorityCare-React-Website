@@ -18,3 +18,11 @@ export async function setFacilityCapacity(id: number | string, capacity: number,
   const { error } = await supabase.rpc('set_evacuation_facility_capacity', { p_center_id: id, p_capacity: capacity, p_expected_capacity: expectedCapacity })
   if (error) throw facilityError(error)
 }
+export async function changeFacilityStatus(id: number | string, status: 'active' | 'closed', reason: string, expectedStatus: 'active' | 'closed') {
+  if (!reason.trim() || reason.trim().length > 1000) throw new Error('Enter a reason of 1–1,000 characters.')
+  const { error } = await supabase.rpc('change_evacuation_facility_status', {
+    p_center_id: id, p_status: status, p_reason: reason.trim(), p_expected_status: expectedStatus,
+  })
+  if (error) throw new Error(error.code === 'PGRST202'
+    ? 'Center closure needs the 20261014_facility_lifecycle.sql database migration.' : error.message)
+}
