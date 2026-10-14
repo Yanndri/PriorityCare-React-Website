@@ -209,8 +209,9 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   // 🌧️ WEATHER DATA
   // ====================================================
 
-  const [rainfallLevel, setRainfallLevel] =
-    useState(0)
+  const [rainfallLevel, setRainfallLevel] = useState<number | null>(null)
+  const [weatherError, setWeatherError] = useState<string | null>(null)
+  const [weatherUpdatedAt, setWeatherUpdatedAt] = useState<Date | null>(null)
 
   // ====================================================
   // 🌊 FLOOD RISK AREAS
@@ -559,6 +560,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
     if (!WEATHER_API_KEY) {
 
+      setWeatherError(
+        'Weather API key is not configured.',
+      )
+
       console.warn(
         'VITE_OPENWEATHER_API_KEY is not configured.',
       )
@@ -567,6 +572,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     }
 
     try {
+
+      setWeatherError(
+        null,
+      )
 
       const response =
         await fetch(
@@ -590,6 +599,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
         rain,
       )
 
+      setWeatherUpdatedAt(
+        new Date(),
+      )
+
       const riskyAreas =
         barangays.filter(
           (barangay) => {
@@ -606,6 +619,12 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       )
 
     } catch (error) {
+
+      setWeatherError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to fetch weather data.',
+      )
 
       console.error(
         'Weather API error:',
@@ -737,51 +756,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           }}
         >
           🗺️ Default
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
-              'flood',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🌊 Flood
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
-              'fire',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🔥 Fire
-        </button>
-
-        <button
-          onClick={() =>
-            setMapMode(
-              'earthquake',
-            )
-          }
-
-          style={{
-            pointerEvents:
-              'auto',
-          }}
-        >
-          🌎 Earthquake
         </button>
 
         <button
@@ -1008,9 +982,27 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
             <p>
               🌧️ Rainfall Level:{' '}
               <strong>
-                {rainfallLevel}%
+                {rainfallLevel ?? 'Unavailable'}
+                {rainfallLevel === null ? '' : '%'}
               </strong>
             </p>
+
+            {weatherError && (
+
+              <p>
+                Weather data unavailable: {weatherError}
+              </p>
+
+            )}
+
+            {weatherUpdatedAt && (
+
+              <p>
+                Updated{' '}
+                {weatherUpdatedAt.toLocaleTimeString()}
+              </p>
+
+            )}
 
             <p>
               🌪️ Weather system
