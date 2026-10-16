@@ -1,4 +1,4 @@
-import { ageAt, inReportWindow, type RdanaData } from './rdana.ts'
+import { ageAt, eventsDuringWindow, inReportWindow, manifestActivity, type RdanaData } from './rdana.ts'
 import { calculateReliefDemand } from './reliefDemand.ts'
 import { parseReliefReportDraft, type ReliefReportDraft } from './reliefReportDraft.ts'
 
@@ -17,6 +17,10 @@ export function buildDromicReport(data: RdanaData, context: string, relief: Reli
   const unavailable = 'Not available'
   const sos = data.sos.available ? unique(data.sos.data.filter((row) => inReportWindow(row.created_at, data.window)), (row) => row.alert_id) : null
   const completed = data.completedEvacuations.available ? unique(data.completedEvacuations.data.filter((row) => row.evac_status === 'safely_evacuated' && inReportWindow(row.evacuated_at, data.window)), (row) => row.record_id) : null
+  const manifest = data.missingReports?.available ? manifestActivity(data.missingReports.data, data.window) : null
+  const manifestValue = (value: number | undefined) => manifest ? value! : data.missingReports ? unavailable : 'Not assessed'
+  const manifestBasis = (basis: string) => data.missingReports && !data.missingReports.available ? data.missingReports.reason : data.missingReports ? basis : 'Missing-person manifest not included'
+  const declared = data.declaredEvents?.available ? eventsDuringWindow(data.declaredEvents.data, data.window) : null
   const population: ReportTable = { name: 'Population', scope: `Current registered resident accounts: ${data.scope}. Not assessed disaster-affected population.`, headers: ['Metric', 'Count', 'Basis / gaps'], rows: [
     ['Registered resident accounts', residents.length, 'Current sitio registration; not an affected-person count'],
     ['Linked registered households', profiles ? new Set(profiles.map((row) => row.household_id).filter(Boolean)).size : unavailable, 'Unique linked households; not an affected-family count'],
@@ -56,7 +60,11 @@ export function buildDromicReport(data: RdanaData, context: string, relief: Reli
     ['SOS alerts created in period', sos?.length ?? unavailable, data.sos.available ? 'Distinct alerts, not rescued people' : data.sos.reason],
     ['Resident accounts reporting SOS', sos ? new Set(sos.map((row) => row.resident_uid)).size : unavailable, 'Distinct accounts within this sitio'],
     ['Safely-evacuated records completed in period', completed?.length ?? unavailable, data.completedEvacuations.available ? 'Requires completion timestamp and current safely_evacuated status' : data.completedEvacuations.reason],
-    ['Deaths / injuries / missing persons', 'Not assessed', 'Do not infer missing persons from failed evacuation records'],
+    ['Deaths / injuries', 'Not assessed', 'No casualty-assessment records'],
+    ['Open missing-person reports (at retrieval)', manifestValue(manifest?.openNow), manifestBasis('Missing-person manifest, sitio-scoped; unresolved reports, not a casualty count; failed evacuations are not counted as missing')],
+    ['Missing-person reports filed in period', manifestValue(manifest?.filed), manifestBasis('Report filing timestamps within the window')],
+    ['Missing persons marked found in period', manifestValue(manifest?.found), manifestBasis('Reconciliation timestamps within the window')],
+    ['Declared disaster events active in period', declared ? declared.length : data.declaredEvents ? unavailable : 'Not assessed', declared ? (declared.map((event) => `${event.name} (${event.hazard_type})`).join('; ') || 'None in the register') : data.declaredEvents && !data.declaredEvents.available ? data.declaredEvents.reason : 'Event register not included'],
     ['Housing / infrastructure damage', 'Not assessed', 'No damage-assessment records'],
     ['Actual relief distributions / costs', 'Not recorded', 'Planning quantities are not distributions or expenditure'],
     ['Official DSWD-DROMIC template compliance', 'Not established', 'No required official template was supplied'],

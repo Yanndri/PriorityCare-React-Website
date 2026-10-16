@@ -1,8 +1,13 @@
+<<<<<<< Updated upstream
 // Operational timestamp log / evacuation audit trail: filtering and table/CSV shaping.
 // Pure functions (no Supabase, no export libraries) so they can be unit-tested.
 
 export type TimelineCategory =
   | 'evacuation' | 'evacuation_change' | 'facility' | 'disaster_event' | 'missing_person' | 'verification' | 'sos'
+=======
+// Appendix N, Module 3 — Export Evacuation Audit Trails & Operational
+// Timestamp Logs. Shapes match the existing get_operational_timeline() RPC.
+>>>>>>> Stashed changes
 
 export type TimelineEvent = {
   occurred_at: string
@@ -15,7 +20,11 @@ export type TimelineEvent = {
   actor_name: string | null
   actor_role: string | null
   details: string | null
+<<<<<<< Updated upstream
   ref_id: string | null
+=======
+  ref_id: string
+>>>>>>> Stashed changes
 }
 
 export type TimelineData = {
@@ -27,6 +36,7 @@ export type TimelineData = {
   events: TimelineEvent[]
 }
 
+<<<<<<< Updated upstream
 export const CATEGORY_LABELS: Record<TimelineCategory, string> = {
   evacuation: 'Evacuation status',
   evacuation_change: 'Evacuation record edit/delete',
@@ -116,4 +126,93 @@ export function timelineCsv(events: TimelineEvent[], sitioName: (id: number) => 
 
 export function timelineFileName(from: string, to: string, ext: string) {
   return `prioritycare-audit-log_${formatPht(from).slice(0, 10)}_to_${formatPht(new Date(Date.parse(to) - 1).toISOString()).slice(0, 10)}.${ext}`
+=======
+export const timelineCategories = {
+  evacuation: 'Evacuation status logs',
+  evacuation_change: 'Evacuation record edits / deletions',
+  facility: 'Evacuation center status & capacity',
+  disaster_event: 'Disaster event declarations',
+  missing_person: 'Missing-person manifest actions',
+  verification: 'Resident verification',
+  sos: 'SOS alerts raised',
+} as const
+export type TimelineCategory = keyof typeof timelineCategories
+
+// What each source records — shown with results so an empty category is not
+// mistaken for a complete log of inactivity.
+export const categoryCoverage: Record<TimelineCategory, string> = {
+  evacuation: 'One entry per evacuation record at its logged time (evacuated time if not logged). "From" is the resident’s previous record status.',
+  evacuation_change: 'Edits and deletions captured by the evacuation audit trigger. Changes made before the trigger existed are not in the log.',
+  facility: 'Facility-wide center status and capacity changes (shared across sitios).',
+  disaster_event: 'Declarations and resolutions with actor and reason.',
+  missing_person: 'Reports filed, marked found, or withdrawn.',
+  verification: 'Document uploads and review decisions.',
+  sos: 'Creation time only. SOS status changes are not timestamped in the database.',
+}
+
+export const MAX_RANGE_DAYS = 366
+
+// Converts inclusive Asia/Manila calendar dates into a UTC [start, end) range.
+export function manilaDateRange(fromDate: string, toDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+    throw new Error('Choose both a start date and an end date.')
+  }
+  const start = Date.parse(`${fromDate}T00:00:00+08:00`)
+  const end = Date.parse(`${toDate}T00:00:00+08:00`) + 86_400_000
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) throw new Error('The start date must be on or before the end date.')
+  if (end - start > MAX_RANGE_DAYS * 86_400_000) throw new Error(`Choose a range of at most ${MAX_RANGE_DAYS} days.`)
+  return { from: new Date(start).toISOString(), to: new Date(end).toISOString() }
+}
+
+export function manilaDate(offsetDays = 0, now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date(now.getTime() + offsetDays * 86_400_000))
+}
+
+export function manilaTimestamp(value: string) {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return 'Invalid timestamp'
+  // Seconds are kept so ordering and exported times stay exact.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).format(date).replace(',', '') + ' PHT'
+}
+
+export function countByCategory(events: TimelineEvent[]) {
+  const counts = Object.fromEntries(Object.keys(timelineCategories).map((key) => [key, 0])) as Record<TimelineCategory, number>
+  for (const event of events) if (event.category in counts) counts[event.category]++
+  return counts
+}
+
+export const timelineHeaders = ['Occurred (UTC, ISO 8601)', 'Occurred (Asia/Manila)', 'Category', 'Action', 'Subject', 'Sitio', 'From', 'To', 'Actor', 'Actor role', 'Details', 'Reference ID']
+
+export function timelineRows(data: TimelineData, events: TimelineEvent[]) {
+  const sitioName = new Map(data.sitios.map((sitio) => [sitio.sitio_id, sitio.sitio_name]))
+  return events.map((event) => [
+    new Date(event.occurred_at).toISOString(),
+    manilaTimestamp(event.occurred_at),
+    timelineCategories[event.category] ?? event.category,
+    event.action,
+    event.subject ?? '',
+    event.sitio_id === null ? 'All sitios (facility-wide)' : sitioName.get(event.sitio_id) ?? `Sitio ${event.sitio_id}`,
+    event.from_value ?? '',
+    event.to_value ?? '',
+    event.actor_name ?? 'Not recorded',
+    event.actor_role ?? '',
+    event.details ?? '',
+    event.ref_id,
+  ])
+}
+
+// RFC 4180 CSV with spreadsheet-formula neutralisation for text cells.
+export function toCsv(headers: string[], rows: (string | number | null)[][]) {
+  const cell = (value: string | number | null) => {
+    if (value === null) return ''
+    if (typeof value === 'number') return String(value)
+    const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  }
+  return [headers, ...rows].map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n'
+>>>>>>> Stashed changes
 }

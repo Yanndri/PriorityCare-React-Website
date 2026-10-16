@@ -19,6 +19,7 @@ import { GeoMapPage } from './pages/GeoMapPage'
 import { DisasterEventsPage } from './pages/DisasterEventsPage'
 import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { EditResidentModal } from './components/EditResidentModal'
 
@@ -166,8 +167,9 @@ function App() {
       }
     }
 
+    // isLoadingDatabase starts as hasSupabaseConfig, so it is
+    // already false here; there is nothing to load.
     if (!hasSupabaseConfig) {
-      setIsLoadingDatabase(false)
       return
     }
 
@@ -428,6 +430,10 @@ function App() {
 
           {activeMenu === 'reports' && (
             <ReportsPage stats={stats} />
+          )}
+
+          {activeMenu === 'dataMining' && (
+            <DataMiningPage residents={liveResidents} />
           )}
 
           {activeMenu === 'evacCenters' && (

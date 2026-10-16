@@ -14,7 +14,14 @@ export type DashboardData = {
   evacuationHistory: EvacuationHistoryRecord[]
 }
 
-type AnyRow = Record<string, any>
+// A loosely-shaped database row; fields are narrowed where they are read.
+type AnyRow = Record<string, unknown>
+
+// Stand-in for a query that is skipped because there are no residents.
+const EMPTY_ROWS_RESULT: { data: AnyRow[]; error: null } = {
+  data: [],
+  error: null,
+}
 
 // Delete a resident profile and its related records.
 export async function deleteResidentProfile(
@@ -145,10 +152,7 @@ export async function fetchDashboardDataFromSupabase(
           .from('users')
           .select('*')
           .in('uid', residentIds)
-      : Promise.resolve({
-          data: [],
-          error: null,
-        } as any),
+      : Promise.resolve(EMPTY_ROWS_RESULT),
 
     supabase
       .from('sitios')
@@ -160,10 +164,7 @@ export async function fetchDashboardDataFromSupabase(
           .from('verification_documents')
           .select('*')
           .in('uid', residentIds)
-      : Promise.resolve({
-          data: [],
-          error: null,
-        } as any),
+      : Promise.resolve(EMPTY_ROWS_RESULT),
 
     supabase
       .from('document_types')
@@ -178,10 +179,7 @@ export async function fetchDashboardDataFromSupabase(
           .from('evacuation_records')
           .select('*')
           .in('resident_uid', residentIds)
-      : Promise.resolve({
-          data: [],
-          error: null,
-        } as any),
+      : Promise.resolve(EMPTY_ROWS_RESULT),
   ])
 
   // Do not silently treat database errors as empty data.
@@ -420,10 +418,10 @@ function mapResident(
   >,
   index: number,
 ): Resident {
-  const uid = getField(
+  const uid = toScalar(getField(
     residentRow,
     ['uid', 'id', 'resident_uid'],
-  )
+  ))
 
   const user = usersByUid.get(String(uid))
 
@@ -471,12 +469,12 @@ function mapResident(
     ]) ?? '',
   )
 
-  const latitude = getField(
+  const latitude = toScalar(getField(
     residentRow,
     ['GPS_Lat', 'gps_lat', 'latitude', 'lat'],
-  )
+  ))
 
-  const longitude = getField(
+  const longitude = toScalar(getField(
     residentRow,
     [
       'GPS_Long',
@@ -485,7 +483,7 @@ function mapResident(
       'lng',
       'long',
     ],
-  )
+  ))
 
   const isVerified =
     getField(user, ['is_verified', 'verified']) ??
@@ -617,11 +615,11 @@ function groupDocumentsByResidentId(
   >()
 
   rows.forEach((row, index) => {
-    const residentId = getField(row, [
+    const residentId = toScalar(getField(row, [
       'uid',
       'resident_uid',
       'user_id',
-    ])
+    ]))
 
     const typeId = getField(row, [
       'type_id',
@@ -649,7 +647,7 @@ function groupDocumentsByResidentId(
 
     const document: VerificationDocument = {
       id:
-        getField(row, ['doc_id', 'id']) ??
+        toScalar(getField(row, ['doc_id', 'id'])) ??
         `document-${index + 1}`,
 
       residentId,
@@ -685,10 +683,10 @@ function groupDocumentsByResidentId(
       ),
 
       rejectionReason:
-        getField(row, [
+        toOptionalText(getField(row, [
           'rejection_reason',
           'remarks',
-        ]) ?? null,
+        ])) ?? null,
     }
 
     const key = String(residentId)
@@ -727,10 +725,10 @@ function mapEvacuationCenter(
   sitiosById: Map<string, AnyRow>,
   index: number,
 ): EvacuationCenter {
-  const centerId = getField(
+  const centerId = toScalar(getField(
     centerRow,
     ['center_id', 'id'],
-  )
+  ))
 
   const assignedRecords = recordRows.filter(
     (record) => {
@@ -748,10 +746,10 @@ function mapEvacuationCenter(
 
   const assignedResidents = assignedRecords.map(
     (record, recordIndex) => {
-      const residentUid = getField(
+      const residentUid = toScalar(getField(
         record,
         ['resident_uid', 'uid'],
-      )
+      ))
 
       const resident = residentRows.find(
         (row) =>
@@ -858,9 +856,9 @@ function mapEvacuationCenter(
     occupied: assignedResidents.length,
     capacityConfirmed: Number(centerRow.capacity) > 0,
     occupancyKnown: false,
-    closedAt: centerRow.closed_at,
-    closureReason: centerRow.closure_reason,
-    facilityType: centerRow.center_type,
+    closedAt: toOptionalText(centerRow.closed_at),
+    closureReason: toOptionalText(centerRow.closure_reason),
+    facilityType: toOptionalText(centerRow.center_type) ?? undefined,
     gpsLat: Number(centerRow.gps_lat),
     gpsLong: Number(centerRow.gps_long),
 
@@ -884,10 +882,10 @@ function mapEvacuationHistory(
   residentRows: AnyRow[],
   index: number,
 ): EvacuationHistoryRecord {
-  const residentUid = getField(
+  const residentUid = toScalar(getField(
     recordRow,
     ['resident_uid', 'uid'],
-  )
+  ))
 
   const resident = residentRows.find(
     (row) =>
@@ -974,10 +972,10 @@ function mapEvacuationHistory(
 
   return {
     id:
-      getField(recordRow, [
+      toScalar(getField(recordRow, [
         'record_id',
         'id',
-      ]) ?? `evacuation-record-${index + 1}`,
+      ])) ?? `evacuation-record-${index + 1}`,
 
     residentName:
       residentName ||
@@ -1059,6 +1057,20 @@ function toMap(
   })
 
   return map
+}
+
+// Narrow a raw identifier or coordinate to the string | number the UI uses.
+// Strings and numbers pass through unchanged; null/undefined become undefined.
+function toScalar(value: unknown): string | number | undefined {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value === null || value === undefined) return undefined
+  return String(value)
+}
+
+// Narrow a raw optional text column, keeping null vs undefined as-is.
+function toOptionalText(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return value
+  return typeof value === 'string' ? value : String(value)
 }
 
 // Read the first available field from a database row.

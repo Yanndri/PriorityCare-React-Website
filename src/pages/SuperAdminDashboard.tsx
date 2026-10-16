@@ -1,9 +1,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { CreateAdminForm } from '../components/CreateAdminForm'
 
-type AdminAccount = {
+export type AdminAccount = {
   uid: string
   email: string
   f_name: string | null
@@ -12,10 +12,26 @@ type AdminAccount = {
   assigned_sitio_id: number | null
 }
 
-type Sitio = {
+export type Sitio = {
   sitio_id: number
   sitio_name: string
 }
+
+// Shared with the nested Super Admin views (see SuperAdminViews.tsx)
+// so the dashboard data is loaded once, here, and never re-fetched
+// separately by each page.
+export type SuperAdminOutletContext = {
+  admins: AdminAccount[]
+  sitios: Sitio[]
+  reload: () => Promise<void>
+}
+
+const SUPER_ADMIN_NAV = [
+  { to: '/super-admin', label: 'Dashboard', end: true },
+  { to: '/super-admin/create-admin', label: 'Create Admin', end: false },
+  { to: '/super-admin/admins', label: 'Admin Accounts', end: false },
+  { to: '/super-admin/sitios', label: 'Sitio Overview', end: false },
+]
 
 type DashboardResponse = {
   admins?: unknown
@@ -32,7 +48,11 @@ function isAdminAccount(value: unknown): value is AdminAccount {
     typeof admin.uid === 'string' &&
     typeof admin.email === 'string' &&
     (admin.account_status === 'active' ||
-      admin.account_status === 'suspended')
+      admin.account_status === 'suspended') &&
+    (admin.f_name === null || typeof admin.f_name === 'string') &&
+    (admin.l_name === null || typeof admin.l_name === 'string') &&
+    (admin.assigned_sitio_id === null ||
+      typeof admin.assigned_sitio_id === 'number')
   )
 }
 
@@ -51,6 +71,7 @@ export function SuperAdminDashboard() {
   const [admins, setAdmins] = useState<AdminAccount[]>([])
   const [sitios, setSitios] = useState<Sitio[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
 
   const loadDashboard = useCallback(async () => {
@@ -124,10 +145,13 @@ export function SuperAdminDashboard() {
 
       setAdmins(validAdmins)
       setSitios(validSitios)
+      setHasLoaded(true)
     } catch (err) {
       console.error('Dashboard load failed:', err)
+
       setAdmins([])
       setSitios([])
+      setHasLoaded(false)
 
       setError(
         err instanceof Error
@@ -139,197 +163,93 @@ export function SuperAdminDashboard() {
     }
   }, [])
 
+  // Defer the initial request so state updates do not run
+  // synchronously inside the effect body.
   useEffect(() => {
-    void loadDashboard()
+    const timerId = window.setTimeout(() => {
+      void loadDashboard()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timerId)
+    }
   }, [loadDashboard])
 
-  const activeAdmins = admins.filter(
-    (admin) => admin.account_status === 'active',
-  ).length
-
-  const suspendedAdmins = admins.filter(
-    (admin) => admin.account_status === 'suspended',
-  ).length
-
-  const assignedAdmins = admins.filter(
-    (admin) => admin.assigned_sitio_id !== null,
-  ).length
+  const outletContext: SuperAdminOutletContext = {
+    admins,
+    sitios,
+    reload: loadDashboard,
+  }
 
   return (
-    <main className="super-admin-page">
-      <header className="super-admin-header">
-        <div>
-          <p className="eyebrow">
-            PRIORITYCARE / SYSTEM MANAGEMENT
-          </p>
-          <h1>Super Admin Dashboard</h1>
-          <p>
-            Manage administrator accounts and sitio assignments.
-          </p>
+    <div className="super-admin-shell">
+      <aside
+        className="super-admin-sidebar"
+        aria-label="Super Admin navigation"
+      >
+        <div className="brand">
+          <span className="brand-mark">P</span>
+
+          <div>
+            <strong>PriorityCare</strong>
+            <small>Super Admin</small>
+          </div>
         </div>
-      </header>
 
-      {loading && <p>Loading dashboard...</p>}
+        <nav>
+          {SUPER_ADMIN_NAV.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className="nav-button"
+            >
+              <span className="nav-square" />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
 
-      {error && (
-        <section role="alert" className="dashboard-error">
-          <p>{error}</p>
-          <button
-            type="button"
-            onClick={() => void loadDashboard()}
-          >
-            Retry
-          </button>
-          {error.toLowerCase().includes('session') && (
-            <p>
-              Please sign in again using your Super Admin account.
+      <main className="super-admin-page">
+        <header className="super-admin-header">
+          <div>
+            <p className="eyebrow">
+              PRIORITYCARE / SYSTEM MANAGEMENT
             </p>
-          )}
-        </section>
-      )}
-
-      {!loading && !error && (
-        <>
-          <section className="super-admin-stats">
-            <article className="super-admin-card">
-              <span>Total Admins</span>
-              <strong>{admins.length}</strong>
-            </article>
-
-            <article className="super-admin-card">
-              <span>Active Admins</span>
-              <strong>{activeAdmins}</strong>
-            </article>
-
-            <article className="super-admin-card">
-              <span>Suspended Admins</span>
-              <strong>{suspendedAdmins}</strong>
-            </article>
-
-            <article className="super-admin-card">
-              <span>Assigned Admins</span>
-              <strong>{assignedAdmins}</strong>
-            </article>
-          </section>
-
-          <CreateAdminForm
-            sitios={sitios}
-            onCreated={() => loadDashboard()}
-          />
-
-          <section className="super-admin-section">
-            <h2>Admin Accounts</h2>
+            <h1>Super Admin Dashboard</h1>
             <p>
-              Administrator accounts registered in the system.
+              Manage administrator accounts and sitio assignments.
             </p>
+          </div>
+        </header>
 
-            <div className="super-admin-table-wrap">
-              <table className="super-admin-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>User ID</th>
-                    <th>Email</th>
-                    <th>Assigned Sitio</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
+        {loading && !hasLoaded && <p>Loading dashboard...</p>}
 
-                <tbody>
-                  {admins.map((admin) => {
-                    const sitio = sitios.find(
-                      (item) =>
-                        item.sitio_id === admin.assigned_sitio_id,
-                    )
+        {error && (
+          <section role="alert" className="dashboard-error">
+            <p>{error}</p>
 
-                    const name = [
-                      admin.f_name,
-                      admin.l_name,
-                    ]
-                      .filter(
-                        (part): part is string =>
-                          typeof part === 'string' &&
-                          part.trim().length > 0,
-                      )
-                      .join(' ')
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'Retry'}
+            </button>
 
-                    return (
-                      <tr key={admin.uid}>
-                        <td>{name || 'Not provided'}</td>
-                        <td>
-                          <code className="admin-uid">{admin.uid}</code>
-                        </td>
-                        <td>{admin.email}</td>
-                        <td>
-                          {sitio?.sitio_name ?? 'Unassigned'}
-                        </td>
-                        <td>
-                          <span
-                            className={`account-status ${
-                              admin.account_status === 'active'
-                                ? 'status-active'
-                                : 'status-suspended'
-                            }`}
-                          >
-                            {admin.account_status}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-
-                  {admins.length === 0 && (
-                    <tr>
-                      <td colSpan={5}>
-                        No Admin accounts found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <h2>Sitio Overview</h2>
-            <p>Registered Sitios returned by the backend.</p>
-
-            <div className="super-admin-table-wrap">
-              <table className="super-admin-table">
-                <thead>
-                  <tr>
-                    <th>Sitio ID</th>
-                    <th>Sitio Name</th>
-                    <th>Assigned Admins</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {sitios.map((sitio) => (
-                    <tr key={sitio.sitio_id}>
-                      <td>{sitio.sitio_id}</td>
-                      <td>{sitio.sitio_name}</td>
-                      <td>
-                        {
-                          admins.filter(
-                            (admin) =>
-                              admin.assigned_sitio_id ===
-                              sitio.sitio_id,
-                          ).length
-                        }
-                      </td>
-                    </tr>
-                  ))}
-
-                  {sitios.length === 0 && (
-                    <tr>
-                      <td colSpan={3}>No Sitios found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {error.toLowerCase().includes('session') && (
+              <p>
+                Please sign in again using your Super Admin account.
+              </p>
+            )}
           </section>
-        </>
-      )}
-    </main>
+        )}
+
+        {hasLoaded && !error && (
+          <Outlet context={outletContext} />
+        )}
+      </main>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import {
   createAdmin,
   UUID_PATTERN,
@@ -23,11 +23,68 @@ const emptyForm = {
 
 type FormState = typeof emptyForm
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Mirrors the backend rule: optional +, then digits, spaces, or hyphens.
+const CONTACT_PATTERN = /^\+?[0-9][0-9\s-]*$/
+
+function validate(form: FormState, sitios: Sitio[]): string | null {
+  if (
+    !form.email.trim() ||
+    !form.f_name.trim() ||
+    !form.l_name.trim() ||
+    !form.contact_no.trim()
+  ) {
+    return 'Email, first name, last name, and contact number are required.'
+  }
+
+  if (!EMAIL_PATTERN.test(form.email.trim())) {
+    return 'Please enter a valid email address.'
+  }
+
+  if (form.password.length < 8) {
+    return 'Password must be at least 8 characters long.'
+  }
+
+  if (new TextEncoder().encode(form.password).length > 72) {
+    return 'Password must be at most 72 characters long.'
+  }
+
+  if (
+    form.email.trim().length > 100 ||
+    form.f_name.trim().length > 100 ||
+    form.m_name.trim().length > 100 ||
+    form.l_name.trim().length > 100
+  ) {
+    return 'Email and names must be at most 100 characters.'
+  }
+
+  const contact = form.contact_no.trim()
+  const contactDigits = contact.replace(/\D/g, '')
+
+  if (
+    !CONTACT_PATTERN.test(contact) ||
+    contactDigits.length < 7 ||
+    contactDigits.length > 15
+  ) {
+    return 'Contact number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).'
+  }
+
+  const sitioId = Number(form.assigned_sitio_id)
+
+  if (!sitios.some((sitio) => sitio.sitio_id === sitioId)) {
+    return 'Please select a valid Sitio.'
+  }
+
+  return null
+}
+
 export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  // Guards against double submits before the disabled button re-renders.
+  const inFlight = useRef(false)
 
   const update = (field: keyof FormState) =>
     (event: { target: { value: string } }) => {
@@ -43,6 +100,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (inFlight.current) return
     setError('')
     setSuccess('')
 
@@ -51,11 +109,14 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
       return
     }
 
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters long.')
+    const validationError = validate(form, sitios)
+
+    if (validationError) {
+      setError(validationError)
       return
     }
 
+    inFlight.current = true
     setSubmitting(true)
 
     try {
@@ -86,6 +147,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
         err instanceof Error ? err.message : 'Unable to create the Admin account.',
       )
     } finally {
+      inFlight.current = false
       setSubmitting(false)
     }
   }
@@ -146,6 +208,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
             type="email"
             value={form.email}
             onChange={update('email')}
+            maxLength={100}
             required
             autoComplete="off"
           />
@@ -158,6 +221,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
             value={form.password}
             onChange={update('password')}
             minLength={8}
+            maxLength={72}
             required
             autoComplete="new-password"
           />
@@ -169,23 +233,25 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
             type="tel"
             value={form.contact_no}
             onChange={update('contact_no')}
+            maxLength={50}
+            placeholder="e.g. 09171234567"
             required
           />
         </label>
 
         <label className="create-admin-field">
           <span>First Name *</span>
-          <input type="text" value={form.f_name} onChange={update('f_name')} required />
+          <input type="text" value={form.f_name} onChange={update('f_name')} maxLength={100} required />
         </label>
 
         <label className="create-admin-field">
           <span>Middle Name</span>
-          <input type="text" value={form.m_name} onChange={update('m_name')} />
+          <input type="text" value={form.m_name} onChange={update('m_name')} maxLength={100} />
         </label>
 
         <label className="create-admin-field">
           <span>Last Name *</span>
-          <input type="text" value={form.l_name} onChange={update('l_name')} required />
+          <input type="text" value={form.l_name} onChange={update('l_name')} maxLength={100} required />
         </label>
 
         {error && (

@@ -8,6 +8,12 @@ import {
 
 import { LoginPage } from './pages/LoginPage'
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard'
+import {
+  SuperAdminAdminAccounts,
+  SuperAdminCreateAdmin,
+  SuperAdminOverview,
+  SuperAdminSitioOverview,
+} from './pages/SuperAdminViews'
 import App from './App'
 
 export default function AppRouter() {
@@ -38,11 +44,29 @@ export default function AppRouter() {
           element={<App />}
         />
 
-        {/* Super Admin dashboard */}
+        {/* Super Admin: shared layout + sidebar, one view per page */}
         <Route
           path="/super-admin"
           element={<SuperAdminDashboard />}
-        />
+        >
+          <Route index element={<SuperAdminOverview />} />
+          <Route
+            path="create-admin"
+            element={<SuperAdminCreateAdmin />}
+          />
+          <Route
+            path="admins"
+            element={<SuperAdminAdminAccounts />}
+          />
+          <Route
+            path="sitios"
+            element={<SuperAdminSitioOverview />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to="/super-admin" replace />}
+          />
+        </Route>
 
         {/* Unknown URL */}
         <Route

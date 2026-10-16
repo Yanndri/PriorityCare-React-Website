@@ -381,6 +381,51 @@ app.post(
         });
       }
 
+      // Supabase Auth (bcrypt) only uses the first 72 bytes of a password.
+      if (Buffer.byteLength(password, "utf8") > 72) {
+        return res.status(400).json({
+          message: "Password must be at most 72 characters long.",
+        });
+      }
+
+      if (
+        m_name !== undefined &&
+        m_name !== null &&
+        typeof m_name !== "string"
+      ) {
+        return res.status(400).json({
+          message: "Middle name must be text.",
+        });
+      }
+
+      // Match the varchar limits of public.users.
+      const tooLong =
+        email.trim().length > 100 ||
+        f_name.trim().length > 100 ||
+        l_name.trim().length > 100 ||
+        (typeof m_name === "string" && m_name.trim().length > 100) ||
+        contact_no.trim().length > 50;
+
+      if (tooLong) {
+        return res.status(400).json({
+          message:
+            "Email and names must be at most 100 characters; contact number at most 50.",
+        });
+      }
+
+      const contactDigits = contact_no.replace(/\D/g, "");
+
+      if (
+        !/^\+?[0-9][0-9\s-]*$/.test(contact_no.trim()) ||
+        contactDigits.length < 7 ||
+        contactDigits.length > 15
+      ) {
+        return res.status(400).json({
+          message:
+            "Contact number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).",
+        });
+      }
+
       if (
         typeof assigned_sitio_id !== "number" &&
         typeof assigned_sitio_id !== "string"
@@ -542,6 +587,14 @@ app.post(
           authError?.message
         );
 
+        // The profile email check above is case-sensitive, so Auth is
+        // the final authority on duplicate emails.
+        if (authError?.code === "email_exists") {
+          return res.status(409).json({
+            message: "An account with this email already exists.",
+          });
+        }
+
         return res.status(400).json({
           message:
             authError?.message ||
@@ -595,6 +648,15 @@ app.post(
           );
         } else {
           createdUserId = null;
+        }
+
+        // Unique violation: a concurrent request took the email,
+        // contact number, or User ID after the pre-checks above.
+        if (profileError.code === "23505") {
+          return res.status(409).json({
+            message:
+              "An account with this email, contact number, or User ID already exists.",
+          });
         }
 
         return res.status(500).json({
@@ -653,6 +715,31 @@ app.get(
     });
   }
 );
+
+// ============================================
+// JSON ERROR HANDLER
+// ============================================
+
+// Keep error responses JSON (e.g. malformed request bodies) instead of
+// Express's default HTML page.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+
+  const status = err.status || err.statusCode || 500;
+
+  if (status >= 500) {
+    console.error("Unhandled API error:", err.message);
+  }
+
+  return res.status(status).json({
+    message:
+      status === 400
+        ? "Invalid request body."
+        : status === 413
+          ? "Request body is too large."
+          : "Internal server error.",
+  });
+});
 
 // ============================================
 // START SERVER

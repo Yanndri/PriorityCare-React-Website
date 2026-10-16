@@ -5,6 +5,8 @@ export type EvacReportRow = { record_id: string; resident_uid: string; evac_stat
 export type ShelterReportRow = { center_id: number; center_name?: string; capacity: number | null; occupied: number; status?: string }
 export type ResidentReportRow = { uid: string; birthdate: string | null; sex?: string | null; mobility_status: string | null }
 export type ProfileReportRow = { resident_uid: string; is_pregnant: boolean; household_id: string | null; vulnerability_needs: string }
+export type ManifestReportRow = { report_id: string; status: string; reported_at: string; reconciled_at: string | null }
+export type DeclaredEventRow = { event_id: string; name: string; hazard_type: string; status: string; started_at: string; resolved_at: string | null }
 export type RdanaData = {
   window: ReportWindow
   scope: string
@@ -16,6 +18,9 @@ export type RdanaData = {
   loggedEvacuations: ReportSection<EvacReportRow[]>
   completedEvacuations: ReportSection<EvacReportRow[]>
   shelters: ReportSection<ShelterReportRow[]>
+  // Optional so earlier callers keep their previous "Not assessed" wording.
+  missingReports?: ReportSection<ManifestReportRow[]>
+  declaredEvents?: ReportSection<DeclaredEventRow[]>
 }
 export function makeReportWindow(hours: 24 | 48, end = new Date().toISOString()): ReportWindow {
   if (![24, 48].includes(hours) || !Number.isFinite(Date.parse(end))) throw new Error('Choose a valid 24- or 48-hour window.')
@@ -41,6 +46,25 @@ function manila(value: string) {
   return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 function unavailable(reason: string) { return `Not available — ${reason}` }
+// Missing-person manifest activity: filed/closed timestamps inside the window,
+// plus reports still open at retrieval (current status, not a casualty count).
+export function manifestActivity(rows: ManifestReportRow[], window: ReportWindow) {
+  const reports = unique(rows, (row) => row.report_id)
+  return {
+    filed: reports.filter((row) => inReportWindow(row.reported_at, window)).length,
+    found: reports.filter((row) => row.status === 'found' && inReportWindow(row.reconciled_at, window)).length,
+    withdrawn: reports.filter((row) => row.status === 'withdrawn' && inReportWindow(row.reconciled_at, window)).length,
+    openNow: reports.filter((row) => row.status === 'missing').length,
+  }
+}
+// Declared events whose active interval overlaps the reporting window.
+export function eventsDuringWindow(rows: DeclaredEventRow[], window: ReportWindow) {
+  return unique(rows, (row) => row.event_id).filter((row) => {
+    const started = Date.parse(row.started_at)
+    const resolved = row.resolved_at ? Date.parse(row.resolved_at) : Infinity
+    return Number.isFinite(started) && started < Date.parse(window.end) && resolved >= Date.parse(window.start)
+  }).sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at))
+}
 export function ageAt(birthdate: string | null, end: string) {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(end))
   if (!birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > day) return null
@@ -61,9 +85,16 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     '',
     '1. INCIDENT / ASSESSMENT CONTEXT',
     context.trim() ? `Administrator-provided context (not independently verified):\n${context.trim()}` : 'Disaster event, onset, and assessed affected area: Not assessed.',
-    '',
-    '2. RECORDED ACTIVITY DURING THE REPORTING PERIOD',
   ]
+  if (data.declaredEvents?.available) {
+    const events = eventsDuringWindow(data.declaredEvents.data, data.window)
+    lines.push(events.length
+      ? `Declared disaster events active during the period (register; sitio-scoped): ${events.length}.`
+      : 'Declared disaster events active during the period: none recorded in the register.')
+    for (const event of events) lines.push(`- ${event.name} — ${event.hazard_type}; onset ${manila(event.started_at)}; ${event.status === 'resolved' && event.resolved_at ? `resolved ${manila(event.resolved_at)}` : 'still active at retrieval'}.`)
+    if (events.length) lines.push('Declarations are reference records; affected areas are not assessed and individual records are not attributed to an event.')
+  } else if (data.declaredEvents) lines.push(`Declared disaster events: ${unavailable(data.declaredEvents.reason)}.`)
+  lines.push('', '2. RECORDED ACTIVITY DURING THE REPORTING PERIOD')
   if (data.sos.available) {
     const sos = unique(data.sos.data.filter((row) => inReportWindow(row.created_at, data.window)), (row) => row.alert_id)
     lines.push(`SOS alerts created: ${sos.length}; distinct reporting resident accounts: ${new Set(sos.map((row) => row.resident_uid)).size}.`)
@@ -102,8 +133,14 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     lines.push(`Current recorded occupancy in active facilities: ${active.reduce((sum, center) => sum + center.occupied, 0)}; reviewed capacity across known active facilities: ${known.reduce((sum, center) => sum + center.capacity!, 0)}; known available slots: ${known.reduce((sum, center) => sum + Math.max(0, center.capacity! - center.occupied), 0)}.`)
     lines.push(`Active facilities with capacity not set: ${active.length - known.length}; at or above capacity: ${known.filter((center) => center.occupied >= center.capacity!).length}.`)
   } else lines.push(`Shelter snapshot: ${unavailable(data.shelters.reason)}.`)
-  lines.push('', '5. DAMAGE, NEEDS, AND VALIDATION GAPS',
-    'Deaths, injuries, missing persons, damaged homes, infrastructure damage, and total disaster-affected people/families: Not assessed.',
+  lines.push('', '5. DAMAGE, NEEDS, AND VALIDATION GAPS')
+  if (data.missingReports?.available) {
+    const manifest = manifestActivity(data.missingReports.data, data.window)
+    lines.push(`Missing-person manifest (sitio-scoped): reports filed in period ${manifest.filed}; marked found in period ${manifest.found}; withdrawn in period ${manifest.withdrawn}; open reports at retrieval ${manifest.openNow}. Open reports are unresolved cases, not a casualty count.`)
+  } else if (data.missingReports) lines.push(`Missing-person manifest: ${unavailable(data.missingReports.reason)}.`)
+  lines.push(data.missingReports
+    ? 'Deaths, injuries, damaged homes, infrastructure damage, and total disaster-affected people/families: Not assessed.'
+    : 'Deaths, injuries, missing persons, damaged homes, infrastructure damage, and total disaster-affected people/families: Not assessed.',
     'Daily FFP, potable-water, and hygiene-kit requisitions: Not available in this report. Relief-planner drafts are not persisted; attach a reviewed daily requisition export separately.',
     'Disaster-event attribution: Not assessed. Time-window activity may involve multiple incidents.',
     'SOS status does not establish rescue completion; failed evacuation records do not establish a missing person.',
@@ -112,6 +149,20 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     'Statuses are current recorded values, not a reconstruction of status changes during the reporting period.',
     'Population scope follows current sitio registration. Shelter figures are facility-wide and must not be added to registered population totals.',
     'Data is retrieved in multiple read-only queries, not one transactional snapshot. Later transfers, profile edits, and status changes can affect the next generated draft.',
+    '',
+    '7. DATA SOURCES',
+    `Registered residents (sitio registry): retrieved, ${residents.length} account(s).`,
+    ...([
+      ['SOS alerts (creation time)', data.sos],
+      ['Evacuation records (logged time)', data.loggedEvacuations],
+      ['Evacuation records (completion time)', data.completedEvacuations],
+      ['Supplemental resident assessments', data.profiles],
+      ['Resident disability categories', data.disabilityResidents],
+      ['Evacuation facility catalog (all sitios)', data.shelters],
+      ...(data.declaredEvents ? [['Disaster event register', data.declaredEvents] as const] : []),
+      ...(data.missingReports ? [['Missing-person manifest', data.missingReports] as const] : []),
+    ] as const).map(([label, section]) => `${label}: ${section.available ? 'retrieved' : unavailable(section.reason)}.`),
+    '',
     'Reviewer / office: ____________________    Review date: ____________________',
     'Approval / distribution: Pending administrator review.',
   )

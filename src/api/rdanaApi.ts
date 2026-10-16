@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import { makeReportWindow, readReportPages, type RdanaData, type ReportSection, type ResidentReportRow, type SosReportRow, type EvacReportRow, type ProfileReportRow, type ShelterReportRow } from '../utils/rdana'
+import { makeReportWindow, readReportPages, type RdanaData, type ReportSection, type ResidentReportRow, type SosReportRow, type EvacReportRow, type ProfileReportRow, type ShelterReportRow, type ManifestReportRow, type DeclaredEventRow } from '../utils/rdana'
 
 async function optional<T>(read: () => Promise<T>, reason: string): Promise<ReportSection<T>> {
   try { return { available: true, data: await read() } }
@@ -27,7 +27,8 @@ export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
     .select('uid,birthdate,sex,mobility_status').eq('sitio_id', actor.assigned_sitio_id).order('uid').range(from, to))
   const ids = residents.map((resident) => resident.uid)
   const columns = 'record_id,resident_uid,evac_status,logged_at,evacuated_at'
-  const [sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters] = await Promise.all([
+  const scopedSitio = actor.assigned_sitio_id
+  const [sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters, declaredEvents, missingReports] = await Promise.all([
     optional(() => byResidentChunks<SosReportRow>(ids, (chunk, from, to) => supabase.from('sos_alerts')
       .select('alert_id,resident_uid,status,created_at').in('resident_uid', chunk)
       .gte('created_at', window.start).lt('created_at', window.end).order('created_at').order('alert_id').range(from, to)), 'SOS data could not be retrieved completely.'),
@@ -47,6 +48,19 @@ export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
       const nameMap = new Map(names.map((row) => [row.center_id, row.center_name]))
       return (data as ShelterReportRow[]).map((row) => ({ ...row, center_name: nameMap.get(row.center_id) ?? `Facility ${row.center_id}` }))
     }, 'Shared shelter catalog is unavailable; verify the facility migrations and permissions.'),
+    // Existing scoped RPCs; rows are narrowed to the assigned sitio so super admins get the same scope as the report.
+    optional(async () => {
+      const { data, error } = await supabase.rpc('get_disaster_event_register')
+      if (error || !data || !Array.isArray(data.events)) throw new Error('Event register unavailable.')
+      return (data.events as (DeclaredEventRow & { sitio_id: number })[]).filter((row) => row.sitio_id === scopedSitio)
+        .map(({ event_id, name, hazard_type, status, started_at, resolved_at }) => ({ event_id, name, hazard_type, status, started_at, resolved_at }))
+    }, 'Disaster event register could not be retrieved.'),
+    optional(async () => {
+      const { data, error } = await supabase.rpc('get_rescue_reconciliation')
+      if (error || !data || !Array.isArray(data.reports)) throw new Error('Manifest unavailable.')
+      return (data.reports as (ManifestReportRow & { sitio_id: number })[]).filter((row) => row.sitio_id === scopedSitio)
+        .map(({ report_id, status, reported_at, reconciled_at }) => ({ report_id, status, reported_at, reconciled_at }))
+    }, 'Missing-person manifest could not be retrieved.'),
   ])
-  return { window, scope: `${sitio.sitio_name} (sitio ${actor.assigned_sitio_id})`, fetchedAt: new Date().toISOString(), residents, sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters }
+  return { window, scope: `${sitio.sitio_name} (sitio ${actor.assigned_sitio_id})`, fetchedAt: new Date().toISOString(), residents, sos, loggedEvacuations, completedEvacuations, profiles, disabilityResidents, shelters, declaredEvents, missingReports }
 }

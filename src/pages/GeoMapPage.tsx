@@ -90,7 +90,9 @@ const barangays = [
 // ======================================================
 
 delete (
-  L.Icon.Default.prototype as any
+  L.Icon.Default.prototype as L.Icon.Default & {
+    _getIconUrl?: unknown
+  }
 )._getIconUrl
 
 L.Icon.Default.mergeOptions({
@@ -185,6 +187,105 @@ type GeoMapPageProps = {
   residents?: Resident[]
 }
 
+// ======================================================
+// 🚨 EMERGENCY REQUESTS / 🌦️ WEATHER LOADERS
+// These only fetch and return data; the component sets state.
+// ======================================================
+
+type FloodArea = (typeof barangays)[number]
+
+type EmergencyRequest = {
+  id: string | number
+  disaster_type?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
+  resident_name?: string | null
+  status?: string | null
+}
+
+async function loadEmergencyRequests(): Promise<
+  EmergencyRequest[] | null
+> {
+  if (!hasSupabaseConfig) {
+    return null
+  }
+
+  try {
+    const { data, error } =
+      await supabase
+        .from(
+          'sos_alerts',
+        )
+        .select('*')
+
+    if (error) {
+      console.error(
+        'Failed to fetch emergency requests:',
+        error,
+      )
+
+      return null
+    }
+
+    return data ?? null
+  } catch (error) {
+    console.error(
+      'Emergency request error:',
+      error,
+    )
+
+    return null
+  }
+}
+
+async function loadWeatherRisk(): Promise<{
+  rain: number
+  areas: FloodArea[]
+} | null> {
+  if (!WEATHER_API_KEY) {
+    console.warn(
+      'VITE_OPENWEATHER_API_KEY is not configured.',
+    )
+
+    return null
+  }
+
+  try {
+    const response =
+      await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=10.3157&lon=123.8854&appid=${WEATHER_API_KEY}`,
+      )
+
+    if (!response.ok) {
+      throw new Error(
+        `Weather API returned ${response.status}`,
+      )
+    }
+
+    const weatherData =
+      await response.json()
+
+    const rain: number =
+      weatherData.clouds?.all || 0
+
+    const areas =
+      barangays.filter(
+        (barangay) =>
+          rain > 70 &&
+          barangay.lowElevation,
+      )
+
+    return { rain, areas }
+  } catch (error) {
+    console.error(
+      'Weather API error:',
+      error,
+    )
+
+    return null
+  }
+}
+
 export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
   // ====================================================
@@ -202,7 +303,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   // ====================================================
 
   const [requests, setRequests] =
-    useState<any[]>([])
+    useState<EmergencyRequest[]>([])
 
   // ====================================================
   // 🌧️ WEATHER DATA
@@ -216,7 +317,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   // ====================================================
 
   const [affectedAreas, setAffectedAreas] =
-    useState<any[]>([])
+    useState<FloodArea[]>([])
 
   // ====================================================
   // 🪟 PANEL POSITION
@@ -227,6 +328,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
   const floodPanelRef =
     useRef<HTMLDivElement | null>(null)
+
+  // Whether the Live Flood Prediction panel is shown (Weather mode).
+  const [isFloodPanelOpen, setIsFloodPanelOpen] =
+    useState(true)
 
   const [panelPosition, setPanelPosition] =
     useState({
@@ -317,6 +422,76 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   // ====================================================
 
   useEffect(() => {
+
+    // Clamp the dragged panel inside the map section.
+    function updatePanelPosition(
+      clientX: number,
+      clientY: number,
+    ) {
+
+      const section =
+        mapSectionRef.current
+
+      const panel =
+        floodPanelRef.current
+
+      if (!section || !panel) {
+        return
+      }
+
+      const sectionRect =
+        section.getBoundingClientRect()
+
+      const panelRect =
+        panel.getBoundingClientRect()
+
+      let newX =
+        clientX -
+        sectionRect.left -
+        dragOffset.current.x
+
+      let newY =
+        clientY -
+        sectionRect.top -
+        dragOffset.current.y
+
+      const maxX =
+        Math.max(
+          10,
+          sectionRect.width -
+            panelRect.width -
+            10,
+        )
+
+      const maxY =
+        Math.max(
+          10,
+          sectionRect.height -
+            panelRect.height -
+            10,
+        )
+
+      newX = Math.max(
+        10,
+        Math.min(
+          newX,
+          maxX,
+        ),
+      )
+
+      newY = Math.max(
+        10,
+        Math.min(
+          newY,
+          maxY,
+        ),
+      )
+
+      setPanelPosition({
+        x: newX,
+        y: newY,
+      })
+    }
 
     function handleMouseMove(
       event: MouseEvent,
@@ -420,81 +595,17 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   ])
 
   // ====================================================
-  // 📍 UPDATE PANEL POSITION
-  // ====================================================
-
-  function updatePanelPosition(
-    clientX: number,
-    clientY: number,
-  ) {
-
-    const section =
-      mapSectionRef.current
-
-    const panel =
-      floodPanelRef.current
-
-    if (!section || !panel) {
-      return
-    }
-
-    const sectionRect =
-      section.getBoundingClientRect()
-
-    const panelRect =
-      panel.getBoundingClientRect()
-
-    let newX =
-      clientX -
-      sectionRect.left -
-      dragOffset.current.x
-
-    let newY =
-      clientY -
-      sectionRect.top -
-      dragOffset.current.y
-
-    const maxX =
-      Math.max(
-        10,
-        sectionRect.width -
-          panelRect.width -
-          10,
-      )
-
-    const maxY =
-      Math.max(
-        10,
-        sectionRect.height -
-          panelRect.height -
-          10,
-      )
-
-    newX = Math.max(
-      10,
-      Math.min(
-        newX,
-        maxX,
-      ),
-    )
-
-    newY = Math.max(
-      10,
-      Math.min(
-        newY,
-        maxY,
-      ),
-    )
-
-    setPanelPosition({
-      x: newX,
-      y: newY,
-    })
-  }
-
-  // ====================================================
   // 🔄 RESET PANEL
   // ====================================================
+
+  function hideFloodPanel() {
+
+    setIsFloodPanelOpen(false)
+
+    setIsDragging(false)
+
+    setIsArmed(false)
+  }
 
   function resetPanelPosition() {
 
@@ -509,122 +620,37 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
   }
 
   // ====================================================
-  // 🚨 FETCH REQUESTS
-  // ====================================================
-
-  async function fetchRequests() {
-    if (!hasSupabaseConfig) {
-      return
-    }
-
-    try {
-
-      const { data, error } =
-        await supabase
-          .from(
-            'sos_alerts',
-          )
-          .select('*')
-
-      if (error) {
-
-        console.error(
-          'Failed to fetch emergency requests:',
-          error,
-        )
-
-        return
-      }
-
-      if (data) {
-
-        setRequests(data)
-      }
-
-    } catch (error) {
-
-      console.error(
-        'Emergency request error:',
-        error,
-      )
-    }
-  }
-
-  // ====================================================
-  // 🌦️ FETCH WEATHER
-  // ====================================================
-
-  async function fetchWeather() {
-
-    if (!WEATHER_API_KEY) {
-
-      console.warn(
-        'VITE_OPENWEATHER_API_KEY is not configured.',
-      )
-
-      return
-    }
-
-    try {
-
-      const response =
-        await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=10.3157&lon=123.8854&appid=${WEATHER_API_KEY}`,
-        )
-
-      if (!response.ok) {
-
-        throw new Error(
-          `Weather API returned ${response.status}`,
-        )
-      }
-
-      const weatherData =
-        await response.json()
-
-      const rain =
-        weatherData.clouds?.all || 0
-
-      setRainfallLevel(
-        rain,
-      )
-
-      const riskyAreas =
-        barangays.filter(
-          (barangay) => {
-
-            return (
-              rain > 70 &&
-              barangay.lowElevation
-            )
-          },
-        )
-
-      setAffectedAreas(
-        riskyAreas,
-      )
-
-    } catch (error) {
-
-      console.error(
-        'Weather API error:',
-        error,
-      )
-    }
-  }
-
-  // ====================================================
   // 🌍 REALTIME
   // ====================================================
 
   useEffect(() => {
-    fetchWeather()
+    // Guards against setting state after the page unmounts.
+    let active = true
+
+    void loadWeatherRisk().then((weather) => {
+      if (!active || !weather) {
+        return
+      }
+
+      setRainfallLevel(weather.rain)
+      setAffectedAreas(weather.areas)
+    })
 
     if (!hasSupabaseConfig) {
-      return
+      return () => {
+        active = false
+      }
     }
 
-    fetchRequests()
+    function refreshRequests() {
+      void loadEmergencyRequests().then((rows) => {
+        if (active && rows) {
+          setRequests(rows)
+        }
+      })
+    }
+
+    refreshRequests()
 
     const channel =
       supabase
@@ -641,12 +667,13 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           },
           () => {
 
-            fetchRequests()
+            refreshRequests()
           },
         )
         .subscribe()
 
     return () => {
+      active = false
 
       supabase.removeChannel(
         channel,
@@ -674,16 +701,29 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
     <section
       ref={mapSectionRef}
+      className="geo-map-page"
       style={{
         width: '100%',
 
-        height: '100vh',
+        // Fill the screen below the sticky 82px header (+24px gap): close to
+        // the original full-height map, but the whole map fits on screen
+        // once scrolled to, instead of 100vh running past the bottom.
+        height: 'calc(100vh - 106px)',
+
+        minHeight: '480px',
 
         overflow: 'hidden',
 
         borderRadius: '20px',
 
         position: 'relative',
+
+        // Own stacking context: keeps Leaflet panes/controls (z 400-1000)
+        // and the map's floating panels (z 9999+) from painting over the
+        // sticky header and sidebar.
+        isolation: 'isolate',
+
+        zIndex: 0,
 
         background: '#07111f',
       }}
@@ -753,6 +793,35 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           🌪️ Weather
         </button>
 
+        {mapMode === 'weather' &&
+          !isFloodPanelOpen && (
+
+          <button
+            type="button"
+
+            onClick={() =>
+              setIsFloodPanelOpen(
+                true,
+              )
+            }
+
+            aria-expanded={false}
+
+            aria-controls="flood-prediction-panel"
+
+            style={{
+              pointerEvents:
+                'auto',
+
+              background:
+                '#b91c1c',
+            }}
+          >
+            ⚠️ Flood Prediction
+          </button>
+
+        )}
+
       </div>
 
       {/* ==================================================
@@ -789,26 +858,36 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               🌊 FLOATING FLOOD PANEL
               ================================================== */}
 
+          {isFloodPanelOpen && (
+
           <div
             ref={
               floodPanelRef
             }
 
+            id="flood-prediction-panel"
+
+            role="region"
+
+            aria-label="Live Flood Prediction"
+
             style={{
               position:
                 'absolute',
 
+              // Clamp the saved position so the panel never spills
+              // outside the map container (e.g. after a resize).
               left:
-                `${panelPosition.x}px`,
+                `min(${panelPosition.x}px, calc(100% - min(320px, calc(100% - 36px)) - 10px))`,
 
               top:
-                `${panelPosition.y}px`,
+                `min(${panelPosition.y}px, calc(100% - 140px))`,
 
               width:
                 'min(320px, calc(100% - 36px))',
 
               maxHeight:
-                '45vh',
+                `min(45vh, calc(100% - min(${panelPosition.y}px, calc(100% - 140px)) - 10px))`,
 
               overflowY:
                 'auto',
@@ -941,17 +1020,70 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
               </div>
 
-              <span
+              <div
                 style={{
-                  fontSize:
-                    '20px',
+                  display:
+                    'flex',
 
-                  opacity:
-                    0.55,
+                  alignItems:
+                    'center',
+
+                  gap:
+                    '6px',
                 }}
               >
-                ⠿
-              </span>
+
+                <span
+                  style={{
+                    fontSize:
+                      '20px',
+
+                    opacity:
+                      0.55,
+                  }}
+                >
+                  ⠿
+                </span>
+
+                <button
+                  type="button"
+
+                  onClick={
+                    hideFloodPanel
+                  }
+
+                  // Don't start the drag gesture from the close button.
+                  onMouseDown={(event: ReactMouseEvent<HTMLButtonElement>) =>
+                    event.stopPropagation()
+                  }
+
+                  onTouchStart={(event: ReactTouchEvent<HTMLButtonElement>) =>
+                    event.stopPropagation()
+                  }
+
+                  aria-label="Hide Live Flood Prediction panel"
+
+                  aria-expanded={true}
+
+                  aria-controls="flood-prediction-panel"
+
+                  title="Hide panel"
+
+                  style={{
+                    padding:
+                      '4px 9px',
+
+                    fontSize:
+                      '14px',
+
+                    lineHeight:
+                      1,
+                  }}
+                >
+                  ✕
+                </button>
+
+              </div>
 
             </div>
 
@@ -1067,6 +1199,8 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
             </button>
 
           </div>
+
+          )}
 
         </>
 
@@ -1294,7 +1428,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
       <style>
         {`
 
-          button {
+          .geo-map-page button {
             background:
               rgba(15,23,42,0.90);
 
@@ -1321,7 +1455,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               rgba(0,0,0,0.20);
           }
 
-          button:hover {
+          .geo-map-page button:hover {
             background:
               #1e293b;
 
@@ -1331,7 +1465,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
           @media (max-width: 600px) {
 
-            button {
+            .geo-map-page button {
               font-size:
                 11px !important;
 
