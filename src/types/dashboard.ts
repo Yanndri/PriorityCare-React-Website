@@ -8,6 +8,7 @@ export type MenuKey =
   | 'disasterEvents'
   | 'rescueReconciliation'
   | 'familyReunification'
+  | 'dispatch'
   | 'reports'
   | 'dataMining'
   | 'evacCenters'
@@ -40,6 +41,8 @@ export type Resident = {
   disabilityCount?: number
   isPregnant?: boolean
   householdId?: string
+  /** Names from disability_types; undefined when the disability assessment was never loaded. */
+  disabilityTypes?: string[]
   householdName?: string
   isHouseholdHead?: boolean
   vulnerabilityNeeds?: string

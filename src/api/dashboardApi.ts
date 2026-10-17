@@ -261,6 +261,15 @@ export async function fetchDashboardDataFromSupabase(
       counts.set(key, ids)
     }
     for (const resident of residents) resident.disabilityCount = counts.get(String(resident.id))?.size
+    // Disability names (Visual, Hearing, …) for equipment matching (Module 5.4).
+    if ((disabilityRows ?? []).length) {
+      const { data: typeRows } = await supabase.from('disability_types').select('disability_id,disability_name')
+      const names = new Map((typeRows ?? []).map((t) => [t.disability_id, t.disability_name as string]))
+      for (const resident of residents) {
+        const ids = counts.get(String(resident.id))
+        if (ids) resident.disabilityTypes = [...ids].map((id) => names.get(id) ?? `Type ${id}`)
+      }
+    }
     const { data: details, error } = await supabase.from('resident_profile_details')
       .select('resident_uid,address,landmark,is_pregnant,vulnerability_needs,household_id')
       .in('resident_uid', residentIds)
@@ -276,6 +285,7 @@ export async function fetchDashboardDataFromSupabase(
         resident.landmark = detail.landmark || 'No landmark provided'
         resident.isPregnant = detail.is_pregnant
         resident.disabilityCount ??= 0 // A saved assessment with no selected categories.
+        resident.disabilityTypes ??= []
         resident.vulnerabilityNeeds = detail.vulnerability_needs
         const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
         resident.householdId = household?.household_id

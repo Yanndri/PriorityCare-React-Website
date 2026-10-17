@@ -1,5 +1,12 @@
 -- Removes everything inserted by supabase/seed/mock_data.sql (c0ffee00-… IDs, mock centers 9001–9003).
 begin;
+delete from public.dispatch_ticket_events where ticket_id in (select ticket_id from public.dispatch_tickets
+  where source_ref like 'c0ffee00-%' or resident_uid::text like 'c0ffee00-%'
+     or assigned_unit_id in (select unit_id from public.rescue_units where unit_name in ('Barangay Rescue 1','Sitio 3 Alpha Team')));
+delete from public.dispatch_tickets where source_ref like 'c0ffee00-%' or resident_uid::text like 'c0ffee00-%'
+   or assigned_unit_id in (select unit_id from public.rescue_units where unit_name in ('Barangay Rescue 1','Sitio 3 Alpha Team'));
+delete from public.rescue_units where unit_name in ('Barangay Rescue 1','Sitio 3 Alpha Team');
+delete from public.sos_alerts where alert_id::text like 'c0ffee00-%';
 delete from public.missing_person_report_audit where report_id::text like 'c0ffee00-%';
 delete from public.missing_person_reports where report_id::text like 'c0ffee00-%'
    or resident_uid::text like 'c0ffee00-%' or matched_resident_uid::text like 'c0ffee00-%';

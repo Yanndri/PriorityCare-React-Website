@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
+import { useEquipmentRules } from '../api/equipmentRulesApi'
+import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
 type VerificationPageProps = {
   residents: Resident[]
@@ -126,6 +128,8 @@ function VerificationRequestModal({
           <DetailItem label="Mobility" value={resident.mobilityStatus?.replaceAll('_', ' ') || resident.constraint} />
           <DetailItem label="Pregnant" value={resident.isPregnant === undefined ? 'Not recorded' : resident.isPregnant ? 'Yes' : 'No'} />
           <DetailItem label="Assistance Needs" value={resident.vulnerabilityNeeds || 'Not recorded'} />
+          <DetailItem label="Disabilities" value={resident.disabilityTypes === undefined ? 'Not assessed' : resident.disabilityTypes.length ? resident.disabilityTypes.join(', ') : 'None recorded'} />
+          <EquipmentNeeds resident={resident} />
           <DetailItem label="Household" value={resident.householdName || 'Not assigned'} />
           <DetailItem label="Sex" value={resident.sex ?? 'Not specified'} />
           <DetailItem label="Birthdate" value={resident.birthdate ?? 'Not provided'} />
@@ -225,6 +229,17 @@ function VerificationRequestModal({
 type DetailItemProps = {
   label: string
   value: string
+}
+
+// Module 5.4 — rescue equipment suggested by the equipment rules for this resident and their dependents.
+function EquipmentNeeds({ resident }: { resident: Resident }) {
+  const { rules } = useEquipmentRules()
+  const needs = matchEquipment(resident, rules)
+  const gaps = equipmentDataGaps(resident)
+  const text = needs.length
+    ? needs.map((n) => `${n.equipment} (${n.reasons.join('; ')})`).join(' · ')
+    : 'None suggested'
+  return <DetailItem label="Rescue Equipment Needs" value={gaps.length ? `${text} — not yet known: ${gaps.join(', ')}` : text} />
 }
 
 function DetailItem({ label, value }: DetailItemProps) {

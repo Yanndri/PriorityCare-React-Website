@@ -66,7 +66,8 @@ from (values
   (4, 'Purok 4, Sitio 3', 'Near the river bridge', true, '7 months pregnant', 'c0ffee00-0000-4000-8004-000000000002'),
   (5, 'Purok 4, Sitio 3', 'Near the river bridge', false, 'Minor; travels with mother', 'c0ffee00-0000-4000-8004-000000000002'),
   (6, 'Purok 1, Sitio 3', 'Green gate, end of alley', false, 'Bedridden, low vision, lives alone', null),
-  (10, 'Purok 3, Sitio 3', 'Sari-sari store corner', false, 'Wheelchair user; hearing aid', null)
+  (10, 'Purok 3, Sitio 3', 'Sari-sari store corner', false, 'Wheelchair user; hearing aid', null),
+  (7, 'Purok 2, Sitio 3', 'Blue house by the bridge', false, 'COPD; on oxygen at night', null)
 ) v(n, addr, landmark, pregnant, needs, hh)
 on conflict do nothing;
 
@@ -169,5 +170,22 @@ from (values
 cross join (select uid from public.users where role = 'super_admin' and account_status = 'active' order by created_at limit 1) sa
 where to_regclass('public.sitio_shelter_plans') is not null
 on conflict (sitio_id) do nothing;
+
+-- Dispatch (Module 5.5; requires 20261017_rescue_dispatch_tickets.sql): mock SOS alerts + responder units.
+-- Tickets are issued from the Dispatch page (or see docs/DISPATCH.md).
+insert into public.sos_alerts(alert_id, resident_uid, alert_level, alert_type, status, created_at) values
+  ('c0ffee00-0000-4000-8005-000000000001', 'c0ffee00-0000-4000-8000-000000000007', 3, 'medical', 'active', now() - interval '8 minutes'),
+  ('c0ffee00-0000-4000-8005-000000000002', 'c0ffee00-0000-4000-8000-000000000005', 2, 'flood', 'active', now() - interval '25 minutes'),
+  ('c0ffee00-0000-4000-8005-000000000003', 'c0ffee00-0000-4000-8000-000000000001', 3, 'flood', 'active', now() - interval '50 minutes')
+on conflict (alert_id) do nothing;
+insert into public.rescue_units(unit_name, sitio_id, capabilities, member_uids, updated_by)
+select v.name, v.sitio, v.caps, array(select uid from public.users where email = v.member_email), sa.uid
+from (values
+  ('Barangay Rescue 1', null::integer, array['Wheelchair','First aid kit','Oxygen'], 'vic@gmail.com'),
+  ('Sitio 3 Alpha Team', 3, array['Stretcher / spineboard','Boat','Life vests'], 'rescuer@prioritycare.local')
+) v(name, sitio, caps, member_email)
+cross join (select uid from public.users where role = 'super_admin' and account_status = 'active' order by created_at limit 1) sa
+where to_regclass('public.rescue_units') is not null
+on conflict do nothing;
 
 commit;

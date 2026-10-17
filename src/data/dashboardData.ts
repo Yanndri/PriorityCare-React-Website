@@ -9,6 +9,7 @@ export const menuItems: MenuItem[] = [
   { key: 'disasterEvents', label: 'Disaster Events' },
   { key: 'rescueReconciliation', label: 'Missing Persons' },
   { key: 'familyReunification', label: 'Family Reunification' },
+  { key: 'dispatch', label: 'Dispatch' },
   { key: 'reports', label: 'Reports' },
   { key: 'dataMining', label: 'Data Mining' },
   { key: 'evacCenters', label: 'Evac Centers' },
