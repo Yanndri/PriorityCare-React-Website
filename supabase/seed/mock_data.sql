@@ -159,4 +159,15 @@ cross join lateral (values ('reported'), ('found'), ('withdrawn')) a(action)
 where m.report_id::text like 'c0ffee00-%' and (a.action = 'reported' or a.action = m.status)
   and not exists (select 1 from public.missing_person_report_audit x where x.report_id = m.report_id and x.action = a.action);
 
+-- Sitio -> shelter catchment plans (Module 2.2; requires 20261017_sitio_shelter_catchments.sql)
+insert into public.sitio_shelter_plans(sitio_id, primary_center_id, alternate_center_ids, note, updated_by)
+select v.sitio, v.primary_center, v.alts, v.note, sa.uid
+from (values
+  (3, 9001, array[9002], 'Mock: Purok 1–4 to the school; covered court if full'),
+  (1, 9003, array[1], 'Mock: barangay hall first, sports complex as backup')
+) v(sitio, primary_center, alts, note)
+cross join (select uid from public.users where role = 'super_admin' and account_status = 'active' order by created_at limit 1) sa
+where to_regclass('public.sitio_shelter_plans') is not null
+on conflict (sitio_id) do nothing;
+
 commit;

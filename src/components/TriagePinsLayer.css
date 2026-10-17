@@ -1,0 +1,39 @@
+.triage-pin-icon { background: none; border: 0; }
+.triage-pin {
+  position: relative; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  background: var(--pin); border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--ring), 0 3px 6px rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.triage-pin-letter { transform: rotate(45deg); color: #fff; font: 800 13px/1 system-ui, sans-serif; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); }
+.triage-yellow .triage-pin-letter { color: #1f2937; text-shadow: none; }
+.triage-pin-count {
+  position: absolute; top: -8px; right: -8px; transform: rotate(45deg); min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 8px; background: #183153; color: #fff; font: 700 10px/16px system-ui, sans-serif; text-align: center;
+}
+.triage-incomplete { border-style: dashed; }
+.triage-pin-q {
+  position: absolute; bottom: -7px; left: -7px; transform: rotate(45deg); width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; color: #183153; border: 1px solid #183153; font: 800 10px/12px system-ui, sans-serif; text-align: center;
+}
+.triage-control.leaflet-control { margin: 0 10px 24px 0; }
+.triage-legend {
+  width: 240px; max-width: calc(100vw - 60px); padding: 10px 12px; border-radius: 10px; background: #fff; color: #183153;
+  box-shadow: 0 4px 16px rgba(24, 49, 83, 0.18); font: 12px/1.4 system-ui, sans-serif;
+}
+.triage-legend-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.triage-legend-head button { border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #183153; padding: 2px 9px; font: inherit; cursor: pointer; }
+.triage-legend-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer; }
+.triage-legend-row input { margin: 0; }
+.triage-swatch { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 10px; flex: none; }
+.triage-note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
+.triage-popup { font: 13px/1.45 system-ui, sans-serif; color: #183153; min-width: 220px; }
+.triage-popup-head { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.triage-popup-head .triage-swatch { width: 24px; height: 24px; font-size: 12px; }
+.triage-muted { color: #64748b; font-size: 12px; }
+.triage-members { list-style: none; margin: 8px 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.triage-members li { padding: 6px 0; border-top: 1px solid #e2e8f0; }
+.triage-level { float: right; margin-left: 6px; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700; background: #e2e8f0; color: #334155; }
+.triage-level-high { background: #fee2e2; color: #991b1b; }
+.triage-level-moderate { background: #fef3c7; color: #854d0e; }
+.triage-level-low { background: #dcfce7; color: #166534; }
+.triage-missing { color: #92400e; font-size: 11px; }

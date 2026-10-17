@@ -4,6 +4,7 @@ import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
 import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
+import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
 
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
@@ -145,6 +146,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
           })
         )}
       </div>
+      <ShelterCatchmentPanel />
       <ReliefDemandPlanner centers={centers} />
       {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} onClose={() => setForm(null)} onSaved={onReload} />}
       {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}

@@ -278,8 +278,20 @@ export async function fetchDashboardDataFromSupabase(
         resident.disabilityCount ??= 0 // A saved assessment with no selected categories.
         resident.vulnerabilityNeeds = detail.vulnerability_needs
         const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
+        resident.householdId = household?.household_id
         resident.householdName = household?.household_name
         resident.householdMembers = household?.household_members
+      }
+    }
+    // Household heads may have no profile-details row; link them through households.head_uid.
+    for (const household of householdResult.data ?? []) {
+      const head = residents.find((item) => String(item.id) === String(household.head_uid))
+      if (!head) continue
+      head.isHouseholdHead = true
+      if (!head.householdId) {
+        head.householdId = household.household_id
+        head.householdName = household.household_name
+        head.householdMembers = household.household_members
       }
     }
   }

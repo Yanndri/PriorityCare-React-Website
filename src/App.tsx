@@ -18,6 +18,7 @@ import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
 import { DisasterEventsPage } from './pages/DisasterEventsPage'
 import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
+import { FamilyReunificationPage } from './pages/FamilyReunificationPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
@@ -427,6 +428,8 @@ function App() {
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
 
           {activeMenu === 'rescueReconciliation' && <RescueReconciliationPage />}
+
+          {activeMenu === 'familyReunification' && <FamilyReunificationPage />}
 
           {activeMenu === 'reports' && (
             <ReportsPage stats={stats} />

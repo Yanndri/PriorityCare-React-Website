@@ -1,0 +1,15 @@
+.catchment-panel { margin-top: 20px; }
+.catchment-panel .section-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.catchment-muted { color: #64748b; font-size: 13px; }
+.catchment-notice { color: #166534; }
+.catchment-subhead { margin: 22px 0 6px; }
+.catchment-table-wrap { overflow-x: auto; }
+.catchment-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.catchment-table th, .catchment-table td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.catchment-table th { color: #64748b; font-size: 12px; }
+.catchment-table select, .catchment-table input { width: 100%; min-width: 150px; box-sizing: border-box; padding: 7px 9px; border: 1px solid #c5cfdb; border-radius: 7px; font: inherit; font-size: 13px; color: #183153; background: #fff; }
+.catchment-alts { display: grid; gap: 6px; }
+.catchment-load { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; background: #e2e8f0; color: #334155; white-space: nowrap; }
+.catchment-load.load-ok { background: #dcfce7; color: #166534; }
+.catchment-load.load-near { background: #fef3c7; color: #92400e; }
+.catchment-load.load-over { background: #fee2e2; color: #991b1b; }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { getOperationalTimeline } from '../api/auditTrailApi'
 import {
-  ALL_CATEGORIES, CATEGORY_LABELS, filterTimeline, formatPht, phtDayStart, timelineCsv, timelineFileName, timelineRows,
+  ALL_CATEGORIES, CATEGORY_LABELS, filterTimeline, formatPht, phtDayStart, timelineCsv, timelineFileName, timelineTableRows,
   TIMELINE_HEADERS,
 } from '../utils/auditTrail'
 import type { TimelineCategory, TimelineData } from '../utils/auditTrail'
@@ -95,7 +95,7 @@ export function AuditTrailPanel() {
 
   const toggle = (c: TimelineCategory) =>
     setCategories(cur => cur.includes(c) ? cur.filter(x => x !== c) : ALL_CATEGORIES.filter(x => x === c || cur.includes(x)))
-  const rows = timelineRows(filtered.slice(0, PREVIEW_LIMIT), sitioName)
+  const rows = timelineTableRows(filtered.slice(0, PREVIEW_LIMIT), sitioName)
 
   return <section className="panel rdana-panel audit-panel">
     <div className="section-header"><div><span className="panel-kicker">AUDIT TRAIL</span><h3>Evacuation Audit Trail & Operational Timestamp Log</h3></div><span>PDF · Excel · CSV</span></div>

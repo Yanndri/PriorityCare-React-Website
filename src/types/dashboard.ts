@@ -7,6 +7,7 @@ export type MenuKey =
   | 'geoMap'
   | 'disasterEvents'
   | 'rescueReconciliation'
+  | 'familyReunification'
   | 'reports'
   | 'dataMining'
   | 'evacCenters'
@@ -38,7 +39,9 @@ export type Resident = {
   mobilityStatus?: string
   disabilityCount?: number
   isPregnant?: boolean
+  householdId?: string
   householdName?: string
+  isHouseholdHead?: boolean
   vulnerabilityNeeds?: string
   householdMembers?: {
     name: string

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { filterTimeline, formatPht, phtDayStart, timelineCsv, timelineFileName, timelineRows, valueLabel } from '../src/utils/auditTrail.ts'
+import { filterTimeline, formatPht, phtDayStart, timelineCsv, timelineFileName, timelineTableRows, valueLabel } from '../src/utils/auditTrail.ts'
 
 const ev = (o) => ({ occurred_at: '2026-10-14T02:00:00Z', category: 'evacuation', action: 'Evacuation status logged', subject: 'Juan Dela Cruz',
   sitio_id: 1, from_value: 'pending', to_value: 'safely_evacuated', actor_name: 'Rico Rescuer', actor_role: 'rescuer',
@@ -26,7 +26,7 @@ test('filters by category, sitio (0 = facility-wide) and search', () => {
 })
 
 test('rows and CSV are readable and injection-safe', () => {
-  const rows = timelineRows(events, name)
+  const rows = timelineTableRows(events, name)
   assert.deepEqual(rows[0].slice(0, 8), ['2026-10-14 10:00:00', 'Evacuation status', 'Evacuation status logged', 'Juan Dela Cruz', 'Sitio 1', 'Pending', 'Safely evacuated', 'Rico Rescuer'])
   assert.equal(rows[1][4], 'All (facility-wide)')
   assert.equal(rows[1][7], 'Not recorded')

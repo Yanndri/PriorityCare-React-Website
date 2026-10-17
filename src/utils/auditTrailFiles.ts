@@ -1,6 +1,6 @@
 // Excel / PDF builders for the operational timestamp log. Loaded on demand (same libraries as DROMIC exports).
 import {
-  categoryCounts, formatPht, TIMELINE_HEADERS, timelineRows, type TimelineEvent,
+  categoryCounts, formatPht, TIMELINE_HEADERS, timelineTableRows, type TimelineEvent,
 } from './auditTrail.ts'
 
 export type TimelineExportMeta = {
@@ -59,7 +59,7 @@ export async function createTimelineWorkbook(events: TimelineEvent[], sitioName:
   header.values = headers
   header.height = 22
   header.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; c.alignment = { vertical: 'middle' } })
-  const rows = timelineRows(events, sitioName)
+  const rows = timelineTableRows(events, sitioName)
   rows.forEach((r, i) => {
     const row = sheet.addRow([r[0], new Date(events[i].occurred_at), ...r.slice(1)])
     row.getCell(2).numFmt = 'yyyy-mm-dd hh:mm:ss'
@@ -89,7 +89,7 @@ export async function createTimelinePdf(events: TimelineEvent[], sitioName: (id:
   }
   // Reference IDs are left to the Excel/CSV exports to keep the PDF readable.
   const head = [TIMELINE_HEADERS.slice(0, 10)]
-  const body = timelineRows(events, sitioName).map(r => r.slice(0, 10))
+  const body = timelineTableRows(events, sitioName).map(r => r.slice(0, 10))
   autoTable(doc, {
     head, body: body.length ? body : [['No events match the selected filters.', '', '', '', '', '', '', '', '', '']],
     margin: { top, bottom: 14, left: 10, right: 10 },

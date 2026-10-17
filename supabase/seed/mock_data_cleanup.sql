@@ -11,6 +11,9 @@ delete from public.households where household_id::text like 'c0ffee00-%';
 delete from public.resident_disabilities where resident_uid::text like 'c0ffee00-%';
 delete from public.residents where uid::text like 'c0ffee00-%';
 delete from public.users where uid::text like 'c0ffee00-%' and email like '%@mock.prioritycare.test';
+delete from public.sitio_shelter_plan_audit where sitio_id in (select sitio_id from public.sitio_shelter_plans
+  where primary_center_id in (9001, 9002, 9003) or alternate_center_ids && array[9001, 9002, 9003]);
+delete from public.sitio_shelter_plans where primary_center_id in (9001, 9002, 9003) or alternate_center_ids && array[9001, 9002, 9003];
 delete from public.evacuation_centers where center_id in (9001, 9002, 9003)
   and not exists (select 1 from public.evacuation_records r where r.evac_center_id = center_id);
 commit;

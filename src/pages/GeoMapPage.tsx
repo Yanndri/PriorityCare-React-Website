@@ -25,6 +25,8 @@ import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { DisasterEventMarkers } from '../components/DisasterEventMarkers'
 import { SpatialHeatmapLayer } from '../components/SpatialHeatmapLayer'
+import { TriagePinsLayer } from '../components/TriagePinsLayer'
+import { CatchmentLinesLayer } from '../components/CatchmentLinesLayer'
 
 // ======================================================
 // 🌍 SUPABASE
@@ -168,15 +170,6 @@ const evacuationIcon = new L.Icon({
   iconSize: [30, 48],
 
   iconAnchor: [15, 48],
-})
-
-const residentIcon = new L.Icon({
-  iconUrl:
-    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png',
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
 })
 
 // ======================================================
@@ -681,17 +674,6 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     }
 
   }, [])
-
-  const mappedResidents = residents.flatMap((resident) => {
-    const latitude = Number(resident.gpsLat)
-    const longitude = Number(resident.gpsLong)
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return []
-    }
-
-    return [{ resident, position: [latitude, longitude] as [number, number] }]
-  })
 
   // ====================================================
   // 🎨 UI
@@ -1242,26 +1224,10 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {mappedResidents.map(({ resident, position }) => (
-            <Marker
-              key={`resident-${resident.id}`}
-              position={position}
-              icon={resident.floodZone ? floodIcon : residentIcon}
-            >
-              <Popup>
-                <strong>{resident.name}</strong>
-                <br />
-                {resident.status} · {resident.constraint}
-                <br />
-                {resident.sitio}
-                <br />
-                📍 {position[0]}, {position[1]}
-                <br />
-                ☎ {resident.emergencyContactName ?? 'No emergency contact'}
-                {resident.emergencyContactNo ? ` · ${resident.emergencyContactNo}` : ''}
-              </Popup>
-            </Marker>
-          ))}
+          {/* 🏠 HOUSEHOLD TRIAGE PINS (Module 4.3): one pin per household, coloured by VPI urgency */}
+          {/* 🧭 SITIO → SHELTER CATCHMENT LINKS (Module 2.2) */}
+          <CatchmentLinesLayer />
+          <TriagePinsLayer residents={residents} />
 
           {/* 🟢 EVACUATION CENTER */}
 
