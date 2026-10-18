@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './App.css'
 
-import { menuItems } from './data/dashboardData'
+import { adminMenuItems, superAdminMenuItems } from './data/dashboardData'
 
 import type {
   MenuKey,
@@ -24,10 +25,13 @@ import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { EditResidentModal } from './components/EditResidentModal'
+import { AuditTrailPanel } from './components/AuditTrailPanel'
+import { SuperAdminSection } from './pages/SuperAdminDashboard'
 
 import { exportReport } from './utils/exportReport'
 
 import {
+  ALL_SITIOS,
   deleteResidentProfile,
   fetchDashboardDataFromSupabase,
   rejectResidentUser,
@@ -40,9 +44,33 @@ import {
   hasSupabaseConfig,
   supabase,
 } from './lib/supabaseClient'
+import {
+  LOGIN_PATH,
+  signOutStaff,
+  type StaffProfile,
+} from './lib/staffProfile'
 
-function App() {
+type AppProps = {
+  // Verified by RequireStaffRole from public.users before App renders.
+  profile: StaffProfile
+}
+
+type SitioOption = { sitio_id: number; sitio_name: string }
+
+// One dashboard shell for both staff roles.
+// Admin: the assigned sitio only; the scope cannot be changed.
+// Super Admin: all sitios by default, or one sitio picked in the scope
+// selector, plus the Super Admin management tabs.
+function App({ profile }: AppProps) {
+  const navigate = useNavigate()
+  const isSuperAdmin = profile.role === 'super_admin'
+  const menuItems = isSuperAdmin ? superAdminMenuItems : adminMenuItems
+
   const [activeMenu, setActiveMenu] = useState<MenuKey>('home')
+  const [scope, setScope] = useState<string>(
+    isSuperAdmin ? ALL_SITIOS : String(profile.assignedSitioId ?? ''),
+  )
+  const [sitioOptions, setSitioOptions] = useState<SitioOption[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] =
     useState<'All' | Status>('All')
@@ -80,62 +108,68 @@ function App() {
   const [savingResidentId, setSavingResidentId] =
     useState<number | string | null>(null)
 
-  // Load the authenticated Admin profile and its assigned sitio.
+  // Super Admin scope selector: every sitio.
+  useEffect(() => {
+    if (!isSuperAdmin || !hasSupabaseConfig) return
+    let cancelled = false
+
+    supabase
+      .from('sitios')
+      .select('sitio_id, sitio_name')
+      .order('sitio_name')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) console.error('Failed to load sitios:', error)
+        else setSitioOptions((data ?? []) as SitioOption[])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isSuperAdmin])
+
+  // Load the dashboard data for the current scope.
   useEffect(() => {
     let cancelled = false
 
     async function loadAdminDashboard() {
       try {
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser()
+        // An Admin's scope always comes from their verified profile.
+        const sitioId = isSuperAdmin
+          ? scope
+          : String(profile.assignedSitioId ?? '')
 
-        if (authError) throw authError
+        const allSitios = isSuperAdmin && sitioId === ALL_SITIOS
 
-        if (!user) {
+        if (!allSitios && !/^[1-9][0-9]*$/.test(sitioId)) {
           throw new Error(
-            'You must log in before accessing the Admin Dashboard.',
+            isSuperAdmin
+              ? 'Choose a sitio from the scope selector.'
+              : 'Your account has no assigned sitio. Contact the Super Admin.',
           )
         }
 
-        const { data: profile, error: profileError } =
-          await supabase
-            .from('users')
-            .select(
-              'uid, role, account_status, assigned_sitio_id',
+        let sitioName = 'All sitios'
+
+        if (!allSitios) {
+          const { data: sitio, error: sitioError } =
+            await supabase
+              .from('sitios')
+              .select('sitio_id, sitio_name')
+              .eq('sitio_id', sitioId)
+              .maybeSingle()
+
+          if (sitioError) throw sitioError
+
+          if (!sitio) {
+            throw new Error(
+              isSuperAdmin
+                ? 'This sitio could not be found.'
+                : 'Your assigned sitio could not be found.',
             )
-            .eq('uid', user.id)
-            .maybeSingle()
+          }
 
-        if (profileError) throw profileError
-
-        if (
-          !profile ||
-          profile.role !== 'admin' ||
-          profile.account_status !== 'active' ||
-          !profile.assigned_sitio_id
-        ) {
-          throw new Error(
-            'Your account is not an active Admin or has no assigned sitio.',
-          )
-        }
-
-        const sitioId = String(profile.assigned_sitio_id)
-
-        const { data: sitio, error: sitioError } =
-          await supabase
-            .from('sitios')
-            .select('sitio_id, sitio_name')
-            .eq('sitio_id', sitioId)
-            .maybeSingle()
-
-        if (sitioError) throw sitioError
-
-        if (!sitio) {
-          throw new Error(
-            'Your assigned sitio could not be found.',
-          )
+          sitioName = String(sitio.sitio_name ?? 'Assigned Sitio')
         }
 
         const data =
@@ -144,9 +178,7 @@ function App() {
         if (cancelled) return
 
         setAssignedSitioId(sitioId)
-        setAssignedSitioName(
-          String(sitio.sitio_name ?? 'Assigned Sitio'),
-        )
+        setAssignedSitioName(sitioName)
         setDashboardData(data)
         setDatabaseError(null)
       } catch (error) {
@@ -180,9 +212,20 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isSuperAdmin, profile.assignedSitioId, scope])
 
-  // Always refresh using the assigned sitio, never a browser-selected sitio.
+  function changeScope(next: string) {
+    if (!isSuperAdmin || next === scope) return
+    setIsLoadingDatabase(true)
+    setScope(next)
+  }
+
+  async function handleSignOut() {
+    await signOutStaff()
+    navigate(LOGIN_PATH, { replace: true })
+  }
+
+  // Always refresh the scope already loaded (an Admin's assigned sitio).
   async function reloadDashboardData() {
     if (!assignedSitioId) {
       throw new Error(
@@ -290,6 +333,12 @@ function App() {
     })
   }, [liveResidents, searchTerm, statusFilter])
 
+  // Location filter options: the sitios actually present in the data.
+  const locationOptions = useMemo(
+    () => [...new Set(liveResidents.map((resident) => resident.sitio).filter(Boolean))].sort(),
+    [liveResidents],
+  )
+
   const stats = useMemo(() => {
     const pending = liveResidents.filter(
       (resident) => resident.status === 'Pending',
@@ -307,7 +356,9 @@ function App() {
       {
         label: 'Total Registered',
         value: liveResidents.length,
-        note: 'Assigned sitio',
+        note: isSuperAdmin
+          ? assignedSitioId === ALL_SITIOS ? 'All sitios' : 'Selected sitio'
+          : 'Assigned sitio',
         tone: 'black',
       },
       {
@@ -329,7 +380,7 @@ function App() {
         tone: 'blue',
       },
     ]
-  }, [liveResidents])
+  }, [liveResidents, isSuperAdmin, assignedSitioId])
 
   const constraintStats = useMemo(() => {
     return getConstraintStats(liveResidents)
@@ -339,33 +390,35 @@ function App() {
     menuItems.find((item) => item.key === activeMenu)?.label ??
     'Dashboard'
 
-  if (isLoadingDatabase) {
-    return (
-      <div className="dashboard-message">
-        Loading Admin Dashboard...
-      </div>
-    )
-  }
+  const scopeLabel = isSuperAdmin
+    ? assignedSitioId === ALL_SITIOS ? 'All sitios' : assignedSitioName
+    : assignedSitioName
+  const generatedBy = `${profile.fullName || profile.email} (${isSuperAdmin ? 'Super Admin' : 'Admin'})`
 
-  if (databaseError) {
-    return (
-      <div className="dashboard-error">
-        <h2>Unable to open Admin Dashboard</h2>
-        <p>{databaseError}</p>
-        <p>
-          Confirm that you are logged in with an active Admin
-          account and that your assigned sitio is configured.
-        </p>
-      </div>
-    )
+  // Super Admin management tabs do not depend on the sitio data.
+  const isManagementTab =
+    isSuperAdmin &&
+    (activeMenu === 'sitioOverview' ||
+      activeMenu === 'adminAccounts' ||
+      activeMenu === 'activityLogs')
+
+  function openSitio(sitioId: number) {
+    changeScope(String(sitioId))
+    setActiveMenu('home')
   }
 
   return (
     <div className="app">
-      <AppHeader />
+      <AppHeader
+        name={profile.fullName || profile.email}
+        roleLabel={isSuperAdmin ? 'Super Admin' : 'Admin'}
+        onSignOut={() => void handleSignOut()}
+      />
 
       <div className="app-layout">
         <Sidebar
+          items={menuItems}
+          subtitle={isSuperAdmin ? 'Super Admin' : 'Admin Dashboard'}
           activeMenu={activeMenu}
           onMenuChange={setActiveMenu}
         />
@@ -373,13 +426,63 @@ function App() {
         <main className="page-content">
           <div className="admin-sitio-banner">
             <div>
-              <span>Admin Dashboard</span>
-              <strong>{assignedSitioName}</strong>
+              <span>
+                {isSuperAdmin ? 'Super Admin · Viewing' : 'Admin Dashboard'}
+              </span>
+              <strong>{scopeLabel || '…'}</strong>
             </div>
-            <span className="sitio-status">
-              Assigned Sitio
-            </span>
+            {isSuperAdmin ? (
+              <label className="scope-select">
+                <span>Scope</span>
+                <select
+                  value={scope}
+                  disabled={isLoadingDatabase}
+                  onChange={(event) => changeScope(event.target.value)}
+                >
+                  <option value={ALL_SITIOS}>All sitios</option>
+                  {sitioOptions.map((sitio) => (
+                    <option key={sitio.sitio_id} value={String(sitio.sitio_id)}>
+                      {sitio.sitio_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="sitio-status">
+                Assigned Sitio
+              </span>
+            )}
           </div>
+
+          {isManagementTab ? (
+            <>
+              {activeMenu === 'sitioOverview' && (
+                <SuperAdminSection view="sitios" onOpenSitio={openSitio} />
+              )}
+              {activeMenu === 'adminAccounts' && (
+                <SuperAdminSection view="accounts" onOpenSitio={openSitio} />
+              )}
+              {activeMenu === 'activityLogs' && <AuditTrailPanel />}
+            </>
+          ) : isLoadingDatabase ? (
+            <div className="dashboard-message" role="status">
+              Loading {scopeLabel || 'dashboard'} data…
+            </div>
+          ) : databaseError ? (
+            <div className="dashboard-error" role="alert">
+              <h2>Unable to load dashboard data</h2>
+              <p>{databaseError}</p>
+              <p>
+                {isSuperAdmin
+                  ? 'Choose another scope, or check the database connection.'
+                  : 'Confirm that you are logged in with an active Admin account and that your assigned sitio is configured.'}
+              </p>
+            </div>
+          ) : (
+          <>
+          {isSuperAdmin && activeMenu === 'home' && (
+            <SuperAdminSection view="overview" onOpenSitio={openSitio} />
+          )}
 
           <PageTitle
             title={activeTitle}
@@ -389,6 +492,8 @@ function App() {
                 residents: liveResidents,
                 alerts: liveAlerts,
                 evacuationCenters: liveEvacuationCenters,
+                scopeLabel,
+                generatedBy,
               })
             }
           />
@@ -404,6 +509,7 @@ function App() {
               statusFilter={statusFilter}
               onSearchChange={setSearchTerm}
               onStatusFilterChange={setStatusFilter}
+              locationOptions={locationOptions}
             />
           )}
 
@@ -414,6 +520,7 @@ function App() {
               statusFilter={statusFilter}
               onSearchChange={setSearchTerm}
               onStatusFilterChange={setStatusFilter}
+              locationOptions={locationOptions}
               verifyingResidentId={verifyingResidentId}
               onVerifyResident={handleVerifyResident}
               onRejectResident={handleRejectResident}
@@ -435,7 +542,11 @@ function App() {
           {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} />}
 
           {activeMenu === 'reports' && (
-            <ReportsPage stats={stats} />
+            <ReportsPage
+              stats={stats}
+              scopeLabel={scopeLabel}
+              generatedBy={generatedBy}
+            />
           )}
 
           {activeMenu === 'dataMining' && (
@@ -447,6 +558,8 @@ function App() {
               onReload={reloadDashboardData}
               centers={liveEvacuationCenters}
             />
+          )}
+          </>
           )}
         </main>
       </div>

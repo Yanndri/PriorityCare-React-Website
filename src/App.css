@@ -2667,3 +2667,213 @@ tbody tr:hover {
     margin-left: 0;
   }
 }
+
+/* Shared staff login: account box, sign out, Admin account actions */
+.admin-box .sign-out-button,
+.super-admin-account .sign-out-button {
+  margin-top: 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.super-admin-account {
+  display: grid;
+  gap: 2px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe3ee;
+  font-size: 13px;
+}
+
+.super-admin-account strong {
+  color: #172033;
+  overflow-wrap: anywhere;
+}
+
+.super-admin-account .sign-out-button {
+  justify-self: start;
+  color: #35135f;
+}
+
+.admin-sitio-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-sitio-edit select {
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.super-admin-table .secondary-button,
+.super-admin-table .danger-button {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.super-admin-table .secondary-button {
+  border: 1px solid #2563eb;
+  background: #ffffff;
+  color: #1d4ed8;
+}
+
+.super-admin-table .danger-button {
+  border: 1px solid #b91c1c;
+  background: #ffffff;
+  color: #b91c1c;
+}
+
+.super-admin-table button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.super-admin-table small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.super-admin-table .admin-row-error {
+  color: #b91c1c;
+}
+
+.admin-sitio-banner a.sitio-status {
+  text-decoration: none;
+}
+
+/* Super Admin scope selector in the shared dashboard banner */
+.admin-sitio-banner .scope-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-sitio-banner .scope-select select {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+}
+
+/* Evacuation facility registration: drag-and-drop location picker */
+.facility-picker {
+  grid-column: 1 / -1;
+}
+
+.facility-picker-hint {
+  margin: 0 0 8px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.facility-picker-map {
+  height: 260px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.facility-pin span {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  background: #35135f;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+
+.facility-picker-legend {
+  display: flex;
+  gap: 16px;
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.facility-picker-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.facility-picker-legend .legend-new { background: #35135f; }
+.facility-picker-legend .legend-existing { background: #0abd67; }
+
+/* Printable reports */
+.print-only {
+  display: none;
+}
+
+.printable-report .reports-grid {
+  margin-top: 12px;
+}
+
+@media print {
+  .app-header,
+  .sidebar,
+  .admin-sitio-banner,
+  .page-title,
+  .no-print {
+    display: none !important;
+  }
+
+  .app-layout {
+    display: block;
+  }
+
+  .page-content {
+    padding: 0;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .print-report-header h1 {
+    margin: 0 0 8px;
+    font-size: 20px;
+  }
+
+  .print-report-header p {
+    margin: 2px 0;
+    font-size: 12px;
+  }
+
+  .printable-report {
+    box-shadow: none;
+    border: 0;
+  }
+
+  .printable-report .reports-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .report-card {
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+  }
+}

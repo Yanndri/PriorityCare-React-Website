@@ -148,7 +148,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
       </div>
       <ShelterCatchmentPanel />
       <ReliefDemandPlanner centers={centers} />
-      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} onClose={() => setForm(null)} onSaved={onReload} />}
+      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} onClose={() => setForm(null)} onSaved={onReload} />}
       {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
     </section>
   )

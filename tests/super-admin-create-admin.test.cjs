@@ -1,5 +1,6 @@
 // Exercises the real prioritycare-api/server.js route handlers for
-// GET /api/super-admin/dashboard and POST /api/super-admin/admins
+// GET /api/super-admin/dashboard, POST /api/super-admin/admins and
+// PATCH /api/super-admin/admins/:uid
 // with in-memory stand-ins for Express, Supabase, MySQL, and dotenv.
 // No network or database is touched.
 //
@@ -29,6 +30,8 @@ const state = {
   ],
   failNextProfileInsert: null,
   deletedAuthUsers: [],
+  bans: [],
+  failNextBan: false,
 }
 
 function resetState() {
@@ -44,6 +47,8 @@ function resetState() {
   ]
   state.failNextProfileInsert = null
   state.deletedAuthUsers = []
+  state.bans = []
+  state.failNextBan = false
 }
 
 function pick(row, cols) {
@@ -54,7 +59,7 @@ function pick(row, cols) {
 }
 
 function from(table) {
-  const q = { table, filters: [], cols: '*', insertRow: null, order: null }
+  const q = { table, filters: [], cols: '*', insertRow: null, updateRow: null, order: null }
   const rows = () => (table === 'users' ? state.users : state.sitios)
   const run = () => {
     if (q.insertRow) {
@@ -78,6 +83,11 @@ function from(table) {
       state.users.push({ ...r })
       return { data: [pick(r, q.cols)], error: null }
     }
+    if (q.updateRow) {
+      const hit = rows().filter((r) => q.filters.every(([c, v]) => r[c] === v))
+      for (const r of hit) Object.assign(r, q.updateRow)
+      return { data: hit.map((r) => pick(r, q.cols)), error: null }
+    }
     let out = rows().filter((r) => q.filters.every(([c, v]) => r[c] === v))
     if (q.order) out = [...out].sort((a, b) => String(a[q.order]).localeCompare(String(b[q.order])))
     return { data: out.map((r) => pick(r, q.cols)), error: null }
@@ -87,6 +97,7 @@ function from(table) {
     eq(c, v) { q.filters.push([c, v]); return builder },
     order(c) { q.order = c; return builder },
     insert(row) { q.insertRow = row; return builder },
+    update(row) { q.updateRow = row; return builder },
     async maybeSingle() { const r = run(); return { data: r.data?.[0] ?? null, error: r.error } },
     async single() { const r = run(); return { data: r.data?.[0] ?? null, error: r.error } },
     then(resolve, reject) { return Promise.resolve(run()).then(resolve, reject) },
@@ -117,6 +128,14 @@ const fakeSupabase = {
         state.authUsers.set(id, user)
         return { data: { user }, error: null }
       },
+      async updateUserById(id, attrs) {
+        if (state.failNextBan) {
+          state.failNextBan = false
+          return { data: { user: null }, error: { message: 'auth unavailable' } }
+        }
+        state.bans.push([id, attrs.ban_duration])
+        return { data: { user: state.authUsers.get(id) }, error: null }
+      },
       async deleteUser(id) {
         state.authUsers.delete(id)
         state.deletedAuthUsers.push(id)
@@ -133,6 +152,7 @@ function fakeExpress() {
     use() {},
     get(p, ...h) { routes.push({ method: 'GET', path: p, handlers: h }) },
     post(p, ...h) { routes.push({ method: 'POST', path: p, handlers: h }) },
+    patch(p, ...h) { routes.push({ method: 'PATCH', path: p, handlers: h }) },
     listen() {},
   }
   return app
@@ -157,10 +177,22 @@ const quietError = console.error
 console.error = () => {}
 require(path.join(__dirname, '..', 'prioritycare-api', 'server.js'))
 
+function matchRoute(pattern, actual) {
+  const p = pattern.split('/'), a = actual.split('/')
+  if (p.length !== a.length) return null
+  const params = {}
+  for (let i = 0; i < p.length; i++) {
+    if (p[i].startsWith(':')) params[p[i].slice(1)] = decodeURIComponent(a[i])
+    else if (p[i] !== a[i]) return null
+  }
+  return params
+}
+
 async function call(method, routePath, { token, body } = {}) {
-  const route = routes.find((r) => r.method === method && r.path === routePath)
+  let params = null
+  const route = routes.find((r) => r.method === method && (params = matchRoute(r.path, routePath)))
   assert.ok(route, `route ${method} ${routePath} registered`)
-  const req = { headers: token ? { authorization: `Bearer ${token}` } : {}, body }
+  const req = { headers: token ? { authorization: `Bearer ${token}` } : {}, body, params }
   const res = {
     statusCode: 200, body: undefined, headersSent: false,
     status(c) { this.statusCode = c; return this },
@@ -301,4 +333,114 @@ test('race on a unique column returns 409 and rolls back the Auth user', async (
 test('dashboard is also super-admin only', async () => {
   assert.equal((await call('GET', '/api/super-admin/dashboard')).statusCode, 401)
   assert.equal((await call('GET', '/api/super-admin/dashboard', { token: 'admin-token' })).statusCode, 403)
+})
+
+// ---------- PATCH /api/super-admin/admins/:uid ----------
+const adminPath = (uid = ADMIN) => `/api/super-admin/admins/${uid}`
+const adminRow = () => state.users.find((u) => u.uid === ADMIN)
+
+test('manage admin: only an active super admin may call it', async () => {
+  assert.equal((await call('PATCH', adminPath(), { body: { account_status: 'suspended' } })).statusCode, 401)
+  assert.equal((await call('PATCH', adminPath(), { token: 'forged', body: { account_status: 'suspended' } })).statusCode, 401)
+  assert.equal((await call('PATCH', adminPath(), { token: 'admin-token', body: { account_status: 'suspended' } })).statusCode, 403)
+  assert.equal((await call('PATCH', adminPath(), { token: 'suspended-token', body: { account_status: 'suspended' } })).statusCode, 403)
+  assert.equal(adminRow().account_status, 'active')
+  assert.equal(state.bans.length, 0)
+})
+
+test('manage admin: suspend bans sign-in, reactivate restores it', async () => {
+  let res = await call('PATCH', adminPath(), { token: 'super-token', body: { account_status: 'suspended' } })
+  assert.equal(res.statusCode, 200, res.body?.message)
+  assert.equal(adminRow().account_status, 'suspended')
+  assert.deepEqual(state.bans, [[ADMIN, '876000h']])
+  assert.match(res.body.message, /suspended/)
+
+  res = await call('PATCH', adminPath(), { token: 'super-token', body: { account_status: 'active' } })
+  assert.equal(res.statusCode, 200)
+  assert.equal(adminRow().account_status, 'active')
+  assert.deepEqual(state.bans.at(-1), [ADMIN, 'none'])
+  assert.match(res.body.message, /reactivated/)
+})
+
+test('manage admin: reassigns the sitio without touching sign-in', async () => {
+  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { assigned_sitio_id: 2 } })
+  assert.equal(res.statusCode, 200)
+  assert.equal(adminRow().assigned_sitio_id, 2)
+  assert.equal(res.body.admin.assigned_sitio_id, 2)
+  assert.equal(state.bans.length, 0)
+})
+
+test('manage admin: rejects bad input and protected accounts', async () => {
+  const bad = [
+    [adminPath('not-a-uuid'), { account_status: 'suspended' }, 400],
+    [adminPath(), {}, 400],
+    [adminPath(), { role: 'super_admin' }, 400],
+    [adminPath(), { account_status: 'suspended', role: 'super_admin' }, 400],
+    [adminPath(), { account_status: 'deleted' }, 400],
+    [adminPath(), { assigned_sitio_id: 99 }, 400],
+    [adminPath(), { assigned_sitio_id: 'abc' }, 400],
+    [adminPath(SUPER), { account_status: 'suspended' }, 400], // own account
+    [adminPath(SUSPENDED_SUPER), { account_status: 'active' }, 404], // a super admin
+    [adminPath('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'), { account_status: 'suspended' }, 404],
+  ]
+  for (const [p, body, status] of bad) {
+    const res = await call('PATCH', p, { token: 'super-token', body })
+    assert.equal(res.statusCode, status, `${p} ${JSON.stringify(body)} -> ${res.statusCode} ${res.body?.message}`)
+  }
+  assert.equal(adminRow().account_status, 'active')
+  assert.equal(adminRow().assigned_sitio_id, 1)
+  assert.equal(adminRow().role, 'admin')
+  assert.equal(state.users.find((u) => u.uid === SUSPENDED_SUPER).account_status, 'suspended')
+  assert.equal(state.bans.length, 0)
+})
+
+test('manage admin: if Auth cannot be updated, the profile change is undone', async () => {
+  state.failNextBan = true
+  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { account_status: 'suspended', assigned_sitio_id: 2 } })
+  assert.equal(res.statusCode, 500)
+  assert.equal(adminRow().account_status, 'active')
+  assert.equal(adminRow().assigned_sitio_id, 1)
+})
+
+// ---------- startup key check ----------
+test('server refuses to start with the publishable key or a non-service JWT', () => {
+  const { spawnSync } = require('node:child_process')
+  const jwt = (claims) => ['e30', Buffer.from(JSON.stringify(claims)).toString('base64url'), 'sig'].join('.')
+  const boot = (key) => spawnSync(process.execPath, ['-e', `
+    const Module = require('node:module'); const real = Module._load
+    const stubs = { express: Object.assign(() => ({ use(){}, get(){}, post(){}, patch(){}, listen(){} }), { json: () => () => {} }),
+      cors: () => () => {}, 'mysql2/promise': { createPool: () => ({}) }, dotenv: { config() {} },
+      '@supabase/supabase-js': { createClient: () => ({}) } }
+    Module._load = function (r, ...a) { return Object.hasOwn(stubs, r) ? stubs[r] : real.call(this, r, ...a) }
+    try { require(${JSON.stringify(path.join(__dirname, '..', 'prioritycare-api', 'server.js'))}); console.log('STARTED') }
+    catch (e) { console.log('REFUSED: ' + e.message) }`],
+  { env: { ...process.env, SUPABASE_URL: 'https://abcd.supabase.co', SUPABASE_SERVICE_ROLE_KEY: key }, encoding: 'utf8' })
+
+  const cases = [
+    ['sb_publishable_x', /REFUSED: .*publishable/],
+    [jwt({ role: 'anon', ref: 'abcd' }), /REFUSED: .*'anon' key/],
+    [jwt({ role: 'service_role', ref: 'other' }), /REFUSED: .*different Supabase project/],
+    [jwt({ role: 'service_role', ref: 'abcd' }), /STARTED/],
+    ['sb_secret_x', /STARTED/],
+  ]
+  for (const [key, expected] of cases) {
+    const out = boot(key)
+    assert.match(out.stdout, expected, out.stderr)
+    assert.ok(!out.stdout.includes(key), 'key value is never printed')
+  }
+})
+
+// ---------- legacy MySQL routes ----------
+test('legacy resident routes are not public (401 / 403 for non-super-admins)', async () => {
+  for (const p of ['/api/residents', '/api/map/residents', '/api/verification/pending', '/api/test-db']) {
+    assert.equal((await call('GET', p)).statusCode, 401, `${p} without a token`)
+    assert.equal((await call('GET', p, { token: 'forged' })).statusCode, 401, `${p} forged token`)
+    assert.equal((await call('GET', p, { token: 'admin-token' })).statusCode, 403, `${p} as an Admin`)
+    assert.equal((await call('GET', p, { token: 'suspended-token' })).statusCode, 403, `${p} as a suspended Super Admin`)
+  }
+})
+
+test('health check stays public', async () => {
+  const res = await call('GET', '/api/health')
+  assert.equal(res.statusCode, 200)
 })

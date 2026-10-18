@@ -13,6 +13,8 @@ type ResidentTableProps = {
   onDeleteResident?: (resident: Resident) => void
   onVerifyResident?: (residentId: number | string) => void
   verifyingResidentId?: number | string | null
+  // Sitio names present in the loaded data (the location filter options).
+  locationOptions?: string[]
 }
 
 export function ResidentTable({
@@ -27,6 +29,7 @@ export function ResidentTable({
   onDeleteResident,
   onVerifyResident,
   verifyingResidentId,
+  locationOptions = [],
 }: ResidentTableProps) {
   const hasActions = Boolean(onViewResidentRequest || onEditResident || onDeleteResident || onVerifyResident)
 
@@ -46,15 +49,11 @@ export function ResidentTable({
               ? { value: searchTerm, label: searchTerm }
               : { value: '', label: 'All Locations' }
           }
+          // Real sitio names from the loaded records (previously a fixed
+          // list of sample locations that did not match the database).
           options={[
             { value: '', label: 'All Locations' },
-            { value: 'San Roque', label: 'Brgy. San Roque' },
-            { value: 'Mabolo', label: 'Brgy. Mabolo' },
-            { value: 'Lahug', label: 'Brgy. Lahug' },
-            { value: 'Sitio Pag-asa', label: 'Sitio Pag-asa' },
-            { value: 'Sitio Maligaya', label: 'Sitio Maligaya' },
-            { value: 'Sitio Rizal', label: 'Sitio Rizal' },
-            { value: 'Sitio Mabuhay', label: 'Sitio Mabuhay' },
+            ...locationOptions.map((name) => ({ value: name, label: name })),
           ]}
           placeholder="Search location..."
           onChange={(selected) => {

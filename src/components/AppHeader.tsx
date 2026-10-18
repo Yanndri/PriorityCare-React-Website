@@ -1,4 +1,10 @@
-export function AppHeader() {
+type AppHeaderProps = {
+  name: string
+  roleLabel: string
+  onSignOut: () => void
+}
+
+export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
   // This is the fixed top header for the whole dashboard.
   return (
     <header className="app-header">
@@ -14,8 +20,11 @@ export function AppHeader() {
       </div>
 
       <div className="admin-box">
-        <span>Welcome back</span>
-        <strong>Admin Diaz</strong>
+        <span>{roleLabel}</span>
+        <strong>{name}</strong>
+        <button type="button" className="sign-out-button" onClick={onSignOut}>
+          Sign out
+        </button>
       </div>
     </header>
   )

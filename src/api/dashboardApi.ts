@@ -23,6 +23,20 @@ const EMPTY_ROWS_RESULT: { data: AnyRow[]; error: null } = {
   error: null,
 }
 
+// Row Level Security hides rows outside the caller's sitio, so a blocked
+// change looks like "0 rows changed" rather than an error. Treat that as
+// a permission failure instead of reporting success.
+function requireChangedRow(
+  rows: unknown[] | null,
+  action: string,
+) {
+  if (!rows || rows.length === 0) {
+    throw new Error(
+      `Unable to ${action}: this resident is not in your authorized sitio, or no longer exists.`,
+    )
+  }
+}
+
 // Delete a resident profile and its related records.
 export async function deleteResidentProfile(
   residentId: number | string,
@@ -41,31 +55,33 @@ export async function deleteResidentProfile(
 
   if (recordsError) throw recordsError
 
-  const { error: residentError } = await supabase
-    .from('residents')
-    .delete()
-    .eq('uid', residentId)
-
-  if (residentError) throw residentError
-
-  const { error: userError } = await supabase
+  // Deleting the users row removes the residents row and its disability
+  // entries through ON DELETE CASCADE. It is done in one step because the
+  // sitio check needs the residents row to still exist.
+  const { data: deletedUsers, error: userError } = await supabase
     .from('users')
     .delete()
     .eq('uid', residentId)
+    .select('uid')
 
   if (userError) throw userError
+
+  requireChangedRow(deletedUsers, 'delete this resident')
 }
 
 // Approve a resident's verification.
 export async function verifyResidentUser(
   residentId: number | string,
 ) {
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('users')
     .update({ is_verified: true })
     .eq('uid', residentId)
+    .select('uid')
 
   if (error) throw error
+
+  requireChangedRow(updated, 'verify this resident')
 
   await updateVerificationDocumentsStatus(
     residentId,
@@ -78,12 +94,15 @@ export async function rejectResidentUser(
   residentId: number | string,
   reason = 'Rejected by administrator',
 ) {
-  const { error: userError } = await supabase
+  const { data: updated, error: userError } = await supabase
     .from('users')
     .update({ is_verified: false })
     .eq('uid', residentId)
+    .select('uid')
 
   if (userError) throw userError
+
+  requireChangedRow(updated, 'reject this resident')
 
   await updateVerificationDocumentsStatus(
     residentId,
@@ -92,11 +111,15 @@ export async function rejectResidentUser(
   )
 }
 
+export const ALL_SITIOS = 'all'
+
 /**
- * Fetch dashboard data for one Admin's assigned sitio.
+ * Fetch dashboard data for one sitio, or for every sitio (Super Admin).
  *
  * IMPORTANT:
- * assignedSitioId must be the sitio_id from the Admin's profile.
+ * Admins must pass the sitio_id from their own profile; App.tsx never offers
+ * ALL_SITIOS to an Admin. The sitio filter here is for display only: what a
+ * user can actually read is decided by the database (RLS policies).
  * Do not pass the Admin's uid as the sitio ID.
  */
 export async function fetchDashboardDataFromSupabase(
@@ -105,6 +128,7 @@ export async function fetchDashboardDataFromSupabase(
   const selectedSitioId = String(
     assignedSitioId ?? '',
   ).trim()
+  const allSitios = selectedSitioId === ALL_SITIOS
 
   // Do not load dashboard data if the Admin has no assigned sitio.
   if (!selectedSitioId) {
@@ -113,11 +137,13 @@ export async function fetchDashboardDataFromSupabase(
     )
   }
 
-  // 1. Fetch residents assigned to this sitio only.
-  const residentsResult = await supabase
+  // 1. Fetch residents assigned to this sitio only (or all sitios).
+  const residentsQuery = supabase
     .from('residents')
     .select('*')
-    .eq('sitio_id', selectedSitioId)
+  const residentsResult = allSitios
+    ? await residentsQuery
+    : await residentsQuery.eq('sitio_id', selectedSitioId)
 
   if (residentsResult.error) {
     throw residentsResult.error
@@ -150,14 +176,17 @@ export async function fetchDashboardDataFromSupabase(
     residentIds.length > 0
       ? supabase
           .from('users')
-          .select('*')
+          // Explicit columns: never load PINs or other secrets into the browser.
+          .select('uid, role, email, f_name, m_name, l_name, contact_no, is_verified, created_at')
           .in('uid', residentIds)
       : Promise.resolve(EMPTY_ROWS_RESULT),
 
-    supabase
-      .from('sitios')
-      .select('*')
-      .eq('sitio_id', selectedSitioId),
+    allSitios
+      ? supabase.from('sitios').select('*')
+      : supabase
+          .from('sitios')
+          .select('*')
+          .eq('sitio_id', selectedSitioId),
 
     residentIds.length > 0
       ? supabase
@@ -275,8 +304,11 @@ export async function fetchDashboardDataFromSupabase(
       .in('resident_uid', residentIds)
     // Older deployments may not yet have the new table. Other errors must surface.
     if (error && !['PGRST205', '42P01'].includes(error.code)) throw error
-    const householdResult = await supabase.from('households')
-      .select('household_id,household_name,head_uid,household_members').eq('sitio_id', selectedSitioId)
+    const householdQuery = supabase.from('households')
+      .select('household_id,household_name,head_uid,household_members')
+    const householdResult = allSitios
+      ? await householdQuery
+      : await householdQuery.eq('sitio_id', selectedSitioId)
     if (householdResult.error && !['PGRST205', '42P01'].includes(householdResult.error.code)) throw householdResult.error
     for (const detail of details ?? []) {
       const resident = residents.find((item) => String(item.id) === String(detail.resident_uid))

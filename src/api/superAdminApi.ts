@@ -39,7 +39,9 @@ export type CreateAdminInput = {
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-async function getAccessToken(): Promise<string> {
+// Returns a current access token, refreshing it first when it has expired
+// or is about to, so the backend never receives a stale JWT.
+async function getAccessToken(forceRefresh = false): Promise<string> {
   const {
     data: { session },
     error,
@@ -48,19 +50,30 @@ async function getAccessToken(): Promise<string> {
   if (error) throw error
 
   if (!session?.access_token) {
-    throw new Error('Please sign in again as Super Admin.')
+    throw new Error('Your session has ended. Please sign in again.')
   }
 
-  return session.access_token
+  const expiresSoon =
+    typeof session.expires_at === 'number' &&
+    session.expires_at * 1000 - Date.now() < 60_000
+
+  if (!forceRefresh && !expiresSoon) return session.access_token
+
+  const { data: refreshed, error: refreshError } =
+    await supabase.auth.refreshSession()
+
+  if (refreshError || !refreshed.session?.access_token) {
+    throw new Error('Your session has expired. Please sign in again.')
+  }
+
+  return refreshed.session.access_token
 }
 
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = await getAccessToken()
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const send = async (token: string) => fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
       Accept: 'application/json',
@@ -69,6 +82,25 @@ async function apiRequest<T>(
       ...options.headers,
     },
   })
+
+  let response: Response
+
+  try {
+    response = await send(await getAccessToken())
+
+    // A 401 can mean the token expired in transit: refresh once and retry.
+    if (response.status === 401) {
+      response = await send(await getAccessToken(true))
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        `Cannot reach the PriorityCare API at ${API_BASE_URL}. Make sure the backend is running.`,
+        { cause: error },
+      )
+    }
+    throw error
+  }
 
   const text = await response.text()
 
@@ -95,6 +127,34 @@ async function apiRequest<T>(
   return result as T
 }
 
+function isAdminAccount(value: unknown): value is AdminAccount {
+  if (!value || typeof value !== 'object') return false
+
+  const admin = value as Record<string, unknown>
+
+  return (
+    typeof admin.uid === 'string' &&
+    typeof admin.email === 'string' &&
+    (admin.account_status === 'active' ||
+      admin.account_status === 'suspended') &&
+    (admin.f_name === null || typeof admin.f_name === 'string') &&
+    (admin.l_name === null || typeof admin.l_name === 'string') &&
+    (admin.assigned_sitio_id === null ||
+      typeof admin.assigned_sitio_id === 'number')
+  )
+}
+
+function isSitio(value: unknown): value is Sitio {
+  if (!value || typeof value !== 'object') return false
+
+  const sitio = value as Record<string, unknown>
+
+  return (
+    typeof sitio.sitio_id === 'number' &&
+    typeof sitio.sitio_name === 'string'
+  )
+}
+
 export async function getSuperAdminDashboard(): Promise<DashboardData> {
   const result = await apiRequest<{
     admins?: unknown
@@ -108,8 +168,8 @@ export async function getSuperAdminDashboard(): Promise<DashboardData> {
   }
 
   return {
-    admins: result.admins as AdminAccount[],
-    sitios: result.sitios as Sitio[],
+    admins: result.admins.filter(isAdminAccount),
+    sitios: result.sitios.filter(isSitio),
   }
 }
 
@@ -140,6 +200,38 @@ export async function createAdmin(
     {
       method: 'POST',
       body: JSON.stringify({ ...input, uid: uid || undefined }),
+    },
+  )
+}
+
+export type AdminAccountUpdate = {
+  account_status?: 'active' | 'suspended'
+  assigned_sitio_id?: number
+}
+
+// Suspend, reactivate, or reassign an Admin account (Super Admin only;
+// enforced by the backend).
+export async function updateAdminAccount(
+  uid: string,
+  changes: AdminAccountUpdate,
+): Promise<{ message?: string; admin?: AdminAccount }> {
+  if (!UUID_PATTERN.test(uid)) {
+    throw new Error('Invalid Admin account ID.')
+  }
+
+  if (
+    changes.assigned_sitio_id !== undefined &&
+    (!Number.isInteger(changes.assigned_sitio_id) ||
+      changes.assigned_sitio_id <= 0)
+  ) {
+    throw new Error('Please select a valid Sitio.')
+  }
+
+  return apiRequest<{ message?: string; admin?: AdminAccount }>(
+    `/api/super-admin/admins/${encodeURIComponent(uid)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
     },
   )
 }

@@ -2,9 +2,16 @@ import { useState, type FormEvent } from 'react'
 import type { EvacuationCenter } from '../types/dashboard'
 import { registerFacility, setFacilityCapacity } from '../api/facilityApi'
 import { FACILITY_TYPES, validateCapacity, validateFacility } from '../utils/facility'
+import { FacilityLocationPicker } from './FacilityLocationPicker'
 
-type Props = { center: EvacuationCenter | null; onClose: () => void; onSaved: () => Promise<void> }
-export function FacilityForm({ center, onClose, onSaved }: Props) {
+type Props = {
+  center: EvacuationCenter | null
+  // Existing facilities, shown on the location map when registering.
+  existingCenters?: EvacuationCenter[]
+  onClose: () => void
+  onSaved: () => Promise<void>
+}
+export function FacilityForm({ center, existingCenters = [], onClose, onSaved }: Props) {
   const [name, setName] = useState('')
   const [type, setType] = useState<typeof FACILITY_TYPES[number]>('school')
   const [latitude, setLatitude] = useState('')
@@ -38,6 +45,13 @@ export function FacilityForm({ center, onClose, onSaved }: Props) {
           <label><span>Facility type</span><select value={type} onChange={(e) => setType(e.target.value as typeof type)}>{FACILITY_TYPES.map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></label>
           <label><span>GPS latitude</span><input required type="number" step="any" min={-90} max={90} value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label>
           <label><span>GPS longitude</span><input required type="number" step="any" min={-180} max={180} value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label>
+          <FacilityLocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            centers={existingCenters}
+            disabled={saving || saved}
+            onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng) }}
+          />
         </>}
         <label><span>Maximum safe capacity (people)</span><input required type="number" min={1} max={1_000_000} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
       </div></fieldset><p>Enter the limit approved for this facility. The website records this value; it does not assess structural safety.</p>

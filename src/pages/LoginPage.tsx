@@ -2,14 +2,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import {
+  dashboardPathFor,
+  fetchStaffProfile,
+  StaffAccessError,
+} from '../lib/staffProfile'
 
-type LoginPageProps = {
-  role: 'admin' | 'super_admin'
-}
-
-export function LoginPage({ role }: LoginPageProps) {
+// One shared sign-in page for Admin and Super Admin accounts. The role is
+// read from public.users after Supabase Auth succeeds; the form never asks
+// for it.
+export function LoginPage() {
   const navigate = useNavigate()
-  const isSuperAdmin = role === 'super_admin'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,40 +37,20 @@ export function LoginPage({ role }: LoginPageProps) {
         throw new Error('Invalid email or password.')
       }
 
-      const { data: profile, error: profileError } =
-        await supabase
-          .from('users')
-          .select('role, account_status, assigned_sitio_id')
-          .eq('uid', data.user.id)
-          .maybeSingle()
-
-      if (profileError || !profile) {
+      let profile
+      try {
+        profile = await fetchStaffProfile()
+      } catch (profileError) {
         await supabase.auth.signOut()
-        throw new Error(
-          'No matching user profile was found. Please contact the administrator.',
-        )
+        throw profileError
       }
 
-      if (profile.account_status !== 'active') {
+      if (!profile) {
         await supabase.auth.signOut()
-        throw new Error('This account is suspended or inactive.')
+        throw new StaffAccessError('Unable to start your session. Please try again.')
       }
 
-      if (profile.role !== role) {
-        await supabase.auth.signOut()
-        throw new Error(
-          `This login is for ${isSuperAdmin ? 'Super Admin' : 'Admin'} accounts only.`,
-        )
-      }
-
-      if (!isSuperAdmin && !profile.assigned_sitio_id) {
-        await supabase.auth.signOut()
-        throw new Error(
-          'Your account has no assigned sitio. Contact the Super Admin.',
-        )
-      }
-
-      navigate(isSuperAdmin ? '/super-admin' : '/admin')
+      navigate(dashboardPathFor(profile.role), { replace: true })
     } catch (err) {
       setError(
         err instanceof Error
@@ -106,12 +89,10 @@ export function LoginPage({ role }: LoginPageProps) {
           PriorityCare
         </h1>
 
-        <h2>
-          {isSuperAdmin ? 'Super Admin Login' : 'Admin Login'}
-        </h2>
+        <h2>Staff Login</h2>
 
         <p style={{ color: '#64748b' }}>
-          Sign in using your authorized account.
+          Admin and Super Admin accounts sign in here. You will be taken to the dashboard for your role.
         </p>
 
         <label htmlFor="email">Email</label>

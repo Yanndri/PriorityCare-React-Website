@@ -12,6 +12,10 @@ export type MenuKey =
   | 'reports'
   | 'dataMining'
   | 'evacCenters'
+  // Super Admin only
+  | 'sitioOverview'
+  | 'adminAccounts'
+  | 'activityLogs'
 
 export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
 

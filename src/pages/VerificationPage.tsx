@@ -11,6 +11,7 @@ type VerificationPageProps = {
   verifyingResidentId: number | string | null
   onSearchChange: (value: string) => void
   onStatusFilterChange: (value: 'All' | Status) => void
+  locationOptions?: string[]
   onVerifyResident: (residentId: number | string) => void
   onRejectResident: (residentId: number | string, reason: string) => void
   onEditResident: (resident: Resident) => void
@@ -24,6 +25,7 @@ export function VerificationPage({
   verifyingResidentId,
   onSearchChange,
   onStatusFilterChange,
+  locationOptions,
   onVerifyResident,
   onRejectResident,
   onEditResident,
@@ -44,6 +46,7 @@ export function VerificationPage({
         verifyingResidentId={verifyingResidentId}
         onSearchChange={onSearchChange}
         onStatusFilterChange={onStatusFilterChange}
+        locationOptions={locationOptions}
         onViewResidentRequest={setSelectedResident}
         onVerifyResident={onVerifyResident}
         onEditResident={onEditResident}

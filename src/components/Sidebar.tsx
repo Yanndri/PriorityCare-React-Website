@@ -1,13 +1,14 @@
-import { menuItems } from '../data/dashboardData'
-import type { MenuKey } from '../types/dashboard'
+import type { MenuItem, MenuKey } from '../types/dashboard'
 
 type SidebarProps = {
+  items: MenuItem[]
+  subtitle: string
   activeMenu: MenuKey
   onMenuChange: (menu: MenuKey) => void
 }
 
-export function Sidebar({ activeMenu, onMenuChange }: SidebarProps) {
-  // Sidebar menu buttons are generated from dashboardData.ts.
+export function Sidebar({ items, subtitle, activeMenu, onMenuChange }: SidebarProps) {
+  // Sidebar menu buttons come from dashboardData.ts, chosen by role in App.tsx.
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -15,15 +16,16 @@ export function Sidebar({ activeMenu, onMenuChange }: SidebarProps) {
 
         <div>
           <strong>PriorityCare</strong>
-          <small>Resident Dashboard</small>
+          <small>{subtitle}</small>
         </div>
       </div>
 
       <nav>
-        {menuItems.map((item) => (
+        {items.map((item) => (
           <button
             key={item.key}
             className={`nav-button ${activeMenu === item.key ? 'active' : ''}`}
+            aria-current={activeMenu === item.key ? 'page' : undefined}
             onClick={() => onMenuChange(item.key)}
           >
             <span className="nav-square" />

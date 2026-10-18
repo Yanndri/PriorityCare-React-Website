@@ -16,6 +16,7 @@ type HomePageProps = {
   statusFilter: 'All' | Status
   onSearchChange: (value: string) => void
   onStatusFilterChange: (value: 'All' | Status) => void
+  locationOptions?: string[]
 }
 
 export function HomePage({
@@ -28,6 +29,7 @@ export function HomePage({
   statusFilter,
   onSearchChange,
   onStatusFilterChange,
+  locationOptions,
 }: HomePageProps) {
   // Home page combines the main dashboard widgets.
   return (
@@ -48,6 +50,7 @@ export function HomePage({
           statusFilter={statusFilter}
           onSearchChange={onSearchChange}
           onStatusFilterChange={onStatusFilterChange}
+          locationOptions={locationOptions}
         />
 
         <aside className="right-column">

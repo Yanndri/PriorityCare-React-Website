@@ -22,6 +22,56 @@ if (
   );
 }
 
+// Fail fast on the most common misconfiguration: the frontend's publishable
+// (anon) key pasted into SUPABASE_SERVICE_ROLE_KEY, or a key from another
+// project. With the wrong key every token check fails ("Invalid or expired
+// session") or every table read fails ("permission denied"). The key value is
+// never logged.
+function checkServiceKey(url, key) {
+  if (key.startsWith("sb_publishable_")) {
+    return "SUPABASE_SERVICE_ROLE_KEY holds the publishable (frontend) key. Use the secret key (sb_secret_...) or the legacy service_role key from Supabase > Project Settings > API Keys.";
+  }
+
+  const parts = key.split(".");
+
+  if (parts.length !== 3) return null; // sb_secret_... or another non-JWT key
+
+  let claims;
+
+  try {
+    claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  } catch {
+    return "SUPABASE_SERVICE_ROLE_KEY is not a valid Supabase key.";
+  }
+
+  if (claims.role !== "service_role") {
+    return `SUPABASE_SERVICE_ROLE_KEY is a '${claims.role}' key, not the service_role key.`;
+  }
+
+  let projectRef = "";
+
+  try {
+    projectRef = new URL(url).hostname.split(".")[0];
+  } catch {
+    return "SUPABASE_URL is not a valid URL.";
+  }
+
+  if (claims.ref && projectRef && claims.ref !== projectRef) {
+    return "SUPABASE_SERVICE_ROLE_KEY belongs to a different Supabase project than SUPABASE_URL.";
+  }
+
+  return null;
+}
+
+const serviceKeyProblem = checkServiceKey(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+if (serviceKeyProblem) {
+  throw new Error(serviceKeyProblem);
+}
+
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -74,8 +124,15 @@ async function requireSuperAdmin(req, res, next) {
     if (profileError) {
       console.error(
         "Super Admin verification failed:",
+        profileError.code,
         profileError.message
       );
+
+      if (profileError.code === "42501") {
+        console.error(
+          "The backend key cannot read public.users. Check that SUPABASE_SERVICE_ROLE_KEY is the service_role/secret key and that service_role has SELECT on public.users."
+        );
+      }
 
       return res.status(500).json({
         message: "Unable to verify account permissions.",
@@ -128,7 +185,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.get("/api/test-db", async (req, res) => {
+app.get("/api/test-db", requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT DATABASE() AS database_name"
@@ -151,10 +208,18 @@ app.get("/api/test-db", async (req, res) => {
 });
 
 // ============================================
+// LEGACY MYSQL ROUTES
+// These return residents from EVERY sitio (with contact details), so they
+// must never be public. The website does not call them (it reads Supabase
+// directly), so they are limited to an active Super Admin. Admins use the
+// sitio-scoped Supabase queries instead.
+// ============================================
+
+// ============================================
 // EXISTING RESIDENTS API
 // ============================================
 
-app.get("/api/residents", async (req, res) => {
+app.get("/api/residents", requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
@@ -197,7 +262,7 @@ app.get("/api/residents", async (req, res) => {
 // EXISTING MAP API
 // ============================================
 
-app.get("/api/map/residents", async (req, res) => {
+app.get("/api/map/residents", requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
@@ -232,7 +297,7 @@ app.get("/api/map/residents", async (req, res) => {
 // EXISTING VERIFICATION API
 // ============================================
 
-app.get("/api/verification/pending", async (req, res) => {
+app.get("/api/verification/pending", requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
@@ -695,6 +760,207 @@ app.post(
 
       return res.status(500).json({
         message: "Unable to create the Admin account.",
+      });
+    }
+  }
+);
+
+// ============================================
+// MANAGE ADMIN ACCOUNT — SUPER ADMIN ONLY
+// Suspend, reactivate, or reassign the sitio of an existing Admin.
+// Super Admin accounts cannot be changed through this endpoint.
+// ============================================
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Effectively permanent until reactivated (Supabase Auth ban duration).
+const SUSPENDED_BAN_DURATION = "876000h";
+
+app.patch(
+  "/api/super-admin/admins/:uid",
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const uid = String(req.params.uid || "").trim().toLowerCase();
+      const body = req.body;
+
+      if (!UUID_PATTERN.test(uid)) {
+        return res.status(400).json({
+          message: "Invalid Admin account ID.",
+        });
+      }
+
+      if (uid === String(req.superAdmin.id).toLowerCase()) {
+        return res.status(400).json({
+          message: "You cannot change your own account here.",
+        });
+      }
+
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return res.status(400).json({
+          message: "Invalid request body.",
+        });
+      }
+
+      const allowed = ["account_status", "assigned_sitio_id"];
+      const keys = Object.keys(body);
+
+      if (!keys.length || keys.some((key) => !allowed.includes(key))) {
+        return res.status(400).json({
+          message:
+            "Send account_status and/or assigned_sitio_id only.",
+        });
+      }
+
+      const changes = {};
+
+      if (body.account_status !== undefined) {
+        if (!["active", "suspended"].includes(body.account_status)) {
+          return res.status(400).json({
+            message: "Status must be 'active' or 'suspended'.",
+          });
+        }
+
+        changes.account_status = body.account_status;
+      }
+
+      if (body.assigned_sitio_id !== undefined) {
+        const sitioId = Number(body.assigned_sitio_id);
+
+        if (
+          (typeof body.assigned_sitio_id !== "number" &&
+            typeof body.assigned_sitio_id !== "string") ||
+          !Number.isSafeInteger(sitioId) ||
+          sitioId <= 0
+        ) {
+          return res.status(400).json({
+            message: "Please select a valid sitio.",
+          });
+        }
+
+        const { data: sitio, error: sitioError } =
+          await supabaseAdmin
+            .from("sitios")
+            .select("sitio_id")
+            .eq("sitio_id", sitioId)
+            .maybeSingle();
+
+        if (sitioError) {
+          console.error("Sitio lookup failed:", sitioError.message);
+
+          return res.status(500).json({
+            message: "Unable to verify the selected sitio.",
+          });
+        }
+
+        if (!sitio) {
+          return res.status(400).json({
+            message: "The selected sitio does not exist.",
+          });
+        }
+
+        changes.assigned_sitio_id = sitioId;
+      }
+
+      const { data: target, error: targetError } =
+        await supabaseAdmin
+          .from("users")
+          .select("uid, role, account_status, assigned_sitio_id")
+          .eq("uid", uid)
+          .maybeSingle();
+
+      if (targetError) {
+        console.error("Admin lookup failed:", targetError.message);
+
+        return res.status(500).json({
+          message: "Unable to load the Admin account.",
+        });
+      }
+
+      if (!target || target.role !== "admin") {
+        return res.status(404).json({
+          message: "Admin account not found.",
+        });
+      }
+
+      const { data: updated, error: updateError } =
+        await supabaseAdmin
+          .from("users")
+          .update(changes)
+          .eq("uid", uid)
+          .eq("role", "admin")
+          .select(
+            "uid, email, f_name, l_name, account_status, assigned_sitio_id"
+          )
+          .single();
+
+      if (updateError || !updated) {
+        console.error(
+          "Admin update failed:",
+          updateError?.message || "No row updated"
+        );
+
+        return res.status(500).json({
+          message: "Unable to update the Admin account.",
+        });
+      }
+
+      // Block or restore sign-in in Supabase Auth to match the status.
+      // Data access is also cut immediately, because the database checks
+      // account_status = 'active' on every request.
+      if (
+        changes.account_status &&
+        changes.account_status !== target.account_status
+      ) {
+        const { error: banError } =
+          await supabaseAdmin.auth.admin.updateUserById(uid, {
+            ban_duration:
+              changes.account_status === "suspended"
+                ? SUSPENDED_BAN_DURATION
+                : "none",
+          });
+
+        if (banError) {
+          console.error("Auth status update failed:", banError.message);
+
+          // Keep the profile and Auth consistent: undo this request.
+          const { error: revertError } = await supabaseAdmin
+            .from("users")
+            .update({
+              account_status: target.account_status,
+              assigned_sitio_id: target.assigned_sitio_id,
+            })
+            .eq("uid", uid);
+
+          if (revertError) {
+            console.error("Status revert failed:", revertError.message);
+          }
+
+          return res.status(500).json({
+            message:
+              "Unable to update sign-in access for this Admin. No change was saved.",
+          });
+        }
+      }
+
+      const verb =
+        changes.account_status === "suspended"
+          ? "suspended"
+          : changes.account_status === "active" &&
+              target.account_status !== "active"
+            ? "reactivated"
+            : "updated";
+
+      return res.json({
+        message: `Admin account ${verb}.`,
+        admin: updated,
+      });
+    } catch (error) {
+      console.error("Manage Admin endpoint failed:", error.message);
+
+      return res.status(500).json({
+        message: "Unable to update the Admin account.",
       });
     }
   }
