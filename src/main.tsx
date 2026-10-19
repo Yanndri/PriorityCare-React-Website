@@ -4,6 +4,8 @@ import './index.css'
 import AppRouter from './AppRouter'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
 import 'leaflet/dist/leaflet.css'
+// Loaded last so the visual theme wins over older component styles.
+import './styles/theme.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

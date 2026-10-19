@@ -1,0 +1,1289 @@
+/*
+ * PriorityCare visual theme — "engineering spec sheet" look.
+ * Inspired by itsua.com: white paper, ink text, one electric-blue accent,
+ * Space Grotesk headlines, JetBrains Mono labels, square edges, hairline
+ * rules and numbered sections (§ 01 / [ 01 ]).
+ *
+ * Imported last (src/main.tsx) so it overrides the older component styles.
+ * Fonts come from Google Fonts and icons from Flaticon UIcons (index.html).
+ */
+
+:root {
+  --ink: #0e1012;
+  --ink-2: #2b2e33;
+  --muted: #60636a;
+  --faint: #8d9097;
+  --paper: #ffffff;
+  --panel: #f6f6f7;
+  --panel-2: #efeff1;
+  --line: #d9dadd;
+  --line-soft: #ebebed;
+  --accent: #2f4cff;
+  --accent-soft: #eaedff;
+  --ok: #0a7a4f;
+  --ok-soft: #e3f4ec;
+  --warn: #b85c00;
+  --warn-soft: #fdf0e3;
+  --danger: #d4202f;
+  --danger-soft: #fdebec;
+  --violet: #8a2be2;
+  --violet-soft: #f4eafd;
+  --font-sans: 'Space Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --header-h: 64px;
+
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--paper);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+}
+
+/* ---------- Global geometry: square corners, no soft shadows ---------- */
+/* Map markers/pins keep their own round shapes. */
+.app *:not(.leaflet-marker-pane *, .leaflet-overlay-pane *, .leaflet-popup-tip, .live-dot, [class*='dot'], .ui-icon),
+.login-page * {
+  border-radius: 0 !important;
+}
+
+.app *:not(.leaflet-marker-pane *, :focus-visible),
+.login-page * {
+  box-shadow: none !important;
+}
+
+.app *:not(.leaflet-container *, code, pre, kbd, textarea.rdana-preview, .ui-icon) {
+  font-family: inherit;
+}
+
+:where(.app, .login-page) :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Icons (Flaticon UIcons) */
+.ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 1em;
+}
+
+.ui-icon::before {
+  line-height: 1;
+}
+
+/* Mono "spec" labels: § 01 — TITLE, kickers, eyebrows */
+.meta,
+.header-eyebrow,
+.panel-kicker,
+.operations-kicker,
+.eyebrow,
+.section-header span,
+.sidebar-label,
+.reconcile-muted.meta {
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- App shell ---------- */
+.app {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+  min-height: var(--header-h);
+  height: var(--header-h);
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 260px;
+  padding: 0 22px;
+  border-right: 1px solid var(--line);
+}
+
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 15px;
+}
+
+.brand-name {
+  display: block;
+  font-family: var(--font-mono) !important;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.header-brand .header-eyebrow {
+  display: block;
+  white-space: nowrap;
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 22px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--ok);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: none;
+  animation: pc-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pc-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
+.admin-box {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 0 0 22px;
+  border-left: 1px solid var(--line);
+  text-align: left;
+}
+
+.admin-box > div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-box span {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-box strong {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-box .sign-out-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  margin: 0;
+  padding: 0 22px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.admin-box .sign-out-button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: calc(100vh - var(--header-h));
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  position: sticky;
+  top: var(--header-h);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--header-h));
+  padding: 0;
+  overflow-y: auto;
+  background: var(--paper);
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+}
+
+.sidebar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 0;
+}
+
+.nav-button {
+  display: grid;
+  grid-template-columns: 46px 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px 10px 22px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, color 0.15s ease;
+  transform: none !important;
+}
+
+.nav-index {
+  color: var(--faint);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.nav-icon {
+  font-size: 14px;
+  color: var(--faint);
+}
+
+.nav-label {
+  line-height: 1.35;
+}
+
+.nav-button:hover {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.nav-button:hover .nav-icon {
+  color: var(--ink);
+}
+
+.nav-button.active {
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.nav-button.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.nav-button.active .nav-index,
+.nav-button.active .nav-icon {
+  color: var(--accent);
+}
+
+.nav-square {
+  display: none;
+}
+
+.sidebar-credit {
+  margin: auto 0 0;
+  padding: 16px 22px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-family: var(--font-mono) !important;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sidebar-credit a {
+  color: var(--muted);
+}
+
+/* ---------- Page canvas with the faint dashed column grid ---------- */
+.page-content {
+  position: relative;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 28px 40px 56px;
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(8.333% - 1px),
+    var(--line-soft) calc(8.333% - 1px),
+    var(--line-soft) 8.333%
+  );
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.page-content > * {
+  position: relative;
+}
+
+/* Sitio scope strip */
+.admin-sitio-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 32px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--paper);
+}
+
+.admin-sitio-banner > div > span {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-sitio-banner strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.admin-sitio-banner .scope-select,
+.admin-sitio-banner .scope-select span {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sitio-status {
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Page title: § 03 — RESIDENT VERIFICATION / big headline */
+.page-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 8px 0 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.page-title .meta {
+  margin-bottom: 14px;
+}
+
+.page-title h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(34px, 4.2vw, 56px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.page-title p {
+  max-width: 560px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ---------- Buttons ---------- */
+/* Primary: split button — accent block with an icon/arrow + ink label */
+.app .primary-button,
+.login-page .primary-button,
+.app .verify-button.large,
+.app .create-admin-form button[type='submit'] {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 40px;
+  padding: 0 18px 0 0;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono) !important;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.app .primary-button > .ui-icon,
+.login-page .primary-button > .ui-icon {
+  align-self: stretch;
+  width: 38px;
+  margin-right: 16px;
+  background: var(--accent);
+  color: var(--paper);
+  font-size: 13px;
+}
+
+.app .primary-button:not(:has(> .ui-icon))::before,
+.app .verify-button.large::before,
+.app .create-admin-form button[type='submit']::before {
+  content: '→';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  margin-right: 16px;
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.app .primary-button,
+.app .verify-button.large,
+.app .create-admin-form button[type='submit'] {
+  align-items: stretch;
+}
+
+.app .primary-button,
+.login-page .primary-button {
+  line-height: 40px;
+}
+
+.app .primary-button:hover,
+.login-page .primary-button:hover,
+.app .verify-button.large:hover,
+.app .create-admin-form button[type='submit']:hover {
+  background: var(--ink-2);
+}
+
+.app .primary-button:disabled,
+.login-page .primary-button:disabled,
+.app .create-admin-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Secondary / table actions: outlined mono */
+.app .secondary-button,
+.app .view-request-button,
+.app .view-id-button,
+.app .edit-button,
+.app .delete-button,
+.app .table-actions button,
+.app .verify-button:not(.large),
+.app .reject-button,
+.app .super-admin-quick-links a,
+.app .super-admin-quick-links button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app .secondary-button:hover,
+.app .view-request-button:hover,
+.app .view-id-button:hover,
+.app .edit-button:hover,
+.app .table-actions button:hover,
+.app .super-admin-quick-links a:hover,
+.app .super-admin-quick-links button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.app .verify-button:not(.large) {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--paper);
+}
+
+.app .delete-button,
+.app .reject-button {
+  border-color: var(--danger);
+  background: var(--paper);
+  color: var(--danger);
+}
+
+.app .delete-button:hover,
+.app .reject-button:hover {
+  background: var(--danger);
+  color: var(--paper);
+}
+
+/* ---------- Surfaces ---------- */
+.app .panel,
+.app .stat-card,
+.app .report-card,
+.app .center-card,
+.app .mining-card,
+.app .evac-center-card,
+.app .alert-card,
+.app .super-admin-card,
+.app .super-admin-section,
+.app .document-card,
+.app .assigned-resident-card,
+.app .request-detail-item,
+.app .ticket-card,
+.app .unit-card,
+.app .intake-item,
+.app .dispatch-col,
+.app .heatmap-panel {
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.app .panel {
+  padding: 24px;
+}
+
+.app .panel h3,
+.app .section-header h3,
+.app .super-admin-section h2 {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Stat tiles: mono label, large number, colored square marker */
+.app .stats-grid {
+  gap: 0;
+  border-left: 1px solid var(--line);
+  margin-bottom: 28px;
+}
+
+.app .stats-grid .stat-card {
+  border-left: 0;
+}
+
+.app .stat-card {
+  position: relative;
+  min-height: 136px;
+  padding: 20px 22px;
+  overflow: hidden;
+}
+
+.app .stat-card::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  left: auto;
+  bottom: auto;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+}
+
+.app .stat-card:nth-child(2)::after { background: var(--warn); }
+.app .stat-card:nth-child(3)::after { background: var(--ok); }
+.app .stat-card:nth-child(4)::after { background: var(--accent); }
+
+.app .stat-card span {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.app .stat-card strong {
+  color: var(--ink);
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.app .stat-card small {
+  color: var(--faint);
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+
+.app .stat-card:nth-child(2) strong { color: var(--warn); }
+.app .stat-card:nth-child(3) strong { color: var(--ok); }
+.app .stat-card:nth-child(4) strong { color: var(--accent); }
+
+/* Operations banner on Home: solid ink block */
+.app .operations-banner {
+  padding: 28px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.app .operations-banner .operations-kicker,
+.app .operations-banner .panel-kicker {
+  color: #9aa6ff;
+}
+
+.app .operations-banner h3 {
+  color: var(--paper);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.app .operations-banner p {
+  color: #b9bcc3;
+}
+
+.app .operations-state {
+  border: 1px solid #3a3d43;
+  color: #4ade80;
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app .operations-metrics {
+  gap: 0;
+  border-left: 1px solid var(--line);
+}
+
+.app .operations-metric {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-top: 3px solid var(--accent);
+  background: var(--paper);
+}
+
+.app .operations-metric.danger { border-top-color: var(--danger); }
+.app .operations-metric.warning { border-top-color: var(--warn); }
+.app .operations-metric.success { border-top-color: var(--ok); }
+.app .operations-metric.danger strong { color: var(--danger); }
+.app .operations-metric.warning strong { color: var(--warn); }
+.app .operations-metric.success strong { color: var(--ok); }
+
+.app .operations-metric span,
+.app .operations-metric small {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.app .operations-metric strong {
+  color: var(--ink);
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.app .panel-kicker {
+  color: var(--accent);
+}
+
+.app .priority-row {
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+}
+
+.app .priority-marker {
+  background: var(--danger);
+  color: var(--paper);
+  font-family: var(--font-mono) !important;
+}
+
+.app .readiness-track,
+.app .bar-track,
+.app .progress-track,
+.app .mining-track,
+.app .capacity-track {
+  background: var(--panel-2);
+}
+
+.app .readiness-track span,
+.app .bar-fill,
+.app .progress-fill,
+.app .mining-fill {
+  background: var(--accent);
+}
+
+/* ---------- Tables ---------- */
+.app table {
+  border-collapse: collapse;
+}
+
+.app th {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.app td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.app tbody tr:hover {
+  background: #fafafb;
+}
+
+/* ---------- Status chips: square, mono, tinted ---------- */
+.app .badge,
+.app .status,
+.app .account-status,
+.app .vpi-badge,
+.app .reconcile-badge,
+.app .disaster-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.app .status.verified,
+.app .status-active {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.app .status.pending {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.app .status.rejected,
+.app .status-suspended {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------- Forms ---------- */
+.app input:not([type='checkbox'], [type='radio'], [type='range']),
+.app select,
+.app textarea,
+.login-page input {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.app input:not([type='checkbox'], [type='radio'], [type='range']):hover,
+.app select:hover,
+.app textarea:hover {
+  border-color: var(--faint);
+}
+
+.app input:focus,
+.app select:focus,
+.app textarea:focus,
+.login-page input:focus {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+}
+
+.app input[type='checkbox'],
+.app input[type='radio'] {
+  accent-color: var(--accent);
+}
+
+/* ---------- Modals ---------- */
+.app .modal-backdrop,
+.app .reject-popup-backdrop {
+  background: rgba(14, 16, 18, 0.55);
+  backdrop-filter: none;
+}
+
+.app .request-modal,
+.app .edit-modal,
+.app .reject-popup-card {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+
+/* ---------- Messages ---------- */
+.app .dashboard-message {
+  font-family: var(--font-mono) !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.app .dashboard-error,
+.app .disaster-error,
+.app .reconcile-error,
+.app .dispatch-error,
+.app .reunite-error {
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.app .dispatch-notice,
+.app .reconcile-notice {
+  border: 1px solid var(--ok);
+  border-left-width: 3px;
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+/* Map frames */
+.app .leaflet-container {
+  border: 1px solid var(--line);
+  font-family: var(--font-sans);
+}
+
+/* Map controls and floating map panels */
+.app .leaflet-bar,
+.app .leaflet-control-layers,
+.app .leaflet-popup-content-wrapper,
+.app .heatmap-panel,
+.app .triage-legend {
+  border: 1px solid var(--ink) !important;
+  background: var(--paper);
+}
+
+.app .leaflet-bar a {
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+
+.app .leaflet-popup-content-wrapper {
+  font-family: var(--font-sans);
+}
+
+.app .geo-map-page button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transform: none;
+}
+
+.app .geo-map-page button:hover {
+  background: var(--ink);
+  color: var(--paper);
+  transform: none;
+}
+
+/* Heatmap panel controls: compact segmented switch */
+.app .geo-map-page .heatmap-panel button {
+  padding: 6px 7px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.app .heatmap-segment {
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+
+.app .geo-map-page .heatmap-segment button {
+  flex: 1 1 auto;
+  justify-content: center;
+  border: 0;
+  border-right: 1px solid var(--line);
+}
+
+.app .geo-map-page .heatmap-segment button:last-child {
+  border-right: 0;
+}
+
+.app .geo-map-page .heatmap-segment button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.app .heatmap-panel h3,
+.app .heatmap-panel strong {
+  color: var(--ink);
+}
+
+/* Super admin overview cards */
+.app .super-admin-stats {
+  gap: 0;
+  border-left: 1px solid var(--line);
+}
+
+.app .super-admin-stats .super-admin-card {
+  border-left: 0;
+}
+
+.app .super-admin-card {
+  padding: 20px 22px;
+}
+
+.app .super-admin-card span {
+  color: var(--muted);
+  font-family: var(--font-mono) !important;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.app .super-admin-card strong {
+  color: var(--ink);
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+/* ---------- Login ---------- */
+.login-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
+  min-height: 100vh;
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(8.333% - 1px),
+    var(--line-soft) calc(8.333% - 1px),
+    var(--line-soft) 8.333%
+  );
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.login-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px clamp(24px, 6vw, 96px);
+}
+
+.login-hero h1 {
+  margin: 24px 0 0;
+  font-size: clamp(54px, 8vw, 120px);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+}
+
+.login-hero-sub {
+  margin: 28px 0 0;
+  font-size: clamp(22px, 2.6vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.login-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 44px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  width: fit-content;
+}
+
+.login-facts li {
+  padding: 12px 16px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.login-facts li span {
+  margin-right: 8px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px clamp(24px, 4vw, 56px);
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.login-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 48px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.login-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+}
+
+.login-card h2 {
+  margin: 10px 0 0;
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.login-note {
+  margin: 12px 0 28px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.login-card label {
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.login-card input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+}
+
+.login-error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 46px !important;
+  line-height: 46px !important;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  .header-brand { width: auto; }
+  .app-layout { grid-template-columns: 220px minmax(0, 1fr); }
+  .page-content { padding: 24px 24px 48px; }
+}
+
+@media (max-width: 860px) {
+  :root { --header-h: auto; }
+
+  .app-header {
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .header-brand {
+    flex: 1 1 auto;
+    padding: 12px 16px;
+    border-right: 0;
+  }
+
+  .header-status {
+    padding: 0 16px;
+    border-left: 0;
+  }
+
+  .admin-box {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    padding: 0 0 0 16px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .admin-box .sign-out-button { padding: 12px 16px; }
+
+  .app-layout { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sidebar nav {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .nav-button {
+    grid-template-columns: auto auto;
+    flex: 0 0 auto;
+    width: auto;
+    border-right: 1px solid var(--line-soft);
+  }
+
+  .nav-index,
+  .sidebar-label,
+  .sidebar-credit { display: none; }
+
+  .page-content {
+    padding: 20px 16px 40px;
+    background-image: none;
+  }
+
+  .page-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-sitio-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .app .stats-grid,
+  .app .operations-metrics { border-left: 0; }
+  .app .stats-grid .stat-card,
+  .app .operations-metric { border-left: 1px solid var(--line); }
+
+  .login-page { grid-template-columns: 1fr; }
+  .login-hero { padding: 40px 16px 24px; }
+  .login-card { padding: 32px 16px 48px; border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* Map: keep Leaflet's zoom buttons clear of the Default/Weather switch */
+.app .geo-map-page .leaflet-top.leaflet-left {
+  top: 46px;
+}

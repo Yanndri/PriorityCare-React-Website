@@ -14,6 +14,7 @@ import {
 } from '../utils/dispatch'
 import type { BoardColumn, DispatchBoard, DispatchTicket, RescueUnit, TicketPriority, TicketSource } from '../utils/dispatch'
 import './DispatchPage.css'
+import { Icon } from '../components/Icon'
 
 type Draft = {
   sitio: string; event: string; resident: string; subject: string; source: TicketSource; sourceRef: string | null
@@ -140,7 +141,7 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
       <h4>{t.subject}</h4>
       <p className="dispatch-muted">{SOURCE_LABELS[t.source]} · {sitioName(t.sitio_id)} · opened {elapsed(t.created_at)} ago{t.created_by_name ? ` by ${t.created_by_name}` : ''}</p>
       {resident && <p className="dispatch-muted">Resident: {resident.name}{resident.mobilityStatus ? ` · ${resident.mobilityStatus.replace('_', '-')}` : ''}</p>}
-      {(t.latitude !== null || t.location_note) && <p className="dispatch-muted">📍 {t.location_note}{t.location_note && t.latitude !== null ? ' · ' : ''}
+      {(t.latitude !== null || t.location_note) && <p className="dispatch-muted"><Icon name="marker" /> {t.location_note}{t.location_note && t.latitude !== null ? ' · ' : ''}
         {t.latitude !== null && <a href={`https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=18/${t.latitude}/${t.longitude}`} target="_blank" rel="noreferrer">{Number(t.latitude).toFixed(5)}, {Number(t.longitude).toFixed(5)}</a>}</p>}
       {t.equipment.length > 0 && <p className="ticket-equip">{t.equipment.map(e => <span key={e}>{e}</span>)}</p>}
       {t.instructions && <p className="ticket-instr">{t.instructions}</p>}

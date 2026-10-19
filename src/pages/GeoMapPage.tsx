@@ -27,6 +27,7 @@ import { DisasterEventMarkers } from '../components/DisasterEventMarkers'
 import { SpatialHeatmapLayer } from '../components/SpatialHeatmapLayer'
 import { TriagePinsLayer } from '../components/TriagePinsLayer'
 import { CatchmentLinesLayer } from '../components/CatchmentLinesLayer'
+import { Icon } from '../components/Icon'
 
 // ======================================================
 // 🌍 SUPABASE
@@ -757,7 +758,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               'auto',
           }}
         >
-          🗺️ Default
+          <Icon name="map" /> Default
         </button>
 
         <button
@@ -772,7 +773,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
               'auto',
           }}
         >
-          🌪️ Weather
+          <Icon name="wind" /> Weather
         </button>
 
         {mapMode === 'weather' &&
@@ -799,7 +800,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                 '#b91c1c',
             }}
           >
-            ⚠️ Flood Prediction
+            <Icon name="exclamation" /> Flood Prediction
           </button>
 
         )}
@@ -977,7 +978,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                       1.2,
                   }}
                 >
-                  ⚠️ Live Flood Prediction
+                  <Icon name="exclamation" /> Live Flood Prediction
                 </h2>
 
                 <span
@@ -996,7 +997,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                   }}
                 >
                   {isDragging
-                    ? '↔️ Moving...'
+                    ? 'Moving…'
                     : 'Double-click + hold to move'}
                 </span>
 
@@ -1074,14 +1075,14 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                 ================================================== */}
 
             <p>
-              🌧️ Rainfall Level:{' '}
+              <Icon name="cloud-rain" /> Rainfall Level:{' '}
               <strong>
                 {rainfallLevel}%
               </strong>
             </p>
 
             <p>
-              🌪️ Weather system
+              <Icon name="wind" /> Weather system
               approaching Cebu.
             </p>
 
@@ -1101,7 +1102,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                   '12px',
               }}
             >
-              📍 Possible Affected Areas
+              <Icon name="marker" /> Possible Affected Areas
             </h3>
 
             {affectedAreas.length === 0 && (
@@ -1136,7 +1137,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                 >
 
                   <strong>
-                    🌊{' '}
+                    <Icon name="water" />{' '}
                     {area.name}
                   </strong>
 
@@ -1177,7 +1178,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
                   '12px',
               }}
             >
-              ↩️ Reset Panel Position
+              <Icon name="refresh" /> Reset Panel Position
             </button>
 
           </div>
@@ -1244,7 +1245,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
             <Popup>
 
-              🟢 Cebu City Gym
+              <Icon name="building" /> Cebu City Gym
 
               <br />
 
@@ -1354,23 +1355,23 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
 
                   <Popup>
 
-                    🚨 Emergency Request
+                    <Icon name="siren-on" /> Emergency Request
 
                     <br />
 
-                    👤{' '}
+                    <Icon name="user" />{' '}
                     {request.resident_name ??
                       'Unknown resident'}
 
                     <br />
 
-                    🌍{' '}
+                    <Icon name="globe" />{' '}
                     {request.disaster_type ??
                       'Unknown disaster'}
 
                     <br />
 
-                    📌 Status:{' '}
+                    <Icon name="info" /> Status:{' '}
 
                     {request.status ??
                       'Unknown'}

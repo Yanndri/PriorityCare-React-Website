@@ -1,4 +1,4 @@
-import type { MenuItem } from '../types/dashboard'
+import type { MenuItem, MenuKey } from '../types/dashboard'
 
 // Sidebar menu items only.
 // All dashboard records are now loaded from Supabase through src/api/dashboardApi.ts.
@@ -33,3 +33,20 @@ export const superAdminMenuItems: MenuItem[] = [
   ),
   { key: 'activityLogs', label: 'Activity Logs' },
 ]
+
+// Flaticon UIcons (fi-rs-*) shown next to each tab in the sidebar.
+export const menuIcons: Record<MenuKey, string> = {
+  home: 'apps',
+  verification: 'user-check',
+  geoMap: 'map-marker',
+  evacCenters: 'building',
+  disasterEvents: 'siren-on',
+  rescueReconciliation: 'search-location',
+  familyReunification: 'family',
+  dispatch: 'ambulance',
+  reports: 'file-chart-line',
+  dataMining: 'chart-histogram',
+  sitioOverview: 'map-location-track',
+  adminAccounts: 'user-gear',
+  activityLogs: 'list-check',
+}

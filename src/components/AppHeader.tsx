@@ -1,3 +1,5 @@
+import { Icon } from './Icon'
+
 type AppHeaderProps = {
   name: string
   roleLabel: string
@@ -8,10 +10,14 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
   // This is the fixed top header for the whole dashboard.
   return (
     <header className="app-header">
-      <div>
-        <div className="header-eyebrow">PRIORITYCARE OPERATIONS</div>
-        <h1>Emergency response dashboard</h1>
-        <p>Cebu City · Live resident and evacuation data</p>
+      <div className="header-brand">
+        <span className="brand-mark" aria-hidden="true">
+          <Icon name="life-ring" />
+        </span>
+        <div>
+          <strong className="brand-name">PRIORITYCARE</strong>
+          <span className="header-eyebrow">Emergency response · Cebu City</span>
+        </div>
       </div>
 
       <div className="header-status">
@@ -20,9 +26,12 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
       </div>
 
       <div className="admin-box">
-        <span>{roleLabel}</span>
-        <strong>{name}</strong>
+        <div>
+          <span>{roleLabel}</span>
+          <strong>{name}</strong>
+        </div>
         <button type="button" className="sign-out-button" onClick={onSignOut}>
+          <Icon name="sign-out-alt" />
           Sign out
         </button>
       </div>

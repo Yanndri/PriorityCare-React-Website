@@ -7,6 +7,7 @@ import { buildTriagePins, TRIAGE_LEVELS, TRIAGE_ORDER } from '../utils/triagePin
 import type { TriageLevel, TriagePin } from '../utils/triagePins'
 import { DEFAULT_VPI_RULES } from '../utils/vpi'
 import './TriagePinsLayer.css'
+import { Icon } from './Icon'
 
 // One cached DivIcon per colour / people-count / incomplete combination.
 const iconCache = new Map<string, L.DivIcon>()
@@ -102,8 +103,8 @@ export function TriagePinsLayer({ residents }: { residents: Resident[] }) {
             </li>)}
           </ul>
           {pin.unmappedMembers > 0 && <div className="triage-muted">{pin.unmappedMembers} member(s) have no GPS of their own.</div>}
-          <div className="triage-muted">📍 {pin.position[0].toFixed(5)}, {pin.position[1].toFixed(5)} ({pin.positionSource === 'head' ? 'household head' : 'member'} location)</div>
-          {pin.contact && <div className="triage-muted">☎ {pin.contact}</div>}
+          <div className="triage-muted"><Icon name="marker" /> {pin.position[0].toFixed(5)}, {pin.position[1].toFixed(5)} ({pin.positionSource === 'head' ? 'household head' : 'member'} location)</div>
+          {pin.contact && <div className="triage-muted"><Icon name="phone-call" /> {pin.contact}</div>}
           <div className="triage-muted">Prototype VPI — supports, not replaces, responder judgement.</div>
         </div>
       </Popup>

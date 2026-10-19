@@ -486,6 +486,7 @@ function App({ profile }: AppProps) {
 
           <PageTitle
             title={activeTitle}
+            index={menuItems.findIndex((item) => item.key === activeMenu)}
             onExportReport={() =>
               exportReport({
                 stats,
