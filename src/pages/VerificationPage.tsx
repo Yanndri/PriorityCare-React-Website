@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Resident, Status, VerificationDocument } from '../types/dashboard'
+import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
 import { useEquipmentRules } from '../api/equipmentRulesApi'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
@@ -16,6 +16,10 @@ type VerificationPageProps = {
   onRejectResident: (residentId: number | string, reason: string) => void
   onEditResident: (resident: Resident) => void
   onDeleteResident: (resident: Resident) => void
+  onChangeAccountState: (resident: Resident, action: AccountAction) => void
+  accountFilter: AccountFilter
+  onAccountFilterChange: (value: AccountFilter) => void
+  onRegisterResident?: () => void
 }
 
 export function VerificationPage({
@@ -30,6 +34,10 @@ export function VerificationPage({
   onRejectResident,
   onEditResident,
   onDeleteResident,
+  onChangeAccountState,
+  accountFilter,
+  onAccountFilterChange,
+  onRegisterResident,
 }: VerificationPageProps) {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
 
@@ -38,6 +46,14 @@ export function VerificationPage({
 
   return (
     <>
+      {onRegisterResident && (
+        <div className="page-actions">
+          <button type="button" className="secondary-button" onClick={onRegisterResident}>
+            Register Resident
+          </button>
+        </div>
+      )}
+
       <ResidentTable
         title="Verification Queue"
         residents={residents}
@@ -51,6 +67,9 @@ export function VerificationPage({
         onVerifyResident={onVerifyResident}
         onEditResident={onEditResident}
         onDeleteResident={onDeleteResident}
+        onChangeAccountState={onChangeAccountState}
+        accountFilter={accountFilter}
+        onAccountFilterChange={onAccountFilterChange}
       />
 
       {selectedResidentFromLatestData && (

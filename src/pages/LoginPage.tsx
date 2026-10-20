@@ -76,7 +76,7 @@ export function LoginPage() {
         </h1>
         <p className="login-hero-sub">Disaster response, Cebu City</p>
         <ul className="login-facts" aria-label="What the portal covers">
-          <li><span>01</span>Resident verification</li>
+          <li><span>01</span>Resident Management</li>
           <li><span>02</span>Evacuation &amp; shelters</li>
           <li><span>03</span>Rescue dispatch</li>
         </ul>

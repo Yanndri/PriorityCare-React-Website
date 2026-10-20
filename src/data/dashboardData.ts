@@ -8,7 +8,7 @@ import type { MenuItem, MenuKey } from '../types/dashboard'
 // Operational modules shared by Admin (assigned barangay) and Super Admin
 // (all barangays or the barangay chosen in the scope selector).
 const operationalItems: MenuItem[] = [
-  { key: 'verification', label: 'Resident Verification' },
+  { key: 'verification', label: 'Resident Management' },
   { key: 'geoMap', label: 'Geospatial Map' },
   { key: 'evacCenters', label: 'Evacuation Centers' },
   { key: 'preemptiveEvacuation', label: 'Pre-emptive Evacuation' },

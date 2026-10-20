@@ -1,4 +1,4 @@
-import type { Resident, Status } from '../types/dashboard'
+import type { AccountAction, AccountFilter, Resident, Status } from '../types/dashboard'
 import Select from 'react-select'
 
 type ResidentTableProps = {
@@ -12,6 +12,9 @@ type ResidentTableProps = {
   onEditResident?: (resident: Resident) => void
   onDeleteResident?: (resident: Resident) => void
   onVerifyResident?: (residentId: number | string) => void
+  onChangeAccountState?: (resident: Resident, action: AccountAction) => void
+  accountFilter?: AccountFilter
+  onAccountFilterChange?: (value: AccountFilter) => void
   verifyingResidentId?: number | string | null
   // Barangay names present in the loaded data (the location filter options).
   locationOptions?: string[]
@@ -28,10 +31,15 @@ export function ResidentTable({
   onEditResident,
   onDeleteResident,
   onVerifyResident,
+  onChangeAccountState,
+  accountFilter,
+  onAccountFilterChange,
   verifyingResidentId,
   locationOptions = [],
 }: ResidentTableProps) {
-  const hasActions = Boolean(onViewResidentRequest || onEditResident || onDeleteResident || onVerifyResident)
+  const hasActions = Boolean(
+    onViewResidentRequest || onEditResident || onDeleteResident || onVerifyResident || onChangeAccountState,
+  )
 
   return (
     <section className="panel table-panel">
@@ -70,6 +78,20 @@ export function ResidentTable({
           <option value="Verified">Verified</option>
           <option value="Rejected">Rejected</option>
         </select>
+
+        {accountFilter && onAccountFilterChange && (
+          <select
+            aria-label="Account"
+            value={accountFilter}
+            onChange={(event) => onAccountFilterChange(event.target.value as AccountFilter)}
+          >
+            <option value="Current">Current Accounts</option>
+            <option value="Active">Active</option>
+            <option value="Deactivated">Deactivated</option>
+            <option value="Archived">Archived</option>
+            <option value="All">All Accounts</option>
+          </select>
+        )}
       </div>
 
       <div className="table-scroll">
@@ -106,6 +128,14 @@ export function ResidentTable({
                       <span className={`status ${resident.status.toLowerCase()}`}>
                         {resident.status}
                       </span>
+                      {resident.accountState && resident.accountState !== 'Active' && (
+                        <span
+                          className={`status account-${resident.accountState.toLowerCase()}`}
+                          title={describeAccountState(resident)}
+                        >
+                          {resident.accountState}
+                        </span>
+                      )}
                     </td>
 
                     {hasActions && (
@@ -145,6 +175,30 @@ export function ResidentTable({
                             </button>
                           )}
 
+                          {onChangeAccountState && resident.accountState === 'Archived' && (
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'restore')}>
+                              Restore
+                            </button>
+                          )}
+
+                          {onChangeAccountState && resident.accountState === 'Deactivated' && (
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'reactivate')}>
+                              Reactivate
+                            </button>
+                          )}
+
+                          {onChangeAccountState && (resident.accountState ?? 'Active') === 'Active' && (
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'deactivate')}>
+                              Deactivate
+                            </button>
+                          )}
+
+                          {onChangeAccountState && resident.accountState !== 'Archived' && (
+                            <button className="account-button archive" onClick={() => onChangeAccountState(resident, 'archive')}>
+                              Archive
+                            </button>
+                          )}
+
                           {onDeleteResident && (
                             <button className="delete-button" onClick={() => onDeleteResident(resident)}>
                               Delete
@@ -176,6 +230,12 @@ function openSubmittedId(resident: Resident) {
   if (fileUrl) {
     window.open(fileUrl, '_blank', 'noopener,noreferrer')
   }
+}
+
+// Hover text for a Deactivated / Archived tag: why and when.
+function describeAccountState(resident: Resident) {
+  const when = resident.statusChangedAt ? new Date(resident.statusChangedAt).toLocaleString() : null
+  return [resident.statusReason, when].filter(Boolean).join(' · ') || resident.accountState || ''
 }
 
 // Turns "Walk Assist" into "walk-assist" so CSS can style it.

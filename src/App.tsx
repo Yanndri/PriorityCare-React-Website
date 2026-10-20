@@ -5,6 +5,8 @@ import './App.css'
 import { adminMenuItems, superAdminMenuItems } from './data/dashboardData'
 
 import type {
+  AccountAction,
+  AccountFilter,
   MenuKey,
   Resident,
   Status,
@@ -27,6 +29,7 @@ import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
 import { PreemptiveEvacuationPage } from './pages/PreemptiveEvacuationPage'
 import { EditResidentModal } from './components/EditResidentModal'
+import { RegisterResidentModal } from './components/RegisterResidentModal'
 import { AuditTrailPanel } from './components/AuditTrailPanel'
 import { SuperAdminSection } from './pages/SuperAdminDashboard'
 
@@ -37,6 +40,7 @@ import {
   deleteResidentProfile,
   fetchDashboardDataFromSupabase,
   rejectResidentUser,
+  setResidentAccountState,
   verifyResidentUser,
   type DashboardData,
 } from './api/dashboardApi'
@@ -76,6 +80,8 @@ function App({ profile }: AppProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] =
     useState<'All' | Status>('All')
+  const [accountFilter, setAccountFilter] =
+    useState<AccountFilter>('Current')
 
   const [dashboardData, setDashboardData] =
     useState<DashboardData>({
@@ -109,6 +115,8 @@ function App({ profile }: AppProps) {
 
   const [savingResidentId, setSavingResidentId] =
     useState<number | string | null>(null)
+
+  const [registeringResident, setRegisteringResident] = useState(false)
 
   // Super Admin scope selector: every barangay.
   useEffect(() => {
@@ -300,10 +308,30 @@ function App({ profile }: AppProps) {
     }
   }
 
+  // Barangays a staff member can register residents in.
+  const registrationBarangays = useMemo<BarangayOption[]>(() => {
+    if (isSuperAdmin) return barangayOptions
+    const id = Number(assignedBarangayId)
+    return Number.isInteger(id) && id > 0 ? [{ barangay_id: id, barangay_name: assignedBarangayName }] : []
+  }, [isSuperAdmin, barangayOptions, assignedBarangayId, assignedBarangayName])
+
+  async function handleResidentRegistered(uid: string, markVerified: boolean) {
+    setRegisteringResident(false)
+    if (markVerified) {
+      try {
+        await verifyResidentUser(uid)
+      } catch (error) {
+        console.error('Failed to verify new resident:', error)
+        window.alert('The resident was registered but could not be marked verified. Verify them from the list.')
+      }
+    }
+    await reloadDashboardData()
+  }
+
   async function handleDeleteResident(resident: Resident) {
     if (
       !window.confirm(
-        `Delete ${resident.name} permanently? This action cannot be undone.`,
+        `Delete ${resident.name} permanently? This action cannot be undone. To keep their records, use Archive instead.`,
       )
     ) {
       return
@@ -321,19 +349,62 @@ function App({ profile }: AppProps) {
     }
   }
 
-  const liveResidents = dashboardData.residents
+  // Archived residents only appear in the Verification list when its account
+  // filter asks for them; every other view works with current residents.
+  const allResidents = dashboardData.residents
+  const liveResidents = useMemo(
+    () => allResidents.filter((resident) => resident.accountState !== 'Archived'),
+    [allResidents],
+  )
+  async function handleResidentAccountState(resident: Resident, action: AccountAction) {
+    let reason: string | undefined
+
+    if (action === 'deactivate' || action === 'archive') {
+      const effect = action === 'deactivate'
+        ? 'Their account stops working until it is reactivated.'
+        : 'Their account stops working and they are hidden from the current resident lists.'
+      const answer = window.prompt(
+        `${action === 'deactivate' ? 'Deactivate' : 'Archive'} ${resident.name}? ${effect} All their records are kept.\n\nReason (required):`,
+      )
+      if (answer === null) return
+      if (!answer.trim()) {
+        window.alert('Please give a reason.')
+        return
+      }
+      reason = answer.trim()
+    } else if (
+      !window.confirm(
+        `${action === 'restore' ? 'Restore' : 'Reactivate'} ${resident.name}? Their account will work again.`,
+      )
+    ) {
+      return
+    }
+
+    try {
+      await setResidentAccountState(resident.id, action, reason)
+      await reloadDashboardData()
+    } catch (error) {
+      console.error('Failed to change resident account:', error)
+
+      window.alert(
+        error instanceof Error ? error.message : 'Unable to change this resident account.',
+      )
+    }
+  }
+
   const liveAlerts = dashboardData.alerts
   const liveEvacuationCenters =
     dashboardData.evacuationCenters
 
   const filteredResidents = useMemo(() => {
-    return liveResidents.filter((resident) => {
+    return allResidents.filter((resident) => {
       return (
         matchesSearch(resident, searchTerm) &&
-        matchesStatus(resident.status, statusFilter)
+        matchesStatus(resident.status, statusFilter) &&
+        matchesAccount(resident, accountFilter)
       )
     })
-  }, [liveResidents, searchTerm, statusFilter])
+  }, [allResidents, searchTerm, statusFilter, accountFilter])
 
   // Location filter options: the barangays actually present in the data.
   const locationOptions = useMemo(
@@ -531,6 +602,10 @@ function App({ profile }: AppProps) {
               onRejectResident={handleRejectResident}
               onEditResident={setEditingResident}
               onDeleteResident={handleDeleteResident}
+              onChangeAccountState={handleResidentAccountState}
+              accountFilter={accountFilter}
+              onAccountFilterChange={setAccountFilter}
+              onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
             />
           )}
 
@@ -578,6 +653,16 @@ function App({ profile }: AppProps) {
         </main>
       </div>
 
+      <RegisterResidentModal
+        open={registeringResident}
+        barangays={registrationBarangays}
+        defaultBarangayId={
+          assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null
+        }
+        onClose={() => setRegisteringResident(false)}
+        onRegistered={handleResidentRegistered}
+      />
+
       <EditResidentModal
         resident={editingResident}
         isSaving={savingResidentId !== null}
@@ -601,6 +686,13 @@ function matchesSearch(
     resident.barangay.toLowerCase().includes(search) ||
     resident.constraint.toLowerCase().includes(search)
   )
+}
+
+function matchesAccount(resident: Resident, filter: AccountFilter) {
+  const state = resident.accountState ?? 'Active'
+  if (filter === 'All') return true
+  if (filter === 'Current') return state !== 'Archived'
+  return state === filter
 }
 
 function matchesStatus(

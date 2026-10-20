@@ -67,3 +67,49 @@ export async function saveResidentProfile(residentId: number | string, profile: 
   const { error } = await supabase.rpc('update_resident_demographics', { p_uid: residentId, p_profile: profile })
   if (error) throw profileError(error)
 }
+
+// Staff registering a resident on their behalf (Module 1). Uses the same
+// register-resident Edge Function as app sign-up, so the resident signs in to
+// the app with this contact number and PIN.
+export type ResidentRegistrationInput = {
+  f_name: string
+  m_name: string
+  l_name: string
+  contact_no: string
+  sex: 'male' | 'female'
+  birthdate: string
+  mobility_status: ResidentProfileInput['mobility_status']
+  emerg_contact_name: string
+  emerg_contact_no: string
+  barangay_id: number
+  sitio: string
+  address: string
+  landmark: string
+  gps_lat: string
+  gps_long: string
+  is_pregnant: boolean
+  vulnerability_needs: string
+  disability_ids: number[]
+  household: { household_name: string }
+}
+
+export async function registerResident(form: ResidentRegistrationInput, pin: string) {
+  const { data, error } = await supabase.functions.invoke<{ uid: string; household_id: string; error?: string }>(
+    'register-resident',
+    { body: { ...form, pin } },
+  )
+  if (error) {
+    // The function answers 4xx with { error }; show that instead of the generic HTTP message.
+    const context = (error as { context?: Response }).context
+    const body = context ? await context.json().catch(() => null) as { error?: string } | null : null
+    throw new Error(body?.error ?? error.message)
+  }
+  if (!data?.uid) throw new Error(data?.error ?? 'The resident could not be registered.')
+  return data
+}
+
+export async function fetchDisabilityTypes() {
+  const { data, error } = await supabase.from('disability_types').select('disability_id,disability_name').order('disability_name')
+  if (error) throw error
+  return (data ?? []) as { disability_id: number; disability_name: string }[]
+}

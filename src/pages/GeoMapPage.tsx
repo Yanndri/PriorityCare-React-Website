@@ -110,54 +110,6 @@ L.Icon.Default.mergeOptions({
 })
 
 // ======================================================
-// 🌊 FLOOD ICON
-// ======================================================
-
-const floodIcon = new L.Icon({
-  iconUrl:
-    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-
-  iconSize: [30, 48],
-
-  iconAnchor: [15, 48],
-})
-
-// ======================================================
-// 🔥 FIRE ICON
-// ======================================================
-
-const fireIcon = new L.Icon({
-  iconUrl:
-    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-
-  iconSize: [30, 48],
-
-  iconAnchor: [15, 48],
-})
-
-// ======================================================
-// 🌎 EARTHQUAKE ICON
-// ======================================================
-
-const earthquakeIcon = new L.Icon({
-  iconUrl:
-    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
-
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-
-  iconSize: [30, 48],
-
-  iconAnchor: [15, 48],
-})
-
-// ======================================================
 // 🟢 EVACUATION ICON
 // ======================================================
 
@@ -189,13 +141,56 @@ type GeoMapPageProps = {
 
 type FloodArea = (typeof barangays)[number]
 
+// One row of public.sos_alerts (an SOS sent from the resident app).
 type EmergencyRequest = {
-  id: string | number
-  disaster_type?: string | null
+  alert_id: string
+  resident_uid?: string | null
+  alert_type?: string | null
+  alert_level?: number | null
+  status?: string | null
   latitude?: number | string | null
   longitude?: number | string | null
-  resident_name?: string | null
-  status?: string | null
+  headcount?: number | null
+  note?: string | null
+  created_at?: string | null
+}
+
+const SOS_TYPES: Record<string, { label: string; icon: string }> = {
+  FLOOD: { label: 'Flood', icon: 'water' },
+  FIRE: { label: 'Fire', icon: 'flame' },
+  MEDICAL: { label: 'Medical emergency', icon: 'heart-rate' },
+  TRAPPED: { label: 'Trapped', icon: 'exclamation' },
+  OTHER: { label: 'Other emergency', icon: 'siren-on' },
+}
+
+const SOS_LEVELS: Record<number, string> = { 3: 'Critical', 2: 'High', 1: 'Moderate' }
+
+// Pulsing red siren pin, larger for critical (level 3) households.
+const sosIcons = new Map<string, L.DivIcon>()
+function sosIcon(level: number, type: string) {
+  const key = `${level}-${type}`
+  let icon = sosIcons.get(key)
+  if (!icon) {
+    const size = level >= 3 ? 46 : 38
+    icon = L.divIcon({
+      className: 'sos-marker-icon',
+      html: `<span class="sos-marker sos-level-${level}" style="width:${size}px;height:${size}px">`
+        + `<i class="fi fi-rs-${(SOS_TYPES[type] ?? SOS_TYPES.OTHER).icon}" aria-hidden="true"></i></span>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+      popupAnchor: [0, -size / 2],
+    })
+    sosIcons.set(key, icon)
+  }
+  return icon
+}
+
+function minutesAgo(iso?: string | null) {
+  if (!iso) return null
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`
 }
 
 async function loadEmergencyRequests(): Promise<
@@ -211,7 +206,9 @@ async function loadEmergencyRequests(): Promise<
         .from(
           'sos_alerts',
         )
-        .select('*')
+        .select('alert_id, resident_uid, alert_type, alert_level, status, latitude, longitude, headcount, note, created_at')
+        // Only open SOS calls belong on the live map.
+        .eq('status', 'active')
 
     if (error) {
       console.error(
@@ -1278,101 +1275,46 @@ export function GeoMapPage({ residents = [], centers = [] }: GeoMapPageProps) {
             ),
           )}
 
-          {/* 🚨 EMERGENCY REQUESTS */}
+          {/* 🚨 EMERGENCY REQUESTS (active SOS alerts) */}
 
-          {requests.map(
-            (request) => {
+          {requests.map((request) => {
+            const latitude = Number(request.latitude)
+            const longitude = Number(request.longitude)
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
 
-              let markerIcon =
-                floodIcon
+            const type = (request.alert_type ?? 'OTHER').toUpperCase()
+            const level = request.alert_level ?? 1
+            const typeInfo = SOS_TYPES[type] ?? SOS_TYPES.OTHER
+            const resident = residents.find((r) => String(r.id) === String(request.resident_uid))
+            const sent = minutesAgo(request.created_at)
 
-              if (
-                request.disaster_type ===
-                'fire'
-              ) {
-
-                markerIcon =
-                  fireIcon
-              }
-
-              if (
-                request.disaster_type ===
-                'earthquake'
-              ) {
-
-                markerIcon =
-                  earthquakeIcon
-              }
-
-              const latitude =
-                Number(
-                  request.latitude,
-                )
-
-              const longitude =
-                Number(
-                  request.longitude,
-                )
-
-              if (
-                !Number.isFinite(
-                  latitude,
-                ) ||
-                !Number.isFinite(
-                  longitude,
-                )
-              ) {
-
-                return null
-              }
-
-              return (
-
-                <Marker
-                  key={
-                    request.id
-                  }
-
-                  position={[
-                    latitude,
-                    longitude,
-                  ]}
-
-                  icon={
-                    markerIcon
-                  }
-                >
-
-                  <Popup>
-
-                    <Icon name="siren-on" /> Emergency Request
-
-                    <br />
-
-                    <Icon name="user" />{' '}
-                    {request.resident_name ??
-                      'Unknown resident'}
-
-                    <br />
-
-                    <Icon name="globe" />{' '}
-                    {request.disaster_type ??
-                      'Unknown disaster'}
-
-                    <br />
-
-                    <Icon name="info" /> Status:{' '}
-
-                    {request.status ??
-                      'Unknown'}
-
-                  </Popup>
-
-                </Marker>
-
-              )
-            },
-          )}
+            return (
+              <Marker
+                key={request.alert_id}
+                position={[latitude, longitude]}
+                icon={sosIcon(level, type)}
+                zIndexOffset={1000 + level * 100}
+              >
+                <Popup className="sos-popup">
+                  <div className="sos-popup-banner">
+                    <Icon name="siren-on" /> EMERGENCY SOS
+                  </div>
+                  <div className="sos-popup-body">
+                    <strong className="sos-popup-type">
+                      <Icon name={typeInfo.icon} /> {typeInfo.label}
+                    </strong>
+                    <span className={`sos-popup-level sos-level-${level}`}>
+                      {SOS_LEVELS[level] ?? `Level ${level}`} priority
+                    </span>
+                    <p><Icon name="user" /> {resident?.name ?? 'Resident outside your loaded barangay'}</p>
+                    {request.headcount != null && <p><Icon name="users" /> {request.headcount} {request.headcount === 1 ? 'person' : 'people'} need help</p>}
+                    {request.note && <p><Icon name="comment" /> {request.note}</p>}
+                    {sent && <p><Icon name="clock" /> Sent {sent}</p>}
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
 
         </MapContainer>
 

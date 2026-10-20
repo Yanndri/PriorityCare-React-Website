@@ -586,6 +586,16 @@ textarea {
   color: var(--paper);
 }
 
+/* App.css forces white text on View ID (it used to have a purple fill);
+   override it so the label shows on the outlined button. */
+.app .view-id-button {
+  color: var(--ink) !important;
+}
+
+.app .view-id-button:hover {
+  color: var(--paper) !important;
+}
+
 .app .verify-button:not(.large) {
   border-color: var(--ok);
   background: var(--ok);

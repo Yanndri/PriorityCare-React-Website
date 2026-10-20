@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import type {
+  AccountAction,
   Alert,
   EvacuationCenter,
   EvacuationHistoryRecord,
@@ -47,6 +48,26 @@ export async function deleteResidentProfile(
   if (error) {
     throw new Error(error.code === 'PGRST202'
       ? 'Deleting residents needs the 20261019_13_delete_resident_account.sql database migration.'
+      : error.message)
+  }
+}
+
+// Deactivate, reactivate, archive or restore a resident account. Unlike delete,
+// this keeps the resident's SOS, evacuation and other records.
+export async function setResidentAccountState(
+  residentId: number | string,
+  action: AccountAction,
+  reason?: string,
+) {
+  const { error } = await supabase.rpc('set_resident_account_state', {
+    p_uid: residentId,
+    p_action: action,
+    p_reason: reason ?? null,
+  })
+
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Archiving and deactivating residents needs the 20261020_02_resident_archiving.sql database migration.'
       : error.message)
   }
 }
@@ -248,17 +269,20 @@ export async function fetchDashboardDataFromSupabase(
       documentTypesById,
     )
   await signDocumentUrls(documentsByResidentId)
+  const accountStates = await fetchAccountStates(residentIds)
 
   // 4. Map residents.
   const residents = residentsRows.map(
-    (residentRow, index) =>
-      mapResident(
+    (residentRow, index) => ({
+      ...mapResident(
         residentRow,
         usersByUid,
         barangaysById,
         documentsByResidentId,
         index,
       ),
+      ...accountStates.get(String(getField(residentRow, ['uid', 'id', 'resident_uid']))),
+    }),
   )
 
   if (residentIds.length > 0) {
@@ -428,6 +452,38 @@ export async function fetchDashboardDataFromSupabase(
 }
 
 // Update a resident's verification documents.
+// Account state for each resident. Loaded separately so the dashboard still opens
+// if 20261020_02_resident_archiving.sql has not been applied.
+async function fetchAccountStates(residentIds: string[]) {
+  const states = new Map<string, Pick<Resident, 'accountState' | 'statusReason' | 'statusChangedAt'>>()
+  if (residentIds.length === 0) return states
+
+  const withArchive = await supabase
+    .from('users')
+    .select('uid, account_status, archived_at, status_reason, status_changed_at')
+    .in('uid', residentIds)
+  // 42703: columns missing; 42501: columns not granted. Either way, fall back.
+  const { data, error } = ['42703', '42501'].includes(withArchive.error?.code ?? '')
+    ? await supabase.from('users').select('uid, account_status').in('uid', residentIds)
+    : withArchive
+
+  if (error) throw error
+
+  for (const row of (data ?? []) as AnyRow[]) {
+    states.set(String(row.uid), {
+      accountState: row.archived_at
+        ? 'Archived'
+        : row.account_status === 'active' || row.account_status == null
+          ? 'Active'
+          : 'Deactivated',
+      statusReason: (row.status_reason as string | null | undefined) ?? null,
+      statusChangedAt: (row.status_changed_at as string | null | undefined) ?? null,
+    })
+  }
+
+  return states
+}
+
 async function updateVerificationDocumentsStatus(
   residentId: number | string,
   statusesToTry: string[],

@@ -23,6 +23,14 @@ export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
 
 export type Status = 'Pending' | 'Verified' | 'Rejected'
 
+// Sign-in state of a resident account, separate from verification Status.
+export type AccountState = 'Active' | 'Deactivated' | 'Archived'
+
+// 'Current' = Active and Deactivated; archived residents are hidden unless asked for.
+export type AccountFilter = 'Current' | 'All' | AccountState
+
+export type AccountAction = 'deactivate' | 'reactivate' | 'archive' | 'restore'
+
 export type VerificationDocument = {
   id: number | string
   residentId: number | string
@@ -70,6 +78,9 @@ export type Resident = {
   gpsLat?: number | string | null
   gpsLong?: number | string | null
   documents?: VerificationDocument[]
+  accountState?: AccountState
+  statusReason?: string | null
+  statusChangedAt?: string | null
 }
 
 export type Alert = {

@@ -1106,6 +1106,42 @@ td {
   filter: brightness(0.95);
 }
 
+/* Resident archiving and deactivation */
+
+.status.account-deactivated,
+.status.account-archived {
+  margin-left: 6px;
+}
+
+.status.account-deactivated {
+  color: #8a4b00;
+  background: #ffe8cc;
+}
+
+.status.account-archived {
+  color: #4b5563;
+  background: #e5e7eb;
+}
+
+.account-button {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 12px;
+  color: #ffffff;
+  background: #183153;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.account-button.archive {
+  background: #6b7280;
+}
+
+.account-button:hover {
+  filter: brightness(0.95);
+}
+
 .edit-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2877,3 +2913,70 @@ tbody tr:hover {
     border: 1px solid #cbd5e1;
   }
 }
+
+/* Register Resident button above the verification table */
+.page-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+/* Geo Map: active SOS alerts */
+.sos-marker-icon { background: none; border: 0; }
+.sos-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #d51f42;
+  color: #ffffff;
+  font-size: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.sos-marker.sos-level-3 { background: #a3001f; font-size: 22px; }
+.sos-marker i { line-height: 1; display: flex; }
+.sos-marker::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 3px solid #d51f42;
+  animation: sos-pulse 1.6s ease-out infinite;
+}
+@keyframes sos-pulse {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sos-marker::after { animation: none; opacity: 0.5; transform: scale(1.4); }
+}
+
+.sos-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; }
+.sos-popup .leaflet-popup-content { margin: 0; min-width: 220px; }
+.sos-popup-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #d51f42;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.sos-popup-body { padding: 10px 12px; }
+.sos-popup-body p { margin: 6px 0 0; display: flex; gap: 6px; align-items: baseline; }
+.sos-popup-type { display: flex; gap: 6px; align-items: center; font-size: 15px; }
+.sos-popup-level {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ffe1e7;
+  color: #d51f42;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.sos-popup-level.sos-level-3 { background: #a3001f; color: #ffffff; }
