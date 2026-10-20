@@ -25,6 +25,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
+import { PreemptiveEvacuationPage } from './pages/PreemptiveEvacuationPage'
 import { EditResidentModal } from './components/EditResidentModal'
 import { AuditTrailPanel } from './components/AuditTrailPanel'
 import { SuperAdminSection } from './pages/SuperAdminDashboard'
@@ -555,6 +556,14 @@ function App({ profile }: AppProps) {
 
           {activeMenu === 'dataMining' && (
             <DataMiningPage residents={liveResidents} />
+          )}
+
+          {activeMenu === 'preemptiveEvacuation' && (
+            <PreemptiveEvacuationPage
+              scopeBarangayId={
+                assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null
+              }
+            />
           )}
 
           {activeMenu === 'evacCenters' && (

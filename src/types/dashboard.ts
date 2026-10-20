@@ -12,6 +12,7 @@ export type MenuKey =
   | 'reports'
   | 'dataMining'
   | 'evacCenters'
+  | 'preemptiveEvacuation'
   // Super Admin only
   | 'barangayOverview'
   | 'adminAccounts'
