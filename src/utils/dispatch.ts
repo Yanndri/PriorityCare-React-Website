@@ -10,7 +10,7 @@ export type TicketSource = 'manual' | 'sos' | 'missing_report' | 'triage'
 export type DispatchTicket = {
   ticket_id: string
   ticket_no: number
-  sitio_id: number
+  barangay_id: number
   event_id: string | null
   resident_uid: string | null
   subject: string
@@ -35,7 +35,7 @@ export type DispatchTicket = {
 export type RescueUnit = {
   unit_id: number
   unit_name: string
-  sitio_id: number | null
+  barangay_id: number | null
   capabilities: string[]
   member_uids: string[]
   is_active: boolean
@@ -44,13 +44,22 @@ export type RescueUnit = {
   live_tickets: number
 }
 
+// barangay_id is where the person was when they raised the SOS; home_barangay_id is where they are registered.
 export type IntakeSos = {
-  alert_id: string; resident_uid: string; resident_name: string; sitio_id: number
+  alert_id: string; resident_uid: string; resident_name: string; barangay_id: number
+  barangay_name?: string | null; home_barangay_id?: number | null; home_barangay_name?: string | null
   alert_type: string | null; alert_level: number | null; created_at: string | null
+  headcount?: number | null; note?: string | null
   latitude: number | string | null; longitude: number | string | null
 }
+// A barangay admin's own residents with an active SOS filed in another barangay (read-only).
+export type AwaySos = {
+  alert_id: string; resident_uid: string; resident_name: string; barangay_id: number; barangay_name: string
+  alert_type: string | null; alert_level: number | null; created_at: string | null; headcount: number | null
+  ticket_status: TicketStatus | null; unit_name: string | null
+}
 export type IntakeMissing = {
-  report_id: string; resident_uid: string | null; full_name: string; sitio_id: number
+  report_id: string; resident_uid: string | null; full_name: string; barangay_id: number
   last_seen_location: string; last_seen_at: string | null; reported_at: string
   latitude: number | string | null; longitude: number | string | null
 }
@@ -58,12 +67,13 @@ export type IntakeMissing = {
 export type DispatchBoard = {
   generated_at: string
   is_super_admin: boolean
-  sitios: { sitio_id: number; sitio_name: string }[]
-  events: { event_id: string; sitio_id: number; name: string; hazard_type: string }[]
+  barangays: { barangay_id: number; barangay_name: string }[]
+  events: { event_id: string; barangay_id: number; name: string; hazard_type: string }[]
   tickets: DispatchTicket[]
   units: RescueUnit[]
   rescuers: { uid: string; name: string }[]
   intake_sos: IntakeSos[]
+  away_sos?: AwaySos[]
   intake_missing: IntakeMissing[]
 }
 

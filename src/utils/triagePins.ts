@@ -26,7 +26,7 @@ export type TriagePin = {
   key: string
   position: [number, number]
   householdName: string | null
-  sitio: string
+  barangay: string
   triage: TriageLevel
   /** Highest member VPI score in the household. */
   score: number
@@ -85,7 +85,7 @@ export function buildTriagePins(residents: Resident[], rules: VpiRules = DEFAULT
     const list = groups.get(key)
     if (list) list.push(r); else groups.set(key, [r])
   }
-  const maxScore = calculateVpi({ id: 'x', name: '', sitio: '', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '' } as Resident, rules, asOf).maxScore
+  const maxScore = calculateVpi({ id: 'x', name: '', barangay: '', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '' } as Resident, rules, asOf).maxScore
   const pins: TriagePin[] = []
   let unmappedHouseholds = 0
   for (const [key, people] of groups) {
@@ -109,7 +109,7 @@ export function buildTriagePins(residents: Resident[], rules: VpiRules = DEFAULT
     const triage: TriageLevel = band === 'High' ? 'red' : band === 'Moderate' ? 'yellow' : 'green'
     members.sort((a, b) => b.score - a.score || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name))
     pins.push({
-      key, position: position(located)!, householdName: located.householdName ?? null, sitio: located.sitio,
+      key, position: position(located)!, householdName: located.householdName ?? null, barangay: located.barangay,
       triage, score, maxScore, incomplete, members,
       unmappedMembers: people.filter(p => !position(p)).length,
       floodZone: people.some(p => p.floodZone),

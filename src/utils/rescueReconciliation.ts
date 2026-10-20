@@ -6,7 +6,7 @@ export type ReportStatus = 'missing' | 'found' | 'withdrawn'
 
 export type RegistryResident = {
   uid: string
-  sitio_id: number
+  barangay_id: number
   f_name: string | null
   m_name: string | null
   l_name: string | null
@@ -21,7 +21,7 @@ export type RegistryResident = {
 
 export type MissingPersonReport = {
   report_id: string
-  sitio_id: number
+  barangay_id: number
   event_id: string | null
   resident_uid: string | null
   full_name: string
@@ -41,7 +41,7 @@ export type MissingPersonReport = {
 
 export type ReconciliationEvent = {
   event_id: string
-  sitio_id: number
+  barangay_id: number
   name: string
   hazard_type: string
   status: 'active' | 'resolved'
@@ -50,7 +50,7 @@ export type ReconciliationEvent = {
 
 export type ReconciliationData = {
   generated_at: string
-  sitios: { sitio_id: number; sitio_name: string }[]
+  barangays: { barangay_id: number; barangay_name: string }[]
   events: ReconciliationEvent[]
   reports: MissingPersonReport[]
   residents: RegistryResident[]
@@ -182,7 +182,7 @@ export function scoreCandidate(report: MissingPersonReport, resident: RegistryRe
     else if (diff <= 5) { score += 10; reasons.push(`Age ${age} (reported ~${report.approx_age})`) }
     else { score -= 10; reasons.push(`Age ${age} differs from reported ~${report.approx_age}`) }
   }
-  if (report.sitio_id === resident.sitio_id) reasons.push('Same sitio')
+  if (report.barangay_id === resident.barangay_id) reasons.push('Same barangay')
   return { resident, score: Math.max(0, Math.min(99, Math.round(score))), reasons }
 }
 
@@ -211,12 +211,12 @@ export function reconcile(data: ReconciliationData, asOf = new Date()): Reconcil
   open.sort((a, b) => order[a.classification] - order[b.classification]
     || a.report.reported_at.localeCompare(b.report.reported_at))
 
-  // Registered residents in sitios with an active disaster event who are neither
+  // Registered residents in barangays with an active disaster event who are neither
   // confirmed rescued nor already on the open manifest.
-  const activeSitios = new Set(data.events.filter(e => e.status === 'active').map(e => e.sitio_id))
+  const activeBarangays = new Set(data.events.filter(e => e.status === 'active').map(e => e.barangay_id))
   const onManifest = new Set(openReports.map(r => r.resident_uid).filter(Boolean))
   const unaccounted = data.residents.filter(r =>
-    activeSitios.has(r.sitio_id) && !isRescued(r) && !onManifest.has(r.uid))
+    activeBarangays.has(r.barangay_id) && !isRescued(r) && !onManifest.has(r.uid))
 
   const closed = data.reports.filter(r => r.status !== 'missing')
   const count = (c: MatchClass) => open.filter(o => o.classification === c).length
@@ -254,28 +254,28 @@ function csvCell(value: unknown) {
   return `"${safe.replace(/"/g, '""')}"`
 }
 
-export function reconciliationCsv(result: ReconciliationResult, sitioName: (id: number) => string) {
-  const header = ['Section', 'Report ID', 'Name', 'Sitio', 'Sex', 'Age', 'Reconciliation', 'Best match', 'Match score',
+export function reconciliationCsv(result: ReconciliationResult, barangayName: (id: number) => string) {
+  const header = ['Section', 'Report ID', 'Name', 'Barangay', 'Sex', 'Age', 'Reconciliation', 'Best match', 'Match score',
     'Evacuation center', 'Last seen', 'Reporter', 'Reported at', 'Note']
   const rows: unknown[][] = []
   for (const o of result.open) {
     const best = o.linkedResident && o.classification === 'linked-rescued'
       ? { resident: o.linkedResident, score: 100 } : o.candidates[0]
-    rows.push(['Open manifest', o.report.report_id, o.report.full_name, sitioName(o.report.sitio_id), o.report.sex ?? '',
+    rows.push(['Open manifest', o.report.report_id, o.report.full_name, barangayName(o.report.barangay_id), o.report.sex ?? '',
       o.report.approx_age ?? '', matchLabels[o.classification], best ? fullName(best.resident) : '', best?.score ?? '',
       best?.resident.center_name ?? '', o.report.last_seen_location, o.report.reporter_name, o.report.reported_at, o.report.notes])
   }
   for (const r of result.closed) {
-    rows.push(['Closed report', r.report_id, r.full_name, sitioName(r.sitio_id), r.sex ?? '', r.approx_age ?? '',
+    rows.push(['Closed report', r.report_id, r.full_name, barangayName(r.barangay_id), r.sex ?? '', r.approx_age ?? '',
       r.status === 'found' ? 'Found' : 'Withdrawn', '', '', '', r.last_seen_location, r.reporter_name, r.reported_at,
       r.reconciliation_note ?? ''])
   }
   for (const r of result.unaccounted) {
-    rows.push(['Unaccounted (not reported)', '', fullName(r), sitioName(r.sitio_id), r.sex ?? '', '',
+    rows.push(['Unaccounted (not reported)', '', fullName(r), barangayName(r.barangay_id), r.sex ?? '', '',
       r.latest_status ? statusLabels[r.latest_status] : 'No evacuation record', '', '', r.center_name ?? '', '', '', '', ''])
   }
   for (const r of result.rescued) {
-    rows.push(['Master rescued directory', '', fullName(r), sitioName(r.sitio_id), r.sex ?? '', '',
+    rows.push(['Master rescued directory', '', fullName(r), barangayName(r.barangay_id), r.sex ?? '', '',
       'Safely evacuated', '', '', r.center_name ?? '', '', '', r.evacuated_at ?? r.latest_logged_at ?? '', ''])
   }
   return '﻿' + [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n')

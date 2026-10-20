@@ -8,7 +8,7 @@ begin;
 create table if not exists public.rescue_units (
   unit_id integer generated always as identity primary key,
   unit_name text not null check (length(btrim(unit_name)) between 1 and 80),
-  sitio_id integer references public.sitios(sitio_id),   -- null = barangay-wide unit (super admin manages)
+  barangay_id integer references public.barangays(barangay_id),   -- null = barangay-wide unit (super admin manages)
   capabilities text[] not null default '{}' check (cardinality(capabilities) <= 12),
   member_uids uuid[] not null default '{}' check (cardinality(member_uids) <= 20),
   is_active boolean not null default true,
@@ -20,7 +20,7 @@ create unique index if not exists rescue_units_name on public.rescue_units(lower
 create table if not exists public.dispatch_tickets (
   ticket_id uuid primary key default gen_random_uuid(),
   ticket_no bigint generated always as identity unique,
-  sitio_id integer not null references public.sitios(sitio_id),
+  barangay_id integer not null references public.barangays(barangay_id),
   event_id uuid references public.disaster_events(event_id),
   resident_uid uuid references public.residents(uid),
   subject text not null check (length(btrim(subject)) between 1 and 200),
@@ -49,7 +49,7 @@ create table if not exists public.dispatch_tickets (
 create unique index if not exists dispatch_tickets_live_source
   on public.dispatch_tickets(source, source_ref)
   where source_ref is not null and status not in ('resolved','cancelled');
-create index if not exists dispatch_tickets_sitio_status on public.dispatch_tickets(sitio_id, status);
+create index if not exists dispatch_tickets_barangay_status on public.dispatch_tickets(barangay_id, status);
 
 create table if not exists public.dispatch_ticket_events (
   event_no bigint generated always as identity primary key,
@@ -70,21 +70,21 @@ revoke all on public.rescue_units, public.dispatch_tickets, public.dispatch_tick
 -- ------------------------------------------------------------------ board
 create or replace function public.get_dispatch_board()
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor_role text; actor_sitio integer;
+declare actor_role text; actor_barangay integer;
 begin
   perform public.assert_disaster_admin();
-  select role::text, assigned_sitio_id into actor_role, actor_sitio from public.users where uid = auth.uid();
+  select role::text, assigned_barangay_id into actor_role, actor_barangay from public.users where uid = auth.uid();
   return jsonb_build_object(
     'generated_at', clock_timestamp(),
     'is_super_admin', actor_role = 'super_admin',
-    'sitios', (select coalesce(jsonb_agg(jsonb_build_object('sitio_id', s.sitio_id, 'sitio_name', s.sitio_name) order by s.sitio_name), '[]'::jsonb)
-      from public.sitios s where actor_role = 'super_admin' or s.sitio_id = actor_sitio),
-    'events', (select coalesce(jsonb_agg(jsonb_build_object('event_id', e.event_id, 'sitio_id', e.sitio_id, 'name', e.name, 'hazard_type', e.hazard_type)
+    'barangays', (select coalesce(jsonb_agg(jsonb_build_object('barangay_id', s.barangay_id, 'barangay_name', s.barangay_name) order by s.barangay_name), '[]'::jsonb)
+      from public.barangays s where actor_role = 'super_admin' or s.barangay_id = actor_barangay),
+    'events', (select coalesce(jsonb_agg(jsonb_build_object('event_id', e.event_id, 'barangay_id', e.barangay_id, 'name', e.name, 'hazard_type', e.hazard_type)
         order by e.declared_at desc), '[]'::jsonb)
-      from public.disaster_events e where e.status = 'active' and (actor_role = 'super_admin' or e.sitio_id = actor_sitio)),
+      from public.disaster_events e where e.status = 'active' and (actor_role = 'super_admin' or e.barangay_id = actor_barangay)),
     -- Live tickets, plus tickets closed in the last 7 days.
     'tickets', (select coalesce(jsonb_agg(jsonb_build_object(
-        'ticket_id', t.ticket_id, 'ticket_no', t.ticket_no, 'sitio_id', t.sitio_id, 'event_id', t.event_id,
+        'ticket_id', t.ticket_id, 'ticket_no', t.ticket_no, 'barangay_id', t.barangay_id, 'event_id', t.event_id,
         'resident_uid', t.resident_uid, 'subject', t.subject, 'source', t.source, 'source_ref', t.source_ref,
         'priority', t.priority, 'latitude', t.latitude, 'longitude', t.longitude, 'location_note', t.location_note,
         'instructions', t.instructions, 'equipment', to_jsonb(t.equipment), 'status', t.status,
@@ -94,13 +94,13 @@ begin
         'last_update', (select max(ev.recorded_at) from public.dispatch_ticket_events ev where ev.ticket_id = t.ticket_id)
       ) order by case t.priority when 'critical' then 0 when 'high' then 1 else 2 end, t.created_at), '[]'::jsonb)
       from public.dispatch_tickets t
-      where (actor_role = 'super_admin' or t.sitio_id = actor_sitio)
+      where (actor_role = 'super_admin' or t.barangay_id = actor_barangay)
         and (t.closed_at is null or t.closed_at > now() - interval '7 days')),
-    -- Units are shared: any admin may assign any active unit (e.g. to borrow a team from another sitio).
+    -- Units are shared: any admin may assign any active unit (e.g. to borrow a team from another barangay).
     'units', (select coalesce(jsonb_agg(jsonb_build_object(
-        'unit_id', un.unit_id, 'unit_name', un.unit_name, 'sitio_id', un.sitio_id,
+        'unit_id', un.unit_id, 'unit_name', un.unit_name, 'barangay_id', un.barangay_id,
         'capabilities', to_jsonb(un.capabilities), 'member_uids', to_jsonb(un.member_uids), 'is_active', un.is_active,
-        'editable', actor_role = 'super_admin' or (un.sitio_id is not null and un.sitio_id = actor_sitio),
+        'editable', actor_role = 'super_admin' or (un.barangay_id is not null and un.barangay_id = actor_barangay),
         'members', (select coalesce(jsonb_agg(jsonb_build_object('uid', u.uid, 'name', concat_ws(' ', u.f_name, u.l_name), 'contact_no', u.contact_no)
             order by u.l_name), '[]'::jsonb) from public.users u where u.uid = any(un.member_uids)),
         'live_tickets', (select count(*) from public.dispatch_tickets t where t.assigned_unit_id = un.unit_id
@@ -110,22 +110,22 @@ begin
       from public.users u where u.role::text = 'rescuer' and u.account_status = 'active'),
     -- Intake: active SOS alerts and open missing reports in scope that have no live ticket yet.
     'intake_sos', (select coalesce(jsonb_agg(jsonb_build_object(
-        'alert_id', a.alert_id, 'resident_uid', r.uid, 'resident_name', concat_ws(' ', u.f_name, u.l_name), 'sitio_id', r.sitio_id,
+        'alert_id', a.alert_id, 'resident_uid', r.uid, 'resident_name', concat_ws(' ', u.f_name, u.l_name), 'barangay_id', r.barangay_id,
         'alert_type', a.alert_type, 'alert_level', a.alert_level, 'created_at', a.created_at,
         'latitude', r.gps_lat, 'longitude', r.gps_long) order by a.alert_level desc, a.created_at), '[]'::jsonb)
       from public.sos_alerts a
       join public.residents r on r.uid::text = a.resident_uid
       join public.users u on u.uid = r.uid
-      where coalesce(a.status, 'active') = 'active' and (actor_role = 'super_admin' or r.sitio_id = actor_sitio)
+      where coalesce(a.status, 'active') = 'active' and (actor_role = 'super_admin' or r.barangay_id = actor_barangay)
         and not exists (select 1 from public.dispatch_tickets t where t.source = 'sos' and t.source_ref = a.alert_id::text
           and t.status not in ('resolved','cancelled'))),
     'intake_missing', (select coalesce(jsonb_agg(jsonb_build_object(
-        'report_id', m.report_id, 'resident_uid', m.resident_uid, 'full_name', m.full_name, 'sitio_id', m.sitio_id,
+        'report_id', m.report_id, 'resident_uid', m.resident_uid, 'full_name', m.full_name, 'barangay_id', m.barangay_id,
         'last_seen_location', m.last_seen_location, 'last_seen_at', m.last_seen_at, 'reported_at', m.reported_at,
         'latitude', r.gps_lat, 'longitude', r.gps_long) order by m.reported_at), '[]'::jsonb)
       from public.missing_person_reports m
       left join public.residents r on r.uid = m.resident_uid
-      where m.status = 'missing' and (actor_role = 'super_admin' or m.sitio_id = actor_sitio)
+      where m.status = 'missing' and (actor_role = 'super_admin' or m.barangay_id = actor_barangay)
         and not exists (select 1 from public.dispatch_tickets t where t.source = 'missing_report' and t.source_ref = m.report_id::text
           and t.status not in ('resolved','cancelled')))
   );
@@ -135,8 +135,8 @@ revoke all on function public.get_dispatch_board() from public, anon;
 grant execute on function public.get_dispatch_board() to authenticated;
 
 -- ------------------------------------------------------------------ units
--- p_unit_id null = create. Sitio units: that sitio's admin or a super admin. Barangay-wide (null sitio): super admin.
-create or replace function public.save_rescue_unit(p_unit_id integer, p_name text, p_sitio integer,
+-- p_unit_id null = create. Barangay units: that barangay's admin or a super admin. Barangay-wide (null barangay): super admin.
+create or replace function public.save_rescue_unit(p_unit_id integer, p_name text, p_barangay integer,
   p_capabilities text[], p_member_uids uuid[], p_active boolean)
 returns integer language plpgsql security definer set search_path = '' as $$
 declare actor_role text; existing public.rescue_units; result_id integer;
@@ -148,15 +148,15 @@ begin
   if p_unit_id is not null then
     select * into existing from public.rescue_units where unit_id = p_unit_id for update;
     if not found then raise exception 'Unit was not found.'; end if;
-    if existing.sitio_id is null and actor_role <> 'super_admin' then
+    if existing.barangay_id is null and actor_role <> 'super_admin' then
       raise exception 'Only a super admin can edit barangay-wide units.' using errcode = '42501';
     end if;
-    if existing.sitio_id is not null then perform public.assert_disaster_admin(existing.sitio_id); end if;
+    if existing.barangay_id is not null then perform public.assert_disaster_admin(existing.barangay_id); end if;
   end if;
-  if p_sitio is null and actor_role <> 'super_admin' then
-    raise exception 'Only a super admin can create barangay-wide units. Choose your sitio.' using errcode = '42501';
+  if p_barangay is null and actor_role <> 'super_admin' then
+    raise exception 'Only a super admin can create barangay-wide units. Choose your barangay.' using errcode = '42501';
   end if;
-  if p_sitio is not null then perform public.assert_disaster_admin(p_sitio); end if;
+  if p_barangay is not null then perform public.assert_disaster_admin(p_barangay); end if;
   if exists (select 1 from unnest(caps) c where length(c) > 40) then raise exception 'Keep each capability under 40 characters.'; end if;
   if exists (select 1 from unnest(members) m where not exists (
       select 1 from public.users u where u.uid = m and u.role::text = 'rescuer' and u.account_status = 'active')) then
@@ -167,10 +167,10 @@ begin
     raise exception 'Reassign or close this unit''s live tickets before deactivating it.';
   end if;
   if p_unit_id is null then
-    insert into public.rescue_units(unit_name, sitio_id, capabilities, member_uids, is_active, updated_by)
-      values (btrim(p_name), p_sitio, caps, members, coalesce(p_active, true), auth.uid()) returning unit_id into result_id;
+    insert into public.rescue_units(unit_name, barangay_id, capabilities, member_uids, is_active, updated_by)
+      values (btrim(p_name), p_barangay, caps, members, coalesce(p_active, true), auth.uid()) returning unit_id into result_id;
   else
-    update public.rescue_units set unit_name = btrim(p_name), sitio_id = p_sitio, capabilities = caps, member_uids = members,
+    update public.rescue_units set unit_name = btrim(p_name), barangay_id = p_barangay, capabilities = caps, member_uids = members,
       is_active = coalesce(p_active, true), updated_at = clock_timestamp(), updated_by = auth.uid()
       where unit_id = p_unit_id returning unit_id into result_id;
   end if;
@@ -184,27 +184,27 @@ grant execute on function public.save_rescue_unit(integer, text, integer, text[]
 
 -- ------------------------------------------------------------------ tickets
 create or replace function public.create_dispatch_ticket(
-  p_sitio integer, p_event_id uuid, p_resident_uid uuid, p_subject text, p_source text, p_source_ref text,
+  p_barangay integer, p_event_id uuid, p_resident_uid uuid, p_subject text, p_source text, p_source_ref text,
   p_priority text, p_lat numeric, p_lng numeric, p_location_note text, p_instructions text, p_equipment text[], p_unit_id integer)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare t public.dispatch_tickets;
 begin
-  perform public.assert_disaster_admin(p_sitio);
-  if p_sitio is null then raise exception 'Select a sitio.'; end if;
+  perform public.assert_disaster_admin(p_barangay);
+  if p_barangay is null then raise exception 'Select a barangay.'; end if;
   if p_event_id is not null and not exists (select 1 from public.disaster_events e
-      where e.event_id = p_event_id and e.sitio_id = p_sitio and e.status = 'active') then
-    raise exception 'The linked disaster event must be active and in the same sitio.';
+      where e.event_id = p_event_id and e.barangay_id = p_barangay and e.status = 'active') then
+    raise exception 'The linked disaster event must be active and in the same barangay.';
   end if;
-  if p_resident_uid is not null and not exists (select 1 from public.residents r where r.uid = p_resident_uid and r.sitio_id = p_sitio) then
-    raise exception 'The resident is not registered in this sitio.';
+  if p_resident_uid is not null and not exists (select 1 from public.residents r where r.uid = p_resident_uid and r.barangay_id = p_barangay) then
+    raise exception 'The resident is not registered in this barangay.';
   end if;
   if p_source not in ('manual','sos','missing_report','triage') then raise exception 'Unknown ticket source.'; end if;
   if p_source = 'sos' and not exists (select 1 from public.sos_alerts a where a.alert_id::text = p_source_ref) then
     raise exception 'SOS alert was not found.';
   end if;
   if p_source = 'missing_report' and not exists (select 1 from public.missing_person_reports m
-      where m.report_id::text = p_source_ref and m.status = 'missing' and m.sitio_id = p_sitio) then
-    raise exception 'Open missing-person report was not found in this sitio.';
+      where m.report_id::text = p_source_ref and m.status = 'missing' and m.barangay_id = p_barangay) then
+    raise exception 'Open missing-person report was not found in this barangay.';
   end if;
   if p_lat is null and p_lng is null and p_resident_uid is null and btrim(coalesce(p_location_note, '')) = '' then
     raise exception 'Give a location: a resident, map coordinates, or a location note.';
@@ -213,9 +213,9 @@ begin
   if p_unit_id is not null and not exists (select 1 from public.rescue_units u where u.unit_id = p_unit_id and u.is_active) then
     raise exception 'Choose an active responder unit.';
   end if;
-  insert into public.dispatch_tickets(sitio_id, event_id, resident_uid, subject, source, source_ref, priority,
+  insert into public.dispatch_tickets(barangay_id, event_id, resident_uid, subject, source, source_ref, priority,
       latitude, longitude, location_note, instructions, equipment, status, assigned_unit_id, created_by, assigned_at)
-    values (p_sitio, p_event_id, p_resident_uid, btrim(p_subject), p_source, nullif(btrim(coalesce(p_source_ref, '')), ''), p_priority,
+    values (p_barangay, p_event_id, p_resident_uid, btrim(p_subject), p_source, nullif(btrim(coalesce(p_source_ref, '')), ''), p_priority,
       p_lat, p_lng, btrim(coalesce(p_location_note, '')), btrim(coalesce(p_instructions, '')),
       array(select distinct btrim(x) from unnest(coalesce(p_equipment, '{}')) x where btrim(x) <> ''),
       case when p_unit_id is null then 'open' else 'assigned' end, p_unit_id, auth.uid(),
@@ -243,7 +243,7 @@ begin
   perform public.assert_disaster_admin();
   select * into t from public.dispatch_tickets where ticket_id = p_ticket_id for update;
   if not found then raise exception 'Ticket was not found.'; end if;
-  perform public.assert_disaster_admin(t.sitio_id);
+  perform public.assert_disaster_admin(t.barangay_id);
   if t.status in ('resolved','cancelled') then raise exception 'Ticket is closed. Refresh the board.'; end if;
   if not exists (select 1 from public.rescue_units u where u.unit_id = p_unit_id and u.is_active) then
     raise exception 'Choose an active responder unit.';
@@ -273,7 +273,7 @@ begin
   select role::text into actor_role from public.users where uid = auth.uid() and account_status = 'active';
   select exists (select 1 from public.rescue_units u where u.unit_id = t.assigned_unit_id and auth.uid() = any(u.member_uids))
     into is_member;
-  if not (actor_role = 'rescuer' and is_member) then perform public.assert_disaster_admin(t.sitio_id); end if;
+  if not (actor_role = 'rescuer' and is_member) then perform public.assert_disaster_admin(t.barangay_id); end if;
   if t.status in ('resolved','cancelled') then raise exception 'Ticket is closed. Refresh the board.'; end if;
   if p_status not in ('acknowledged','en_route','on_scene','resolved','cancelled') then raise exception 'Unknown status.'; end if;
   if t.assigned_unit_id is null then raise exception 'Assign a responder unit first.'; end if;
@@ -305,7 +305,7 @@ declare t public.dispatch_tickets;
 begin
   select * into t from public.dispatch_tickets where ticket_id = p_ticket_id for update;
   if not found then raise exception 'Ticket was not found.'; end if;
-  perform public.assert_disaster_admin(t.sitio_id);
+  perform public.assert_disaster_admin(t.barangay_id);
   if t.status <> 'open' then raise exception 'Only unassigned tickets can be cancelled here.'; end if;
   if btrim(coalesce(p_note, '')) = '' or length(p_note) > 1000 then raise exception 'Give a reason (up to 1,000 characters).'; end if;
   update public.dispatch_tickets set status = 'cancelled', closed_at = clock_timestamp(), closed_by = auth.uid(), outcome_note = btrim(p_note)
@@ -324,7 +324,7 @@ declare t public.dispatch_tickets;
 begin
   select * into t from public.dispatch_tickets where ticket_id = p_ticket_id;
   if not found then raise exception 'Ticket was not found.'; end if;
-  perform public.assert_disaster_admin(t.sitio_id);
+  perform public.assert_disaster_admin(t.barangay_id);
   return (select coalesce(jsonb_agg(jsonb_build_object('action', e.action, 'from_status', e.from_status, 'to_status', e.to_status,
       'unit_name', (select u.unit_name from public.rescue_units u where u.unit_id = e.unit_id), 'note', e.note,
       'actor_name', (select concat_ws(' ', us.f_name, us.l_name) from public.users us where us.uid = e.actor_uid),

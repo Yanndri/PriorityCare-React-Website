@@ -393,8 +393,8 @@ textarea {
   position: relative;
 }
 
-/* Sitio scope strip */
-.admin-sitio-banner {
+/* Barangay scope strip */
+.admin-barangay-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -406,7 +406,7 @@ textarea {
   background: var(--paper);
 }
 
-.admin-sitio-banner > div > span {
+.admin-barangay-banner > div > span {
   color: var(--muted);
   font-family: var(--font-mono) !important;
   font-size: 10.5px;
@@ -414,15 +414,15 @@ textarea {
   text-transform: uppercase;
 }
 
-.admin-sitio-banner strong {
+.admin-barangay-banner strong {
   color: var(--ink);
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
 
-.admin-sitio-banner .scope-select,
-.admin-sitio-banner .scope-select span {
+.admin-barangay-banner .scope-select,
+.admin-barangay-banner .scope-select span {
   color: var(--muted);
   font-family: var(--font-mono) !important;
   font-size: 11px;
@@ -430,7 +430,7 @@ textarea {
   text-transform: uppercase;
 }
 
-.sitio-status {
+.barangay-status {
   padding: 6px 10px;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
@@ -1268,7 +1268,7 @@ textarea {
     align-items: flex-start;
   }
 
-  .admin-sitio-banner {
+  .admin-barangay-banner {
     flex-direction: column;
     align-items: flex-start;
   }

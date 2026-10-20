@@ -27,7 +27,7 @@ export default function AppRouter() {
         <Route path="/admin/login" element={<Navigate to={LOGIN_PATH} replace />} />
         <Route path="/super-admin/login" element={<Navigate to={LOGIN_PATH} replace />} />
 
-        {/* Admin: assigned sitio only */}
+        {/* Admin: assigned barangay only */}
         <Route
           path="/admin"
           element={

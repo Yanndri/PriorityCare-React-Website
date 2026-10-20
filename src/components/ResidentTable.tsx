@@ -13,7 +13,7 @@ type ResidentTableProps = {
   onDeleteResident?: (resident: Resident) => void
   onVerifyResident?: (residentId: number | string) => void
   verifyingResidentId?: number | string | null
-  // Sitio names present in the loaded data (the location filter options).
+  // Barangay names present in the loaded data (the location filter options).
   locationOptions?: string[]
 }
 
@@ -49,7 +49,7 @@ export function ResidentTable({
               ? { value: searchTerm, label: searchTerm }
               : { value: '', label: 'All Locations' }
           }
-          // Real sitio names from the loaded records (previously a fixed
+          // Real barangay names from the loaded records (previously a fixed
           // list of sample locations that did not match the database).
           options={[
             { value: '', label: 'All Locations' },
@@ -77,7 +77,7 @@ export function ResidentTable({
           <thead>
             <tr>
               <th>Name</th>
-              <th>Sitio</th>
+              <th>Barangay</th>
               <th>Constraint</th>
               <th>Status</th>
               {hasActions && <th>Action</th>}
@@ -96,7 +96,7 @@ export function ResidentTable({
                 return (
                   <tr key={resident.id}>
                     <td>{resident.name}</td>
-                    <td>{resident.sitio}</td>
+                    <td>{resident.barangay}</td>
                     <td>
                       <span className={`badge ${getConstraintClassName(resident.constraint)}`}>
                         {resident.constraint}

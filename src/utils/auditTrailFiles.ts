@@ -13,7 +13,7 @@ export type TimelineExportMeta = {
 
 const NAVY = 'FF183153'
 
-export async function createTimelineWorkbook(events: TimelineEvent[], sitioName: (id: number) => string, meta: TimelineExportMeta) {
+export async function createTimelineWorkbook(events: TimelineEvent[], barangayName: (id: number) => string, meta: TimelineExportMeta) {
   const { default: ExcelJS } = await import('exceljs')
   const book = new ExcelJS.Workbook()
   book.creator = 'PriorityCare'
@@ -59,7 +59,7 @@ export async function createTimelineWorkbook(events: TimelineEvent[], sitioName:
   header.values = headers
   header.height = 22
   header.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; c.alignment = { vertical: 'middle' } })
-  const rows = timelineTableRows(events, sitioName)
+  const rows = timelineTableRows(events, barangayName)
   rows.forEach((r, i) => {
     const row = sheet.addRow([r[0], new Date(events[i].occurred_at), ...r.slice(1)])
     row.getCell(2).numFmt = 'yyyy-mm-dd hh:mm:ss'
@@ -71,7 +71,7 @@ export async function createTimelineWorkbook(events: TimelineEvent[], sitioName:
   return book
 }
 
-export async function createTimelinePdf(events: TimelineEvent[], sitioName: (id: number) => string, meta: TimelineExportMeta, fontBase64: string) {
+export async function createTimelinePdf(events: TimelineEvent[], barangayName: (id: number) => string, meta: TimelineExportMeta, fontBase64: string) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   doc.addFileToVFS('NotoSans-Regular.ttf', fontBase64)
@@ -89,7 +89,7 @@ export async function createTimelinePdf(events: TimelineEvent[], sitioName: (id:
   }
   // Reference IDs are left to the Excel/CSV exports to keep the PDF readable.
   const head = [TIMELINE_HEADERS.slice(0, 10)]
-  const body = timelineTableRows(events, sitioName).map(r => r.slice(0, 10))
+  const body = timelineTableRows(events, barangayName).map(r => r.slice(0, 10))
   autoTable(doc, {
     head, body: body.length ? body : [['No events match the selected filters.', '', '', '', '', '', '', '', '', '']],
     margin: { top, bottom: 14, left: 10, right: 10 },

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import Select from 'react-select'
 import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
+import { facilityTypeLabel } from '../utils/facility'
 import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
 import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
@@ -9,9 +10,11 @@ import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
   onReload: () => Promise<void>
+  // Set for super admins only: they choose the barangay a new facility belongs to.
+  barangayOptions?: { barangay_id: number; barangay_name: string }[]
 }
 
-export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
+export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCentersPageProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [form, setForm] = useState<{ center: EvacuationCenter | null } | null>(null)
   const [statusCenter, setStatusCenter] = useState<EvacuationCenter | null>(null)
@@ -46,7 +49,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
       const matchesResident = (center.residents ?? []).some((resident) => {
         return (
           resident.name.toLowerCase().includes(normalizedSearch) ||
-          resident.sitio.toLowerCase().includes(normalizedSearch) ||
+          resident.barangay.toLowerCase().includes(normalizedSearch) ||
           resident.constraint.toLowerCase().includes(normalizedSearch) ||
           resident.evacuationStatus.toLowerCase().includes(normalizedSearch)
         )
@@ -82,7 +85,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
 
       <div className="evac-center-list">
         <label className="resident-check"><input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /><span>Include closed centers ({centers.filter((center) => center.status.toLowerCase() === 'closed').length})</span></label>
-        <p>Occupancy uses each resident’s latest record marked safely evacuated. Resident names below are limited to your sitio.</p>
+        <p>Occupancy uses each resident’s latest record marked safely evacuated. Resident names below are limited to your barangay.</p>
         {filteredCenters.length === 0 ? (
           <p className="empty-documents">No evacuation centers or assigned residents found.</p>
         ) : (
@@ -104,9 +107,12 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
                 <p>{center.capacityConfirmed ? `Maximum safe capacity: ${center.capacity} people` : 'Capacity not set'}</p>
                 <p>{center.status.toLowerCase() === 'closed' ? 'Closed — unavailable for new admissions' : center.occupancyKnown ? `${center.occupied} recorded evacuees · ${center.capacityConfirmed ? `${Math.max(0, center.capacity - center.occupied)} slots remaining` : 'available slots unknown'}` : 'Facility-wide occupancy not available'}</p>
                 {center.capacityConfirmed && center.occupancyKnown && center.occupied >= center.capacity && <p role="status">{center.occupied > center.capacity ? 'Over recorded capacity' : 'At capacity'}</p>}
-                {center.facilityType && <p>Type: {center.facilityType.replaceAll('_', ' ')} · GPS: {center.gpsLat}, {center.gpsLong}</p>}
+                {center.facilityType && <p>Type: {facilityTypeLabel(center.facilityType)} · GPS: {center.gpsLat}, {center.gpsLong}</p>}
+                {center.barangayId !== undefined && <p>Barangay: {center.barangayName ?? 'Municipal (all barangays)'}</p>}
+                {center.editable === false ? <p role="note">In your shelter plan · managed by {center.barangayName ? `Barangay ${center.barangayName}` : 'the municipal admin'}</p> : <>
                 <button type="button" className="secondary-button" onClick={() => setForm({ center })}>Set Safe Capacity</button>
                 <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{center.status.toLowerCase() === 'closed' ? 'Reopen Center' : 'Close Center'}</button>
+                </>}
                 {center.closedAt && <p>Closed: {new Date(center.closedAt).toLocaleString()} · {center.closureReason}</p>}
 
                 <section className="assigned-residents">
@@ -121,7 +127,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
                         <div className="assigned-resident-card" key={`${center.id ?? center.name}-${resident.id}`}>
                           <div>
                             <strong>{resident.name}</strong>
-                            <span>{resident.sitio}</span>
+                            <span>{resident.barangay}</span>
                           </div>
 
                           <div className="assigned-resident-tags">
@@ -148,7 +154,7 @@ export function EvacCentersPage({ centers, onReload }: EvacCentersPageProps) {
       </div>
       <ShelterCatchmentPanel />
       <ReliefDemandPlanner centers={centers} />
-      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} onClose={() => setForm(null)} onSaved={onReload} />}
+      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} barangayOptions={barangayOptions} onClose={() => setForm(null)} onSaved={onReload} />}
       {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
     </section>
   )

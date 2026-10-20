@@ -62,7 +62,7 @@ export function RescueReconciliationPanel() {
         downloadFile(toCsv(tables[0].headers, tables[0].rows), `prioritycare-rescue-reconciliation-${stamp}.csv`, CSV_TYPE)
       } else {
         const bytes = await createTableWorkbook('Rescue Reconciliation', [
-          ['Scope', data.sitios.map((sitio) => sitio.sitio_name).join(', ') || 'No sitio in scope'],
+          ['Scope', data.barangays.map((barangay) => barangay.barangay_name).join(', ') || 'No barangay in scope'],
           ['Generated (Asia/Manila)', manilaTime(data.generated_at)],
           ['Matching rule', 'Matches use recorded resident IDs only. Name agreement is never a match; corroborated candidates require in-person verification.'],
           ['Privacy', 'Contains personal data. Reporter contact details are excluded.'],

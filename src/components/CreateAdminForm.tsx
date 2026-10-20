@@ -2,11 +2,11 @@ import { useRef, useState, type FormEvent } from 'react'
 import {
   createAdmin,
   UUID_PATTERN,
-  type Sitio,
+  type Barangay,
 } from '../api/superAdminApi'
 
 type CreateAdminFormProps = {
-  sitios: Sitio[]
+  barangays: Barangay[]
   onCreated: () => void | Promise<void>
 }
 
@@ -18,7 +18,7 @@ const emptyForm = {
   m_name: '',
   l_name: '',
   contact_no: '',
-  assigned_sitio_id: '',
+  assigned_barangay_id: '',
 }
 
 type FormState = typeof emptyForm
@@ -27,7 +27,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 // Mirrors the backend rule: optional +, then digits, spaces, or hyphens.
 const CONTACT_PATTERN = /^\+?[0-9][0-9\s-]*$/
 
-function validate(form: FormState, sitios: Sitio[]): string | null {
+function validate(form: FormState, barangays: Barangay[]): string | null {
   if (
     !form.email.trim() ||
     !form.f_name.trim() ||
@@ -69,16 +69,16 @@ function validate(form: FormState, sitios: Sitio[]): string | null {
     return 'Contact number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).'
   }
 
-  const sitioId = Number(form.assigned_sitio_id)
+  const barangayId = Number(form.assigned_barangay_id)
 
-  if (!sitios.some((sitio) => sitio.sitio_id === sitioId)) {
-    return 'Please select a valid Sitio.'
+  if (!barangays.some((barangay) => barangay.barangay_id === barangayId)) {
+    return 'Please select a valid Barangay.'
   }
 
   return null
 }
 
-export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
+export function CreateAdminForm({ barangays, onCreated }: CreateAdminFormProps) {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -109,7 +109,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
       return
     }
 
-    const validationError = validate(form, sitios)
+    const validationError = validate(form, barangays)
 
     if (validationError) {
       setError(validationError)
@@ -128,16 +128,16 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
         m_name: form.m_name.trim() || undefined,
         l_name: form.l_name.trim(),
         contact_no: form.contact_no.trim(),
-        assigned_sitio_id: Number(form.assigned_sitio_id),
+        assigned_barangay_id: Number(form.assigned_barangay_id),
       })
 
-      const sitioName =
-        sitios.find(
-          (sitio) => sitio.sitio_id === Number(form.assigned_sitio_id),
-        )?.sitio_name ?? 'the selected sitio'
+      const barangayName =
+        barangays.find(
+          (barangay) => barangay.barangay_id === Number(form.assigned_barangay_id),
+        )?.barangay_name ?? 'the selected barangay'
 
       setSuccess(
-        `Admin ${result.admin?.email ?? form.email.trim()} created for ${sitioName}` +
+        `Admin ${result.admin?.email ?? form.email.trim()} created for ${barangayName}` +
           (result.admin?.uid ? ` (User ID ${result.admin.uid}).` : '.'),
       )
       setForm(emptyForm)
@@ -156,7 +156,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
     <section className="super-admin-section create-admin-section">
       <h2>Create Admin</h2>
       <p>
-        Create an administrator account and assign it to a sitio. Leave
+        Create an administrator account and assign it to a barangay. Leave
         User ID blank to auto-generate one.
       </p>
 
@@ -185,18 +185,18 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
         </label>
 
         <label className="create-admin-field">
-          <span>Assigned Sitio *</span>
+          <span>Assigned Barangay *</span>
           <select
-            value={form.assigned_sitio_id}
-            onChange={update('assigned_sitio_id')}
+            value={form.assigned_barangay_id}
+            onChange={update('assigned_barangay_id')}
             required
           >
             <option value="" disabled>
-              Select a sitio
+              Select a barangay
             </option>
-            {sitios.map((sitio) => (
-              <option key={sitio.sitio_id} value={sitio.sitio_id}>
-                {sitio.sitio_name} (ID {sitio.sitio_id})
+            {barangays.map((barangay) => (
+              <option key={barangay.barangay_id} value={barangay.barangay_id}>
+                {barangay.barangay_name} (ID {barangay.barangay_id})
               </option>
             ))}
           </select>
@@ -266,7 +266,7 @@ export function CreateAdminForm({ sitios, onCreated }: CreateAdminFormProps) {
         )}
 
         <div className="create-admin-actions">
-          <button type="submit" disabled={submitting || sitios.length === 0}>
+          <button type="submit" disabled={submitting || barangays.length === 0}>
             {submitting ? 'Creating...' : 'Create Admin'}
           </button>
         </div>

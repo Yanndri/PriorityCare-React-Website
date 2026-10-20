@@ -75,7 +75,7 @@ $$;
 revoke all on function public.get_equipment_rules() from public, anon;
 grant execute on function public.get_equipment_rules() to authenticated;
 
--- Create (p_rule_id null) or edit a rule. Rules are shared by every sitio, so only super admins change them.
+-- Create (p_rule_id null) or edit a rule. Rules are shared by every barangay, so only super admins change them.
 -- Turn a rule off with p_active = false; rules are never removed, so history stays readable.
 create or replace function public.save_equipment_rule(p_rule_id integer, p_kind text, p_value text, p_equipment text, p_note text, p_active boolean)
 returns integer language plpgsql security definer set search_path = '' as $$
@@ -84,7 +84,7 @@ begin
   perform public.assert_disaster_admin();
   select role::text into actor_role from public.users where uid = auth.uid();
   if actor_role <> 'super_admin' then
-    raise exception 'Only a super admin can change equipment rules (they apply to every sitio).' using errcode = '42501';
+    raise exception 'Only a super admin can change equipment rules (they apply to every barangay).' using errcode = '42501';
   end if;
   if p_kind = 'mobility' then v := lower(replace(v, '-', '_')); end if;
   if p_kind = 'pregnancy' then v := 'true'; end if;

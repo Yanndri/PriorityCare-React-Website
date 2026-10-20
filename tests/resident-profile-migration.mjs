@@ -14,26 +14,26 @@ try {
       $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create type public.sex_type as enum ('male','female');
     create type public.mobility_type as enum ('ambulatory','semi_ambulatory','non_ambulatory');
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
     create table public.users(uid uuid primary key, role text, account_status text,
-      assigned_sitio_id integer, f_name text not null,m_name text,l_name text not null,
+      assigned_barangay_id integer, f_name text not null,m_name text,l_name text not null,
       contact_no text not null, is_verified boolean default true);
     create table public.residents(uid uuid primary key references public.users(uid),
-      sitio_id integer references public.sitios(sitio_id), sex sex_type not null,
+      barangay_id integer references public.barangays(barangay_id), sex sex_type not null,
       birthdate date not null, mobility_status mobility_type not null,
       emerg_contact_name text not null,emerg_contact_no text not null,
       gps_lat numeric not null,gps_long numeric not null);
     create table public.disability_types(disability_id integer primary key,disability_name text);
     create table public.resident_disabilities(resident_uid uuid references public.residents(uid),
       disability_id integer references public.disability_types(disability_id),primary key(resident_uid,disability_id));
-    insert into public.sitios values (1,'Sitio 1'),(2,'Sitio 2');
+    insert into public.barangays values (1,'Barangay 1'),(2,'Barangay 2');
     insert into public.disability_types values (1,'Visual'),(2,'Mobility');
     grant usage on schema public,auth to authenticated;
     grant select on public.users,public.residents to authenticated;
   `)
   for (let n = 1; n <= 6; n++) {
     await db.query('insert into auth.users values ($1)', [uid(n)])
-    await db.query(`insert into public.users(uid,role,account_status,assigned_sitio_id,f_name,l_name,contact_no)
+    await db.query(`insert into public.users(uid,role,account_status,assigned_barangay_id,f_name,l_name,contact_no)
       values($1,$2,$3,$4,'Test','Resident','09170000000')`,
       [uid(n), n <= 3 ? 'admin' : 'resident', n === 3 ? 'suspended' : 'active', n === 2 ? 2 : 1])
     if (n >= 4) await db.query(`insert into public.residents values
@@ -77,7 +77,7 @@ try {
   await actor(2)
   await assert.rejects(load(4), /administrator access/)
   const other = (await load(6)).profile
-  await assert.rejects(save(6, { ...other, household_id: shared.profile.household_id }), /resident's sitio/)
+  await assert.rejects(save(6, { ...other, household_id: shared.profile.household_id }), /resident's barangay/)
   await actor(3)
   await assert.rejects(load(4), /administrator access/)
   await actor(4)

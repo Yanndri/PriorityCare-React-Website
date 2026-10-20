@@ -8,7 +8,7 @@ export type TimelineEvent = {
   category: TimelineCategory
   action: string
   subject: string | null
-  sitio_id: number | null
+  barangay_id: number | null
   from_value: string | null
   to_value: string | null
   actor_name: string | null
@@ -22,7 +22,7 @@ export type TimelineData = {
   from: string
   to: string
   scope: string
-  sitios: { sitio_id: number; sitio_name: string }[]
+  barangays: { barangay_id: number; barangay_name: string }[]
   events: TimelineEvent[]
 }
 
@@ -42,7 +42,7 @@ export type TimelineCategory = keyof typeof timelineCategories
 export const categoryCoverage: Record<TimelineCategory, string> = {
   evacuation: 'One entry per evacuation record at its logged time (evacuated time if not logged). "From" is the resident’s previous record status.',
   evacuation_change: 'Edits and deletions captured by the evacuation audit trigger. Changes made before the trigger existed are not in the log.',
-  facility: 'Facility-wide center status and capacity changes (shared across sitios).',
+  facility: 'Facility-wide center status and capacity changes (shared across barangays).',
   disaster_event: 'Declarations and resolutions with actor and reason.',
   missing_person: 'Reports filed, marked found, or withdrawn.',
   verification: 'Document uploads and review decisions.',
@@ -84,17 +84,17 @@ export function countByCategory(events: TimelineEvent[]) {
   return counts
 }
 
-export const timelineHeaders = ['Occurred (UTC, ISO 8601)', 'Occurred (Asia/Manila)', 'Category', 'Action', 'Subject', 'Sitio', 'From', 'To', 'Actor', 'Actor role', 'Details', 'Reference ID']
+export const timelineHeaders = ['Occurred (UTC, ISO 8601)', 'Occurred (Asia/Manila)', 'Category', 'Action', 'Subject', 'Barangay', 'From', 'To', 'Actor', 'Actor role', 'Details', 'Reference ID']
 
 export function timelineRows(data: TimelineData, events: TimelineEvent[]) {
-  const sitioName = new Map(data.sitios.map((sitio) => [sitio.sitio_id, sitio.sitio_name]))
+  const barangayName = new Map(data.barangays.map((barangay) => [barangay.barangay_id, barangay.barangay_name]))
   return events.map((event) => [
     new Date(event.occurred_at).toISOString(),
     manilaTimestamp(event.occurred_at),
     timelineCategories[event.category] ?? event.category,
     event.action,
     event.subject ?? '',
-    event.sitio_id === null ? 'All sitios (facility-wide)' : sitioName.get(event.sitio_id) ?? `Sitio ${event.sitio_id}`,
+    event.barangay_id === null ? 'All barangays (facility-wide)' : barangayName.get(event.barangay_id) ?? `Barangay ${event.barangay_id}`,
     event.from_value ?? '',
     event.to_value ?? '',
     event.actor_name ?? 'Not recorded',
@@ -135,8 +135,8 @@ export const valueLabel = (v: string | null) => v === null || v === '' ? '' : VA
 
 export type TimelineFilter = {
   categories: TimelineCategory[]
-  /** null = every sitio in scope; 0 = facility-wide events with no sitio. */
-  sitioId: number | null
+  /** null = every barangay in scope; 0 = facility-wide events with no barangay. */
+  barangayId: number | null
   search: string
 }
 
@@ -144,7 +144,7 @@ export function filterTimeline(events: TimelineEvent[], filter: TimelineFilter) 
   const cats = new Set(filter.categories)
   const q = filter.search.trim().toLowerCase()
   return events.filter(e => cats.has(e.category)
-    && (filter.sitioId === null || (filter.sitioId === 0 ? e.sitio_id === null : e.sitio_id === filter.sitioId))
+    && (filter.barangayId === null || (filter.barangayId === 0 ? e.barangay_id === null : e.barangay_id === filter.barangayId))
     && (!q || [e.action, e.subject, e.actor_name, e.details, e.from_value, e.to_value, e.ref_id]
       .some(v => v && v.toLowerCase().includes(q))))
 }
@@ -168,13 +168,13 @@ export function phtDayStart(date: string) {
   return t
 }
 
-export const TIMELINE_HEADERS = ['Time (PHT)', 'Category', 'Action', 'Subject', 'Sitio', 'From', 'To', 'By', 'Role', 'Details', 'Reference']
+export const TIMELINE_HEADERS = ['Time (PHT)', 'Category', 'Action', 'Subject', 'Barangay', 'From', 'To', 'By', 'Role', 'Details', 'Reference']
 
 /** Reports-panel table rows (PHT time first). The Data Mining panel uses timelineRows(data, events). */
-export function timelineTableRows(events: TimelineEvent[], sitioName: (id: number) => string): string[][] {
+export function timelineTableRows(events: TimelineEvent[], barangayName: (id: number) => string): string[][] {
   return events.map(e => [
     formatPht(e.occurred_at), CATEGORY_LABELS[e.category] ?? e.category, e.action, e.subject ?? '',
-    e.sitio_id === null ? 'All (facility-wide)' : sitioName(e.sitio_id),
+    e.barangay_id === null ? 'All (facility-wide)' : barangayName(e.barangay_id),
     valueLabel(e.from_value), valueLabel(e.to_value), e.actor_name ?? 'Not recorded', e.actor_role ?? '',
     e.details ?? '', e.ref_id ?? '',
   ])
@@ -189,7 +189,7 @@ function csvCell(value: string) {
   return `"${safe.replace(/"/g, '""')}"`
 }
 
-export function timelineCsv(events: TimelineEvent[], sitioName: (id: number) => string, meta: { scope: string; from: string; to: string; generatedAt: string }) {
+export function timelineCsv(events: TimelineEvent[], barangayName: (id: number) => string, meta: { scope: string; from: string; to: string; generatedAt: string }) {
   const lines = [
     ['PriorityCare operational timestamp log'],
     ['Scope', meta.scope],
@@ -198,7 +198,7 @@ export function timelineCsv(events: TimelineEvent[], sitioName: (id: number) => 
     ['Generated (PHT)', formatPht(meta.generatedAt)],
     [],
     TIMELINE_HEADERS,
-    ...timelineTableRows(events, sitioName),
+    ...timelineTableRows(events, barangayName),
   ]
   return '﻿' + lines.map(l => l.map(csvCell).join(',')).join('\r\n')
 }

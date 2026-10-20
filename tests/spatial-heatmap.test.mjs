@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { gridCells, incidentPoints, metersPerPixel, rampColor, residentPosition, vulnerabilityPoints } from '../src/utils/spatialHeatmap.ts'
 
-const base = { name: 'R', sitio: 'Sitio 3', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
+const base = { name: 'R', barangay: 'Barangay 3', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
   mobilityStatus: 'ambulatory', disabilityCount: 0, isPregnant: false, birthdate: '1990-01-01' }
 const r = (id, lat, lng, extra = {}) => ({ ...base, id, gpsLat: lat, gpsLong: lng, ...extra })
 

@@ -2,25 +2,25 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   getSuperAdminDashboard,
   type AdminAccount,
-  type Sitio,
+  type Barangay,
 } from '../api/superAdminApi'
 import {
   SuperAdminAdminAccounts,
   SuperAdminOverview,
-  SuperAdminSitioOverview,
+  SuperAdminBarangayOverview,
 } from './SuperAdminViews'
 
 type SuperAdminSectionProps = {
-  view: 'overview' | 'accounts' | 'sitios'
-  onOpenSitio: (sitioId: number) => void
+  view: 'overview' | 'accounts' | 'barangays'
+  onOpenBarangay: (barangayId: number) => void
 }
 
 // Super Admin management content inside the shared dashboard shell.
 // Admin accounts are loaded through the backend API (service role, behind
 // requireSuperAdmin); they are never read with the browser's Supabase key.
-export function SuperAdminSection({ view, onOpenSitio }: SuperAdminSectionProps) {
+export function SuperAdminSection({ view, onOpenBarangay }: SuperAdminSectionProps) {
   const [admins, setAdmins] = useState<AdminAccount[]>([])
-  const [sitios, setSitios] = useState<Sitio[]>([])
+  const [barangays, setBarangays] = useState<Barangay[]>([])
   const [loading, setLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
@@ -32,7 +32,7 @@ export function SuperAdminSection({ view, onOpenSitio }: SuperAdminSectionProps)
     try {
       const result = await getSuperAdminDashboard()
       setAdmins(result.admins)
-      setSitios(result.sitios)
+      setBarangays(result.barangays)
       setHasLoaded(true)
     } catch (err) {
       console.error('Super Admin data failed to load:', err)
@@ -65,11 +65,11 @@ export function SuperAdminSection({ view, onOpenSitio }: SuperAdminSectionProps)
 
   if (!hasLoaded) return <p role="status">Loading Admin accounts…</p>
 
-  if (view === 'overview') return <SuperAdminOverview admins={admins} sitios={sitios} />
+  if (view === 'overview') return <SuperAdminOverview admins={admins} barangays={barangays} />
 
-  if (view === 'sitios') {
-    return <SuperAdminSitioOverview admins={admins} sitios={sitios} onOpenSitio={onOpenSitio} />
+  if (view === 'barangays') {
+    return <SuperAdminBarangayOverview admins={admins} barangays={barangays} onOpenBarangay={onOpenBarangay} />
   }
 
-  return <SuperAdminAdminAccounts admins={admins} sitios={sitios} reload={load} />
+  return <SuperAdminAdminAccounts admins={admins} barangays={barangays} reload={load} />
 }

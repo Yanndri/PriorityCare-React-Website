@@ -7,7 +7,7 @@ export type EvacueePerson = {
   full_name: string
   sex: string | null
   age: number | null
-  home_sitio: string | null
+  home_barangay: string | null
   latest_status: EvacStatus | null
   latest_logged_at: string | null
   evacuated_at: string | null
@@ -34,7 +34,7 @@ export type HouseholdMember = {
   sex: string | null
   age: number | null
   is_head: boolean
-  home_sitio: string | null
+  home_barangay: string | null
   latest_status: EvacStatus | null
   latest_logged_at: string | null
   center_id: number | null

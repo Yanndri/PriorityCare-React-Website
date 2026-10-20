@@ -4,7 +4,7 @@ import { buildTriagePins, scoreDependent, TRIAGE_LEVELS } from '../src/utils/tri
 import { DEFAULT_VPI_RULES } from '../src/utils/vpi.ts'
 
 const asOf = '2026-10-17'
-const base = { sitio: 'Sitio 3', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
+const base = { barangay: 'Barangay 3', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
   mobilityStatus: 'ambulatory', disabilityCount: 0, isPregnant: false, birthdate: '1990-01-01', gpsLat: 10.32, gpsLong: 123.9 }
 const r = (id, extra = {}) => ({ ...base, id, name: `Person ${id}`, ...extra })
 

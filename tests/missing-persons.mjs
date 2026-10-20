@@ -9,28 +9,28 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer,
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer,
       f_name text,m_name text,l_name text);
-    create table public.residents(uid uuid primary key references public.users(uid),sitio_id integer references public.sitios(sitio_id),
+    create table public.residents(uid uuid primary key references public.users(uid),barangay_id integer references public.barangays(barangay_id),
       sex text,birthdate date);
     create table public.evacuation_centers(center_id integer primary key,center_name text);
     create table public.evacuation_records(record_id uuid primary key,resident_uid uuid references public.residents(uid),
       evac_center_id integer references public.evacuation_centers(center_id),evac_status text,evacuated_at timestamptz,logged_at timestamptz);
-    insert into public.sitios values(1,'Sitio One'),(2,'Sitio Two');
+    insert into public.barangays values(1,'Barangay One'),(2,'Barangay Two');
     insert into public.evacuation_centers values(10,'Central School');
     grant usage on schema public,auth to authenticated,anon;`)
   const people = [
-    // n, role, status, sitio, first, last
+    // n, role, status, barangay, first, last
     [1,'admin','active',1,'Ana','Admin'],[2,'admin','active',2,'Ben','Admin'],[4,'admin','suspended',1,'Sus','Pended'],
-    [5,'super_admin','active',null,'Sue','Per'],[6,'admin','active',null,'No','Sitio'],
+    [5,'super_admin','active',null,'Sue','Per'],[6,'admin','active',null,'No','Barangay'],
     [20,'resident','active',1,'Juan','Dela Cruz'],[21,'resident','active',1,'Maria','Santos'],
     [22,'resident','active',1,'Pedro','Reyes'],[30,'resident','active',2,'Liza','Gomez'],
   ]
-  for (const [n, role, status, sitio, f, l] of people) {
+  for (const [n, role, status, barangay, f, l] of people) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, role === 'resident' ? null : sitio, f, l])
-    if (role === 'resident') await db.query('insert into public.residents values($1,$2,$3,$4)', [uid(n), sitio, 'male', '1990-01-01'])
+    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, role === 'resident' ? null : barangay, f, l])
+    if (role === 'resident') await db.query('insert into public.residents values($1,$2,$3,$4)', [uid(n), barangay, 'male', '1990-01-01'])
   }
   // Juan: in transit, then safely evacuated (latest). Maria: safely evacuated, then failed (latest). Pedro: no record.
   await db.exec(`insert into public.evacuation_records values
@@ -49,7 +49,7 @@ try {
     await db.exec(`set role ${role}`)
   }
   const file = (o = {}) => {
-    const p = { sitio: 1, event: null, resident: null, name: 'Unregistered Child', sex: 'female', age: 7,
+    const p = { barangay: 1, event: null, resident: null, name: 'Unregistered Child', sex: 'female', age: 7,
       where: 'Riverside', at: '2026-10-14T00:00:00Z', reporter: 'Neighbor', contact: '0917', notes: '', ...o }
     return db.query('select public.file_missing_person_report($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) as id', Object.values(p))
   }
@@ -59,7 +59,7 @@ try {
 
   await actor(1)
   const view = await data()
-  assert.equal(view.sitios.length, 1)
+  assert.equal(view.barangays.length, 1)
   assert.equal(view.residents.length, 3)
   const byUid = Object.fromEntries(view.residents.map(r => [r.uid, r]))
   assert.equal(byUid[uid(20)].latest_status, 'safely_evacuated')
@@ -72,7 +72,7 @@ try {
   const mariaId = (await file({ resident: uid(21), name: 'Maria Santos', sex: 'female', age: 36 })).rows[0].id
   assert.equal((await data()).reports.length, 3)
   await assert.rejects(file({ resident: uid(20), name: 'Juan again' }), /already has an open/)
-  for (const o of [{ sitio: 2 }, { sitio: null }, { resident: uid(30) }, { name: ' ' }, { reporter: '' }, { sex: 'x' },
+  for (const o of [{ barangay: 2 }, { barangay: null }, { resident: uid(30) }, { name: ' ' }, { reporter: '' }, { sex: 'x' },
     { age: 200 }, { at: '2999-01-01T00:00:00Z' }, { notes: 'x'.repeat(2001) }, { event: uid(999) }]) {
     await assert.rejects(file(o))
   }
@@ -86,7 +86,7 @@ try {
   await assert.rejects(found(childId, null, '  '), /Describe where/)
   await assert.rejects(withdraw(mariaId, ' '), /withdrawal reason/)
   await withdraw(mariaId)
-  await found(childId, null, 'Found at relative\'s house in Sitio Two')
+  await found(childId, null, 'Found at relative\'s house in Barangay Two')
   const closed = Object.fromEntries((await data()).reports.map(r => [r.report_id, r]))
   assert.equal(closed[juanId].status, 'found')
   assert.equal(closed[juanId].matched_resident_uid, uid(20))
@@ -101,8 +101,8 @@ try {
   assert.equal((await data()).reports.length, 0)
   assert.equal((await data()).residents.length, 1)
   await assert.rejects(found(childId, null, 'x'), /administrator access/)
-  await assert.rejects(file({ sitio: 1 }), /administrator access/)
-  await file({ sitio: 2, resident: uid(30), name: 'Liza Gomez' })
+  await assert.rejects(file({ barangay: 1 }), /administrator access/)
+  await file({ barangay: 2, resident: uid(30), name: 'Liza Gomez' })
   await actor(5)
   assert.equal((await data()).reports.length, 5)
   assert.equal((await data()).residents.length, 4)

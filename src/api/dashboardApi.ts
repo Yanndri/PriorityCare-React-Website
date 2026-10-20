@@ -23,7 +23,7 @@ const EMPTY_ROWS_RESULT: { data: AnyRow[]; error: null } = {
   error: null,
 }
 
-// Row Level Security hides rows outside the caller's sitio, so a blocked
+// Row Level Security hides rows outside the caller's barangay, so a blocked
 // change looks like "0 rows changed" rather than an error. Treat that as
 // a permission failure instead of reporting success.
 function requireChangedRow(
@@ -32,41 +32,23 @@ function requireChangedRow(
 ) {
   if (!rows || rows.length === 0) {
     throw new Error(
-      `Unable to ${action}: this resident is not in your authorized sitio, or no longer exists.`,
+      `Unable to ${action}: this resident is not in your authorized barangay, or no longer exists.`,
     )
   }
 }
 
-// Delete a resident profile and its related records.
+// Delete a resident's account, household and sign-in. The database refuses
+// residents with SOS, dispatch, evacuation or missing-person history.
 export async function deleteResidentProfile(
   residentId: number | string,
 ) {
-  const { error: documentsError } = await supabase
-    .from('verification_documents')
-    .delete()
-    .eq('uid', residentId)
+  const { error } = await supabase.rpc('delete_resident_account', { p_uid: residentId })
 
-  if (documentsError) throw documentsError
-
-  const { error: recordsError } = await supabase
-    .from('evacuation_records')
-    .delete()
-    .eq('resident_uid', residentId)
-
-  if (recordsError) throw recordsError
-
-  // Deleting the users row removes the residents row and its disability
-  // entries through ON DELETE CASCADE. It is done in one step because the
-  // sitio check needs the residents row to still exist.
-  const { data: deletedUsers, error: userError } = await supabase
-    .from('users')
-    .delete()
-    .eq('uid', residentId)
-    .select('uid')
-
-  if (userError) throw userError
-
-  requireChangedRow(deletedUsers, 'delete this resident')
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Deleting residents needs the 20261019_13_delete_resident_account.sql database migration.'
+      : error.message)
+  }
 }
 
 // Approve a resident's verification.
@@ -111,39 +93,39 @@ export async function rejectResidentUser(
   )
 }
 
-export const ALL_SITIOS = 'all'
+export const ALL_BARANGAYS = 'all'
 
 /**
- * Fetch dashboard data for one sitio, or for every sitio (Super Admin).
+ * Fetch dashboard data for one barangay, or for every barangay (Super Admin).
  *
  * IMPORTANT:
- * Admins must pass the sitio_id from their own profile; App.tsx never offers
- * ALL_SITIOS to an Admin. The sitio filter here is for display only: what a
+ * Admins must pass the barangay_id from their own profile; App.tsx never offers
+ * ALL_BARANGAYS to an Admin. The barangay filter here is for display only: what a
  * user can actually read is decided by the database (RLS policies).
- * Do not pass the Admin's uid as the sitio ID.
+ * Do not pass the Admin's uid as the barangay ID.
  */
 export async function fetchDashboardDataFromSupabase(
-  assignedSitioId: number | string,
+  assignedBarangayId: number | string,
 ): Promise<DashboardData> {
-  const selectedSitioId = String(
-    assignedSitioId ?? '',
+  const selectedBarangayId = String(
+    assignedBarangayId ?? '',
   ).trim()
-  const allSitios = selectedSitioId === ALL_SITIOS
+  const allBarangays = selectedBarangayId === ALL_BARANGAYS
 
-  // Do not load dashboard data if the Admin has no assigned sitio.
-  if (!selectedSitioId) {
+  // Do not load dashboard data if the Admin has no assigned barangay.
+  if (!selectedBarangayId) {
     throw new Error(
-      'Admin has no assigned sitio. Dashboard data was not loaded.',
+      'Admin has no assigned barangay. Dashboard data was not loaded.',
     )
   }
 
-  // 1. Fetch residents assigned to this sitio only (or all sitios).
+  // 1. Fetch residents assigned to this barangay only (or all barangays).
   const residentsQuery = supabase
     .from('residents')
     .select('*')
-  const residentsResult = allSitios
+  const residentsResult = allBarangays
     ? await residentsQuery
-    : await residentsQuery.eq('sitio_id', selectedSitioId)
+    : await residentsQuery.eq('barangay_id', selectedBarangayId)
 
   if (residentsResult.error) {
     throw residentsResult.error
@@ -152,7 +134,7 @@ export async function fetchDashboardDataFromSupabase(
   const residentsRows: AnyRow[] =
     residentsResult.data ?? []
 
-  // Collect the IDs of residents belonging to this sitio.
+  // Collect the IDs of residents belonging to this barangay.
   const residentIds = residentsRows
     .map((row) =>
       getField(row, ['uid', 'id', 'resident_uid']),
@@ -167,7 +149,7 @@ export async function fetchDashboardDataFromSupabase(
   // whose records are linked to residents.
   const [
     usersResult,
-    sitioResult,
+    barangayResult,
     documentsResult,
     documentTypesResult,
     centersResult,
@@ -181,12 +163,12 @@ export async function fetchDashboardDataFromSupabase(
           .in('uid', residentIds)
       : Promise.resolve(EMPTY_ROWS_RESULT),
 
-    allSitios
-      ? supabase.from('sitios').select('*')
+    allBarangays
+      ? supabase.from('barangays').select('*')
       : supabase
-          .from('sitios')
+          .from('barangays')
           .select('*')
-          .eq('sitio_id', selectedSitioId),
+          .eq('barangay_id', selectedBarangayId),
 
     residentIds.length > 0
       ? supabase
@@ -213,7 +195,7 @@ export async function fetchDashboardDataFromSupabase(
 
   // Do not silently treat database errors as empty data.
   if (usersResult.error) throw usersResult.error
-  if (sitioResult.error) throw sitioResult.error
+  if (barangayResult.error) throw barangayResult.error
   if (documentsResult.error) throw documentsResult.error
   if (documentTypesResult.error) {
     throw documentTypesResult.error
@@ -224,8 +206,8 @@ export async function fetchDashboardDataFromSupabase(
   const usersRows: AnyRow[] =
     usersResult.data ?? []
 
-  const sitiosRows: AnyRow[] =
-    sitioResult.data ?? []
+  const barangaysRows: AnyRow[] =
+    barangayResult.data ?? []
 
   const documentRows: AnyRow[] =
     documentsResult.data ?? []
@@ -245,9 +227,9 @@ export async function fetchDashboardDataFromSupabase(
     ['uid', 'id', 'user_id'],
   )
 
-  const sitiosById = toMap(
-    sitiosRows,
-    ['sitio_id', 'id'],
+  const barangaysById = toMap(
+    barangaysRows,
+    ['barangay_id', 'id'],
   )
 
   const centersById = toMap(
@@ -265,6 +247,7 @@ export async function fetchDashboardDataFromSupabase(
       documentRows,
       documentTypesById,
     )
+  await signDocumentUrls(documentsByResidentId)
 
   // 4. Map residents.
   const residents = residentsRows.map(
@@ -272,7 +255,7 @@ export async function fetchDashboardDataFromSupabase(
       mapResident(
         residentRow,
         usersByUid,
-        sitiosById,
+        barangaysById,
         documentsByResidentId,
         index,
       ),
@@ -305,11 +288,17 @@ export async function fetchDashboardDataFromSupabase(
     // Older deployments may not yet have the new table. Other errors must surface.
     if (error && !['PGRST205', '42P01'].includes(error.code)) throw error
     const householdQuery = supabase.from('households')
-      .select('household_id,household_name,head_uid,household_members')
-    const householdResult = allSitios
+      .select('household_id,household_name,head_uid,household_members(member_id,name:full_name,relationship,birthdate,sex,is_pregnant,needs,mobility,age_group)')
+    const householdResult = allBarangays
       ? await householdQuery
-      : await householdQuery.eq('sitio_id', selectedSitioId)
+      : await householdQuery.eq('barangay_id', selectedBarangayId)
     if (householdResult.error && !['PGRST205', '42P01'].includes(householdResult.error.code)) throw householdResult.error
+    // Members are rows now; keep the old shape (blank strings for unknown values).
+    for (const household of householdResult.data ?? []) {
+      household.household_members = (household.household_members ?? []).map((member) => ({
+        ...member, birthdate: member.birthdate ?? '', sex: member.sex ?? '',
+      }))
+    }
     for (const detail of details ?? []) {
       const resident = residents.find((item) => String(item.id) === String(detail.resident_uid))
       if (resident) {
@@ -341,21 +330,27 @@ export async function fetchDashboardDataFromSupabase(
   // 5. Map evacuation centers.
   // Occupancy is based on the records fetched for this Admin's
   // residents, not all residents in the system.
-  const evacuationCenters = centerRows.map(
+  let evacuationCenters = centerRows.map(
     (centerRow, index) =>
       mapEvacuationCenter(
         centerRow,
         recordRows,
         residentsRows,
         usersByUid,
-        sitiosById,
+        barangaysById,
         index,
       ),
   )
 
   const { data: facilityCatalog, error: facilityCatalogError } = await supabase.rpc('get_evacuation_facility_catalog')
   if (facilityCatalogError && facilityCatalogError.code !== 'PGRST202') throw facilityCatalogError
-  for (const entry of (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number; status?: string; closed_at?: string | null; closure_reason?: string | null }[]) {
+  const catalog = (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number; households?: number; status?: string; closed_at?: string | null; closure_reason?: string | null; barangay_id?: number | null; barangay_name?: string | null; editable?: boolean }[]
+  // The catalog only lists centres this admin may see: their barangay's and the ones their shelter plan uses.
+  if (facilityCatalog) {
+    const visible = new Set(catalog.map((entry) => String(entry.center_id)))
+    evacuationCenters = evacuationCenters.filter((center) => visible.has(String(center.id)))
+  }
+  for (const entry of catalog) {
     const center = evacuationCenters.find((item) => String(item.id) === String(entry.center_id))
     if (center) {
       center.capacity = entry.capacity ?? 0
@@ -365,6 +360,10 @@ export async function fetchDashboardDataFromSupabase(
       center.status = entry.status ?? center.status
       center.closedAt = entry.closed_at
       center.closureReason = entry.closure_reason
+      center.barangayId = entry.barangay_id ?? null
+      center.barangayName = entry.barangay_name ?? null
+      center.editable = entry.editable ?? true
+      center.households = entry.households
     }
   }
 
@@ -374,14 +373,14 @@ export async function fetchDashboardDataFromSupabase(
       mapEvacuationHistory(
         recordRow,
         usersByUid,
-        sitiosById,
+        barangaysById,
         centersById,
         residentsRows,
         index,
       ),
   )
 
-  // 7. Calculate dashboard alerts using this sitio's data.
+  // 7. Calculate dashboard alerts using this barangay's data.
   const pendingDocuments = documentRows.filter(
     (row) => {
       const status = String(
@@ -465,7 +464,7 @@ async function updateVerificationDocumentsStatus(
 function mapResident(
   residentRow: AnyRow,
   usersByUid: Map<string, AnyRow>,
-  sitiosById: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
   documentsByResidentId: Map<
     string,
     VerificationDocument[]
@@ -479,12 +478,12 @@ function mapResident(
 
   const user = usersByUid.get(String(uid))
 
-  const sitioId = getField(
+  const barangayId = getField(
     residentRow,
-    ['sitio_id', 'sitioId'],
+    ['barangay_id', 'barangayId'],
   )
 
-  const sitio = sitiosById.get(String(sitioId))
+  const barangay = barangaysById.get(String(barangayId))
 
   const firstName = getField(
     user,
@@ -568,13 +567,13 @@ function mapResident(
       fullNameFromUser ||
       String(rowName ?? `Resident ${index + 1}`),
 
-    sitio: String(
-      getField(sitio, ['sitio_name', 'name']) ??
+    barangay: String(
+      getField(barangay, ['barangay_name', 'name']) ??
         getField(residentRow, [
-          'sitio',
-          'sitio_name',
+          'barangay',
+          'barangay_name',
         ]) ??
-        'Unknown Sitio',
+        'Unknown Barangay',
     ),
 
     constraint: mapConstraint(mobility),
@@ -623,8 +622,8 @@ function mapResident(
         'household_address',
         'home_address',
       ]) ??
-        getField(sitio, [
-          'sitio_name',
+        getField(barangay, [
+          'barangay_name',
           'name',
         ]) ??
         'No address provided',
@@ -655,6 +654,26 @@ function mapResident(
     gpsLat: latitude ?? null,
     gpsLong: longitude ?? null,
     documents,
+  }
+}
+
+// The verification-docs bucket is private: stored values are object paths
+// ("<uid>/<file>") or old public URLs. Swap each for a short-lived signed URL.
+const VERIFICATION_BUCKET = 'verification-docs'
+async function signDocumentUrls(documentsByResidentId: Map<string, VerificationDocument[]>) {
+  const documents = [...documentsByResidentId.values()].flat()
+  const marker = `/object/public/${VERIFICATION_BUCKET}/`
+  const pathOf = (value: string) => value.includes(marker)
+    ? decodeURIComponent(value.split(marker)[1])
+    : /^https?:/.test(value) ? '' : value.replace(new RegExp(`^${VERIFICATION_BUCKET}/`), '')
+  const paths = [...new Set(documents.map((document) => pathOf(document.fileUrl)).filter(Boolean))]
+  if (paths.length === 0) return
+  const { data, error } = await supabase.storage.from(VERIFICATION_BUCKET).createSignedUrls(paths, 60 * 60)
+  if (error) throw error
+  const signed = new Map((data ?? []).filter((item) => item.signedUrl).map((item) => [item.path, item.signedUrl]))
+  for (const document of documents) {
+    const path = pathOf(document.fileUrl)
+    if (path) document.fileUrl = signed.get(path) ?? ''
   }
 }
 
@@ -776,7 +795,7 @@ function mapEvacuationCenter(
   recordRows: AnyRow[],
   residentRows: AnyRow[],
   usersByUid: Map<string, AnyRow>,
-  sitiosById: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
   index: number,
 ): EvacuationCenter {
   const centerId = toScalar(getField(
@@ -816,11 +835,11 @@ function mapEvacuationCenter(
         String(residentUid),
       )
 
-      const sitio = sitiosById.get(
+      const barangay = barangaysById.get(
         String(
           getField(resident, [
-            'sitio_id',
-            'sitioId',
+            'barangay_id',
+            'barangayId',
           ]),
         ),
       )
@@ -858,16 +877,16 @@ function mapEvacuationCenter(
           fullName ||
           `Resident ${residentUid ?? recordIndex + 1}`,
 
-        sitio: String(
-          getField(sitio, [
-            'sitio_name',
+        barangay: String(
+          getField(barangay, [
+            'barangay_name',
             'name',
           ]) ??
             getField(resident, [
-              'sitio',
-              'sitio_name',
+              'barangay',
+              'barangay_name',
             ]) ??
-            'Unknown Sitio',
+            'Unknown Barangay',
         ),
 
         constraint: mapConstraint(
@@ -931,7 +950,7 @@ function mapEvacuationCenter(
 function mapEvacuationHistory(
   recordRow: AnyRow,
   usersByUid: Map<string, AnyRow>,
-  sitiosById: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
   centersById: Map<string, AnyRow>,
   residentRows: AnyRow[],
   index: number,
@@ -951,11 +970,11 @@ function mapEvacuationHistory(
     String(residentUid),
   )
 
-  const sitio = sitiosById.get(
+  const barangay = barangaysById.get(
     String(
       getField(resident, [
-        'sitio_id',
-        'sitioId',
+        'barangay_id',
+        'barangayId',
       ]),
     ),
   )
@@ -1035,16 +1054,16 @@ function mapEvacuationHistory(
       residentName ||
       `Resident ${residentUid ?? index + 1}`,
 
-    sitio: String(
-      getField(sitio, [
-        'sitio_name',
+    barangay: String(
+      getField(barangay, [
+        'barangay_name',
         'name',
       ]) ??
         getField(resident, [
-          'sitio',
-          'sitio_name',
+          'barangay',
+          'barangay_name',
         ]) ??
-        'Unknown Sitio',
+        'Unknown Barangay',
     ),
 
     constraint: mapConstraint(

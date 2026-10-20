@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { DEFAULT_EQUIPMENT_RULES, equipmentDataGaps, matchEquipment } from '../src/utils/equipmentMatch.ts'
 
 const asOf = '2026-10-17'
-const base = { id: 'r', name: 'R', sitio: 'S', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
+const base = { id: 'r', name: 'R', barangay: 'S', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '',
   mobilityStatus: 'ambulatory', disabilityCount: 0, disabilityTypes: [], isPregnant: false, birthdate: '1990-01-01', vulnerabilityNeeds: '' }
 const eq = (res, rules) => matchEquipment(res, rules, asOf).map(n => n.equipment).sort()
 

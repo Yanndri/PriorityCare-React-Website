@@ -44,11 +44,11 @@ create or replace trigger log_evacuation_record_change
   for each row execute function public.log_evacuation_record_change();
 
 -- Combined, time-ordered log of operational events in the caller's scope.
--- Admins: residents/events/reports of their assigned sitio, plus facility-wide center changes.
+-- Admins: residents/events/reports of their assigned barangay, plus facility-wide center changes.
 -- Super admins: everything.
 create or replace function public.get_operational_timeline(p_from timestamptz, p_to timestamptz)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor_role text; actor_sitio integer; result jsonb; total integer; events jsonb;
+declare actor_role text; actor_barangay integer; result jsonb; total integer; events jsonb;
 begin
   perform public.assert_disaster_admin();
   if p_from is null or p_to is null or not isfinite(p_from) or not isfinite(p_to) or p_from >= p_to then
@@ -57,11 +57,11 @@ begin
   if p_to - p_from > interval '366 days' then
     raise exception 'Choose a date range of at most one year.';
   end if;
-  select role::text, assigned_sitio_id into actor_role, actor_sitio from public.users where uid = auth.uid();
+  select role::text, assigned_barangay_id into actor_role, actor_barangay from public.users where uid = auth.uid();
 
-  with ev(occurred_at, category, action, subject, sitio_id, from_value, to_value, actor_uid, details, ref_id) as (
+  with ev(occurred_at, category, action, subject, barangay_id, from_value, to_value, actor_uid, details, ref_id) as (
   -- 1. Evacuation status log (one row per record, with the previous status for that resident).
-  (select x.occurred_at, 'evacuation', 'Evacuation status logged', x.resident_name, x.sitio_id,
+  (select x.occurred_at, 'evacuation', 'Evacuation status logged', x.resident_name, x.barangay_id,
          x.prev_status, x.evac_status, coalesce(x.entered_by, x.rescuer_uid),
          concat_ws(' · ',
            case when x.center_name is not null then 'Center: ' || x.center_name end,
@@ -74,14 +74,14 @@ begin
            coalesce(er.logged_at, er.evacuated_at) as occurred_at,
            lag(er.evac_status::text) over (partition by er.resident_uid
              order by coalesce(er.logged_at, er.evacuated_at), er.record_id) as prev_status,
-           r.sitio_id, concat_ws(' ', u.f_name, u.l_name) as resident_name, c.center_name,
+           r.barangay_id, concat_ws(' ', u.f_name, u.l_name) as resident_name, c.center_name,
            (select a.actor_uid from public.evacuation_record_audit a
              where a.record_id = er.record_id and a.action = 'INSERT' order by a.changed_at limit 1) as entered_by
     from public.evacuation_records er
     join public.residents r on r.uid = er.resident_uid
     join public.users u on u.uid = r.uid
     left join public.evacuation_centers c on c.center_id = er.evac_center_id
-    where actor_role = 'super_admin' or r.sitio_id = actor_sitio
+    where actor_role = 'super_admin' or r.barangay_id = actor_barangay
   ) x
   left join public.users ru on ru.uid = x.rescuer_uid
   where x.occurred_at >= p_from and x.occurred_at < p_to)
@@ -89,7 +89,7 @@ begin
   -- 2. Edits and deletions of evacuation records (captured by the trigger).
   (select a.changed_at, 'evacuation_change',
          case a.action when 'UPDATE' then 'Evacuation record edited' else 'Evacuation record deleted' end,
-         coalesce(nullif(concat_ws(' ', u.f_name, u.l_name), ''), a.resident_uid::text), r.sitio_id,
+         coalesce(nullif(concat_ws(' ', u.f_name, u.l_name), ''), a.resident_uid::text), r.barangay_id,
          a.old_row->>'evac_status', a.new_row->>'evac_status', a.actor_uid,
          concat_ws(' · ',
            case when a.action = 'UPDATE' then 'Changed: ' || (
@@ -101,7 +101,7 @@ begin
   left join public.residents r on r.uid = a.resident_uid
   left join public.users u on u.uid = a.resident_uid
   where a.action in ('UPDATE','DELETE') and a.changed_at >= p_from and a.changed_at < p_to
-    and (actor_role = 'super_admin' or r.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or r.barangay_id = actor_barangay))
   union all
   -- 3. Evacuation center status and capacity changes (facility-wide).
   (select f.changed_at, 'facility', 'Center status changed', c.center_name, null,
@@ -117,7 +117,7 @@ begin
   -- 4. Disaster event declarations and resolutions.
   (select d.recorded_at, 'disaster_event',
          case d.action when 'declared' then 'Disaster event declared' else 'Disaster event resolved' end,
-         e.name, e.sitio_id,
+         e.name, e.barangay_id,
          case d.action when 'resolved' then 'active' end,
          case d.action when 'declared' then 'active' else 'resolved' end,
          d.actor_uid,
@@ -126,13 +126,13 @@ begin
          e.event_id::text
   from public.disaster_event_audit d join public.disaster_events e on e.event_id = d.event_id
   where d.recorded_at >= p_from and d.recorded_at < p_to
-    and (actor_role = 'super_admin' or e.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or e.barangay_id = actor_barangay))
   union all
   -- 5. Missing-person manifest actions.
   (select a.recorded_at, 'missing_person',
          case a.action when 'reported' then 'Missing-person report filed' when 'found' then 'Missing person marked found'
            else 'Missing-person report withdrawn' end,
-         m.full_name, m.sitio_id,
+         m.full_name, m.barangay_id,
          case when a.action <> 'reported' then 'missing' end,
          case a.action when 'reported' then 'missing' else a.action end,
          a.actor_uid,
@@ -145,21 +145,21 @@ begin
          m.report_id::text
   from public.missing_person_report_audit a join public.missing_person_reports m on m.report_id = a.report_id
   where a.recorded_at >= p_from and a.recorded_at < p_to
-    and (actor_role = 'super_admin' or m.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or m.barangay_id = actor_barangay))
   union all
   -- 6. Verification documents: uploads and reviews.
   (select v.uploaded_at, 'verification', 'Verification document uploaded',
-         concat_ws(' ', u.f_name, u.l_name), r.sitio_id, null, 'pending', v.uid,
+         concat_ws(' ', u.f_name, u.l_name), r.barangay_id, null, 'pending', v.uid,
          'Document: ' || coalesce(t.type_name, 'unknown type'), v.doc_id::text
   from public.verification_documents v
   join public.users u on u.uid = v.uid
   left join public.residents r on r.uid = v.uid
   left join public.document_types t on t.type_id = v.type_id
   where v.uploaded_at >= p_from and v.uploaded_at < p_to
-    and (actor_role = 'super_admin' or r.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or r.barangay_id = actor_barangay))
   union all
   (select v.reviewed_at, 'verification', 'Verification document reviewed',
-         concat_ws(' ', u.f_name, u.l_name), r.sitio_id, 'pending', v.review_status::text, v.reviewed_by,
+         concat_ws(' ', u.f_name, u.l_name), r.barangay_id, 'pending', v.review_status::text, v.reviewed_by,
          concat_ws(' · ', 'Document: ' || coalesce(t.type_name, 'unknown type'),
            case when v.rejection_reason is not null then 'Reason: ' || v.rejection_reason end),
          v.doc_id::text
@@ -168,21 +168,21 @@ begin
   left join public.residents r on r.uid = v.uid
   left join public.document_types t on t.type_id = v.type_id
   where v.reviewed_at is not null and v.reviewed_at >= p_from and v.reviewed_at < p_to
-    and (actor_role = 'super_admin' or r.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or r.barangay_id = actor_barangay))
   union all
   -- 7. SOS alerts raised (only creation time is recorded).
-  (select s.created_at, 'sos', 'SOS alert raised', concat_ws(' ', u.f_name, u.l_name), r.sitio_id,
+  (select s.created_at, 'sos', 'SOS alert raised', concat_ws(' ', u.f_name, u.l_name), r.barangay_id,
          null, coalesce(s.status, 'active'), r.uid,
          concat_ws(' · ', 'Type: ' || s.alert_type, 'Level: ' || s.alert_level::text), s.alert_id::text
   from public.sos_alerts s
   join public.residents r on r.uid::text = s.resident_uid
   join public.users u on u.uid = r.uid
   where s.created_at >= p_from and s.created_at < p_to
-    and (actor_role = 'super_admin' or r.sitio_id = actor_sitio))
+    and (actor_role = 'super_admin' or r.barangay_id = actor_barangay))
   )
   select count(*), coalesce(jsonb_agg(jsonb_build_object(
         'occurred_at', e.occurred_at, 'category', e.category, 'action', e.action, 'subject', e.subject,
-        'sitio_id', e.sitio_id, 'from_value', e.from_value, 'to_value', e.to_value,
+        'barangay_id', e.barangay_id, 'from_value', e.from_value, 'to_value', e.to_value,
         'actor_name', case when e.actor_uid is null then null
           else coalesce(nullif(concat_ws(' ', au.f_name, au.l_name), ''), e.actor_uid::text) end,
         'actor_role', au.role::text, 'details', nullif(e.details, ''), 'ref_id', e.ref_id
@@ -197,10 +197,10 @@ begin
   select jsonb_build_object(
     'generated_at', clock_timestamp(),
     'from', p_from, 'to', p_to,
-    'scope', case when actor_role = 'super_admin' then 'All sitios' else
-      coalesce((select sitio_name from public.sitios where sitio_id = actor_sitio), 'Sitio ' || actor_sitio) end,
-    'sitios', (select coalesce(jsonb_agg(jsonb_build_object('sitio_id', s.sitio_id, 'sitio_name', s.sitio_name) order by s.sitio_name), '[]'::jsonb)
-      from public.sitios s where actor_role = 'super_admin' or s.sitio_id = actor_sitio),
+    'scope', case when actor_role = 'super_admin' then 'All barangays' else
+      coalesce((select barangay_name from public.barangays where barangay_id = actor_barangay), 'Barangay ' || actor_barangay) end,
+    'barangays', (select coalesce(jsonb_agg(jsonb_build_object('barangay_id', s.barangay_id, 'barangay_name', s.barangay_name) order by s.barangay_name), '[]'::jsonb)
+      from public.barangays s where actor_role = 'super_admin' or s.barangay_id = actor_barangay),
     'events', events
   ) into result;
   return result;

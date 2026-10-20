@@ -4,7 +4,7 @@ import { calculateVpi, DEFAULT_VPI_RULES, validateVpiRules } from '../src/utils/
 
 const date = '2026-10-14'
 const base = {
-  id: 'test', name: 'Test Resident', sitio: 'Sitio 1', constraint: 'Walk Assist',
+  id: 'test', name: 'Test Resident', barangay: 'Barangay 1', constraint: 'Walk Assist',
   status: 'Verified', floodZone: false, lastUpdated: '', birthdate: '1990-01-01',
   mobilityStatus: 'ambulatory', disabilityCount: 0, isPregnant: false,
 }

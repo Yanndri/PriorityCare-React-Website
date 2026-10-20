@@ -11,17 +11,17 @@ export type AdminAccount = {
   f_name: string | null
   l_name: string | null
   account_status: 'active' | 'suspended'
-  assigned_sitio_id: number | null
+  assigned_barangay_id: number | null
 }
 
-export type Sitio = {
-  sitio_id: number
-  sitio_name: string
+export type Barangay = {
+  barangay_id: number
+  barangay_name: string
 }
 
 export type DashboardData = {
   admins: AdminAccount[]
-  sitios: Sitio[]
+  barangays: Barangay[]
 }
 
 export type CreateAdminInput = {
@@ -31,7 +31,7 @@ export type CreateAdminInput = {
   m_name?: string
   l_name: string
   contact_no: string
-  assigned_sitio_id: number
+  assigned_barangay_id: number
   /** Optional custom User ID (UUID). Leave blank to auto-generate. */
   uid?: string
 }
@@ -139,37 +139,37 @@ function isAdminAccount(value: unknown): value is AdminAccount {
       admin.account_status === 'suspended') &&
     (admin.f_name === null || typeof admin.f_name === 'string') &&
     (admin.l_name === null || typeof admin.l_name === 'string') &&
-    (admin.assigned_sitio_id === null ||
-      typeof admin.assigned_sitio_id === 'number')
+    (admin.assigned_barangay_id === null ||
+      typeof admin.assigned_barangay_id === 'number')
   )
 }
 
-function isSitio(value: unknown): value is Sitio {
+function isBarangay(value: unknown): value is Barangay {
   if (!value || typeof value !== 'object') return false
 
-  const sitio = value as Record<string, unknown>
+  const barangay = value as Record<string, unknown>
 
   return (
-    typeof sitio.sitio_id === 'number' &&
-    typeof sitio.sitio_name === 'string'
+    typeof barangay.barangay_id === 'number' &&
+    typeof barangay.barangay_name === 'string'
   )
 }
 
 export async function getSuperAdminDashboard(): Promise<DashboardData> {
   const result = await apiRequest<{
     admins?: unknown
-    sitios?: unknown
+    barangays?: unknown
   }>('/api/super-admin/dashboard')
 
-  if (!Array.isArray(result.admins) || !Array.isArray(result.sitios)) {
+  if (!Array.isArray(result.admins) || !Array.isArray(result.barangays)) {
     throw new Error(
-      'Invalid dashboard response: expected admins and sitios arrays.',
+      'Invalid dashboard response: expected admins and barangays arrays.',
     )
   }
 
   return {
     admins: result.admins.filter(isAdminAccount),
-    sitios: result.sitios.filter(isSitio),
+    barangays: result.barangays.filter(isBarangay),
   }
 }
 
@@ -181,10 +181,10 @@ export async function createAdmin(
   }
 
   if (
-    !Number.isInteger(input.assigned_sitio_id) ||
-    input.assigned_sitio_id <= 0
+    !Number.isInteger(input.assigned_barangay_id) ||
+    input.assigned_barangay_id <= 0
   ) {
-    throw new Error('Please select a valid Sitio.')
+    throw new Error('Please select a valid Barangay.')
   }
 
   const uid = input.uid?.trim()
@@ -206,7 +206,7 @@ export async function createAdmin(
 
 export type AdminAccountUpdate = {
   account_status?: 'active' | 'suspended'
-  assigned_sitio_id?: number
+  assigned_barangay_id?: number
 }
 
 // Suspend, reactivate, or reassign an Admin account (Super Admin only;
@@ -220,11 +220,11 @@ export async function updateAdminAccount(
   }
 
   if (
-    changes.assigned_sitio_id !== undefined &&
-    (!Number.isInteger(changes.assigned_sitio_id) ||
-      changes.assigned_sitio_id <= 0)
+    changes.assigned_barangay_id !== undefined &&
+    (!Number.isInteger(changes.assigned_barangay_id) ||
+      changes.assigned_barangay_id <= 0)
   ) {
-    throw new Error('Please select a valid Sitio.')
+    throw new Error('Please select a valid Barangay.')
   }
 
   return apiRequest<{ message?: string; admin?: AdminAccount }>(
@@ -234,4 +234,65 @@ export async function updateAdminAccount(
       body: JSON.stringify(changes),
     },
   )
+}
+
+// ---------- Responder (rescuer) accounts ----------
+// Created only by the municipal admin with the volunteer's CDV accreditation
+// (RA 10121 Sec. 13; NDRRMC MC No. 64 s. 2021, amended by MC No. 02 s. 2024).
+
+export type Responder = {
+  uid: string
+  name: string
+  email: string
+  contact_no: string | null
+  account_status: 'active' | 'suspended'
+  barangay_id: number | null
+  barangay_name: string | null
+  accreditation_no: string | null
+  organization: string | null
+  accredited_on: string | null
+  valid_until: string | null
+  trainings: string[]
+  insurance_ref: string | null
+  deployable: boolean
+  units: string[]
+}
+
+export type Accreditation = {
+  accreditation_no: string
+  organization: string
+  accredited_on: string
+  valid_until: string
+  trainings: string[]
+  insurance_ref?: string
+}
+
+export type CreateRescuerInput = Omit<CreateAdminInput, 'uid'> & Accreditation
+
+export async function listResponders(): Promise<Responder[]> {
+  const { data, error } = await supabase.rpc('list_responders')
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'The responder roster needs the 20261019_11_responder_accreditation.sql database migration.'
+      : error.message)
+  }
+  return (data ?? []) as Responder[]
+}
+
+export async function createRescuer(input: CreateRescuerInput) {
+  return apiRequest<{ message?: string }>('/api/super-admin/rescuers', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function updateRescuer(
+  uid: string,
+  changes: { account_status?: 'active' | 'suspended' } | Accreditation,
+) {
+  if (!UUID_PATTERN.test(uid)) throw new Error('Invalid responder account ID.')
+  return apiRequest<{ message?: string }>(`/api/super-admin/rescuers/${encodeURIComponent(uid)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  })
 }

@@ -3,11 +3,13 @@ import { validateFacility, validateCapacity, type FacilityInput } from '../utils
 function facilityError(error: { code?: string; message: string }) {
   return new Error(error.code === 'PGRST202' ? 'Facility registration needs the 20261014_facility_registration.sql database migration.' : error.message)
 }
-export async function registerFacility(input: FacilityInput) {
+export async function registerFacility(input: FacilityInput, barangayId?: number | null) {
   const validation = validateFacility(input)
   if (validation) throw new Error(validation)
   const { data, error } = await supabase.rpc('register_evacuation_facility', {
     p_name: input.name.trim(), p_type: input.type, p_lat: input.latitude, p_long: input.longitude, p_capacity: input.capacity,
+    // Only super admins pick a barangay; null means municipal-wide. Admins always register in their own.
+    ...(barangayId !== undefined ? { p_barangay_id: barangayId } : {}),
   })
   if (error) throw facilityError(error)
   return data as number

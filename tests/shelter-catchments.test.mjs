@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { catchmentLines, haversineKm, shelterLoad, sitioPopulation, validatePlan } from '../src/utils/shelterCatchments.ts'
+import { catchmentLines, haversineKm, shelterLoad, barangayPopulation, validatePlan } from '../src/utils/shelterCatchments.ts'
 
 const center = (id, extra = {}) => ({ center_id: id, center_name: `C${id}`, status: 'active', capacity: 50, gps_lat: 10.3, gps_long: 123.9, primary_for: [1], planned_population: 10, ...extra })
-const sitio = (id, extra = {}) => ({ sitio_id: id, sitio_name: `S${id}`, editable: true, residents: 4, dependents: 2, centroid_lat: '10.31', centroid_long: '123.91',
+const barangay = (id, extra = {}) => ({ barangay_id: id, barangay_name: `S${id}`, editable: true, residents: 4, dependents: 2, centroid_lat: '10.31', centroid_long: '123.91',
   primary_center_id: null, alternate_center_ids: [], note: '', updated_at: null, updated_by_name: null, ...extra })
 
 test('shelter load bands', () => {
@@ -12,15 +12,15 @@ test('shelter load bands', () => {
   assert.equal(shelterLoad(center(1, { planned_population: '40' })).status, 'ok')
   assert.equal(shelterLoad(center(1, { planned_population: 43 })).status, 'near')
   assert.equal(shelterLoad(center(1, { planned_population: 51 })).status, 'over')
-  assert.equal(sitioPopulation(sitio(1)), 6)
+  assert.equal(barangayPopulation(barangay(1)), 6)
 })
 
-test('lines from sitio centroid to primary and alternates; missing GPS reported', () => {
+test('lines from barangay centroid to primary and alternates; missing GPS reported', () => {
   const data = { generated_at: '', can_edit_all: false,
     centers: [center(10), center(11, { gps_lat: null }), center(12, { gps_lat: 10.35, gps_long: 123.95 })],
-    sitios: [sitio(1, { primary_center_id: 10, alternate_center_ids: [12, 11] }), sitio(2, { primary_center_id: 10, centroid_lat: null }), sitio(3)] }
+    barangays: [barangay(1, { primary_center_id: 10, alternate_center_ids: [12, 11] }), barangay(2, { primary_center_id: 10, centroid_lat: null }), barangay(3)] }
   const { lines, missing } = catchmentLines(data)
-  assert.deepEqual(lines.map(l => [l.sitioId, l.centerId, l.role]), [[1, 10, 'primary'], [1, 12, 'alternate']])
+  assert.deepEqual(lines.map(l => [l.barangayId, l.centerId, l.role]), [[1, 10, 'primary'], [1, 12, 'alternate']])
   assert.deepEqual(lines[0].from, [10.31, 123.91])
   assert.equal(missing.length, 2)
   assert.ok(Math.abs(haversineKm([0, 0], [0, 1]) - 111.19) < 0.1)

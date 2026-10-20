@@ -10,18 +10,18 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer,f_name text,l_name text,contact_no text);
-    create table public.residents(uid uuid primary key,sitio_id integer,gps_lat numeric,gps_long numeric);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer,f_name text,l_name text,contact_no text);
+    create table public.residents(uid uuid primary key,barangay_id integer,gps_lat numeric,gps_long numeric);
     create table public.evacuation_records(record_id uuid primary key,resident_uid uuid,evac_status text,evacuated_at timestamptz,logged_at timestamptz);
     create table public.sos_alerts(alert_id uuid primary key,resident_uid varchar,alert_level integer,alert_type varchar,status varchar,created_at timestamptz default now());
-    insert into public.sitios values(1,'Sitio One'),(2,'Sitio Two');
+    insert into public.barangays values(1,'Barangay One'),(2,'Barangay Two');
     grant usage on schema public,auth to authenticated,anon;`)
-  for (const [n, role, status, sitio, f] of [[1,'admin','active',1,'Ana'],[2,'admin','active',2,'Ben'],[4,'admin','suspended',1,'Sus'],
+  for (const [n, role, status, barangay, f] of [[1,'admin','active',1,'Ana'],[2,'admin','active',2,'Ben'],[4,'admin','suspended',1,'Sus'],
     [5,'super_admin','active',null,'Sue'],[7,'rescuer','active',null,'Rico'],[8,'rescuer','active',null,'Rita'],[9,'rescuer','suspended',null,'Old'],
     [20,'resident','active',null,'Juan'],[30,'resident','active',null,'Liza']]) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4,$5,$6,$7)', [uid(n), role, status, sitio, f, 'X', `0917${n}`])
+    await db.query('insert into public.users values($1,$2,$3,$4,$5,$6,$7)', [uid(n), role, status, barangay, f, 'X', `0917${n}`])
   }
   await db.exec(`insert into public.residents values('${uid(20)}',1,10.3,123.9),('${uid(30)}',2,10.4,124.0);
     insert into public.sos_alerts(alert_id,resident_uid,alert_level,alert_type,status) values
@@ -37,11 +37,11 @@ try {
     await db.exec(`set role ${role}`)
   }
   const board = async () => (await db.query('select public.get_dispatch_board() as d')).rows[0].d
-  const saveUnit = (id, name, sitio, caps = [], members = [], active = true) =>
+  const saveUnit = (id, name, barangay, caps = [], members = [], active = true) =>
     db.query('select public.save_rescue_unit($1,$2,$3,$4::text[],$5::uuid[],$6) as id',
-      [id, name, sitio, `{${caps.map(c => `"${c}"`).join(',')}}`, `{${members.join(',')}}`, active])
+      [id, name, barangay, `{${caps.map(c => `"${c}"`).join(',')}}`, `{${members.join(',')}}`, active])
   const create = (o = {}) => {
-    const p = { sitio: 1, event: null, resident: uid(20), subject: 'Bedridden elder', source: 'manual', ref: null, priority: 'high',
+    const p = { barangay: 1, event: null, resident: uid(20), subject: 'Bedridden elder', source: 'manual', ref: null, priority: 'high',
       lat: null, lng: null, note: '', instr: '', equip: '{stretcher}', unit: null, ...o }
     return db.query('select public.create_dispatch_ticket($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::text[],$13) as id', Object.values(p))
   }
@@ -52,7 +52,7 @@ try {
   await actor(1)
   const unitA = (await saveUnit(null, 'Alpha Team', 1, ['stretcher', 'boat', ' stretcher '], [uid(7)])).rows[0].id
   await assert.rejects(saveUnit(null, 'Barangay Team', null), /super admin/)
-  await assert.rejects(saveUnit(null, 'Other Sitio', 2), /administrator access/)
+  await assert.rejects(saveUnit(null, 'Other Barangay', 2), /administrator access/)
   await assert.rejects(saveUnit(null, 'Bad', 1, [], [uid(20)]), /rescuer accounts/)
   await assert.rejects(saveUnit(null, 'Bad2', 1, [], [uid(9)]), /rescuer accounts/)
   await assert.rejects(saveUnit(null, ' alpha team ', 1), /already exists/)
@@ -65,7 +65,7 @@ try {
   assert.deepEqual(b.units[0].capabilities, ['boat', 'stretcher'])
   assert.equal(b.rescuers.length, 2)
 
-  // Intake: only active SOS in own sitio.
+  // Intake: only active SOS in own barangay.
   assert.deepEqual(b.intake_sos.map(a => a.alert_id), [uid(950)])
   const t1 = (await create({ source: 'sos', ref: uid(950), priority: 'critical' })).rows[0].id
   await assert.rejects(create({ source: 'sos', ref: uid(950) }), /already exists/) // one live ticket per alert
@@ -75,7 +75,7 @@ try {
   assert.equal(b.tickets[0].ticket_no >= 1, true)
 
   // Validation.
-  for (const o of [{ sitio: 2 }, { resident: uid(30) }, { source: 'bogus' }, { source: 'sos', ref: uid(999) }, { priority: 'urgent' },
+  for (const o of [{ barangay: 2 }, { resident: uid(30) }, { source: 'bogus' }, { source: 'sos', ref: uid(999) }, { priority: 'urgent' },
     { resident: null }, { resident: null, lat: 10.3 }, { subject: ' ' }, { unit: 999 }, { source: 'missing_report', ref: uid(999) }]) {
     await assert.rejects(create(o))
   }

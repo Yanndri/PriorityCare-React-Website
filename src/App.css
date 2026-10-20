@@ -2345,7 +2345,7 @@ tbody tr:hover {
   .priority-row { grid-template-columns: 32px minmax(0, 1fr); }
   .priority-row .status { grid-column: 2; justify-self: start; }
 }
-.admin-sitio-banner {
+.admin-barangay-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2357,23 +2357,23 @@ tbody tr:hover {
   background: #fff;
 }
 
-.admin-sitio-banner > div {
+.admin-barangay-banner > div {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.admin-sitio-banner > div > span {
+.admin-barangay-banner > div > span {
   color: #64748b;
   font-size: 0.85rem;
 }
 
-.admin-sitio-banner strong {
+.admin-barangay-banner strong {
   color: #0f172a;
   font-size: 1.1rem;
 }
 
-.sitio-status {
+.barangay-status {
   padding: 6px 10px;
   border-radius: 999px;
   background: #eff6ff;
@@ -2701,14 +2701,14 @@ tbody tr:hover {
   color: #35135f;
 }
 
-.admin-sitio-edit {
+.admin-barangay-edit {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
 
-.admin-sitio-edit select {
+.admin-barangay-edit select {
   padding: 6px 8px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -2751,12 +2751,12 @@ tbody tr:hover {
   color: #b91c1c;
 }
 
-.admin-sitio-banner a.sitio-status {
+.admin-barangay-banner a.barangay-status {
   text-decoration: none;
 }
 
 /* Super Admin scope selector in the shared dashboard banner */
-.admin-sitio-banner .scope-select {
+.admin-barangay-banner .scope-select {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2764,7 +2764,7 @@ tbody tr:hover {
   font-weight: 700;
 }
 
-.admin-sitio-banner .scope-select select {
+.admin-barangay-banner .scope-select select {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -2835,7 +2835,7 @@ tbody tr:hover {
 @media print {
   .app-header,
   .sidebar,
-  .admin-sitio-banner,
+  .admin-barangay-banner,
   .page-title,
   .no-print {
     display: none !important;

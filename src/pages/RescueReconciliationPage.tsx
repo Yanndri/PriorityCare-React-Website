@@ -14,7 +14,7 @@ const formatTime = (value: string | null) => value
   : '—'
 
 const emptyForm = {
-  sitio: '', event: '', resident: '', name: '', sex: '', age: '', where: '', when: '',
+  barangay: '', event: '', resident: '', name: '', sex: '', age: '', where: '', when: '',
   reporter: '', contact: '', notes: '',
 }
 
@@ -46,10 +46,10 @@ export function RescueReconciliationPage() {
   }, [])
 
   const result = useMemo(() => data ? reconcile(data) : null, [data])
-  const sitioName = (id: number) => data?.sitios.find(s => s.sitio_id === id)?.sitio_name ?? `Sitio ${id}`
-  const formSitio = Number(form.sitio || data?.sitios[0]?.sitio_id || 0)
-  const sitioResidents = (data?.residents ?? []).filter(r => r.sitio_id === formSitio)
-  const sitioEvents = (data?.events ?? []).filter(e => e.sitio_id === formSitio && e.status === 'active')
+  const barangayName = (id: number) => data?.barangays.find(s => s.barangay_id === id)?.barangay_name ?? `Barangay ${id}`
+  const formBarangay = Number(form.barangay || data?.barangays[0]?.barangay_id || 0)
+  const barangayResidents = (data?.residents ?? []).filter(r => r.barangay_id === formBarangay)
+  const barangayEvents = (data?.events ?? []).filter(e => e.barangay_id === formBarangay && e.status === 'active')
   const set = (field: keyof typeof emptyForm) => (e: { target: { value: string } }) =>
     setForm(f => ({ ...f, [field]: e.target.value }))
 
@@ -75,11 +75,11 @@ export function RescueReconciliationPage() {
     setBusy(true)
     try {
       await fileMissingPersonReport({
-        sitioId: formSitio, eventId: form.event || null, residentUid: form.resident || null,
+        barangayId: formBarangay, eventId: form.event || null, residentUid: form.resident || null,
         fullName: form.name, sex: form.sex === 'male' || form.sex === 'female' ? form.sex : null, approxAge: age,
         lastSeenLocation: form.where, lastSeenAt, reporterName: form.reporter, reporterContact: form.contact, notes: form.notes,
       })
-      setForm({ ...emptyForm, sitio: form.sitio })
+      setForm({ ...emptyForm, barangay: form.barangay })
       setNotice('Missing-person report added to the manifest.'); await load()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to file the report.') }
     finally { setBusy(false) }
@@ -111,7 +111,7 @@ export function RescueReconciliationPage() {
 
   function exportCsv() {
     if (!result) return
-    const blob = new Blob([reconciliationCsv(result, sitioName)], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([reconciliationCsv(result, barangayName)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `rescue-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
@@ -159,7 +159,7 @@ export function RescueReconciliationPage() {
           <span className={`reconcile-badge ${o.classification}`}>{matchLabels[o.classification]}</span>
         </div>
         <p className="reconcile-muted">
-          {sitioName(o.report.sitio_id)} · {o.report.sex ?? 'sex unknown'} · {o.report.approx_age !== null ? `~${o.report.approx_age} yrs` : 'age unknown'}
+          {barangayName(o.report.barangay_id)} · {o.report.sex ?? 'sex unknown'} · {o.report.approx_age !== null ? `~${o.report.approx_age} yrs` : 'age unknown'}
           {o.report.last_seen_location && ` · Last seen: ${o.report.last_seen_location}`}
           {o.report.last_seen_at && ` (${formatTime(o.report.last_seen_at)})`}
         </p>
@@ -196,15 +196,15 @@ export function RescueReconciliationPage() {
     <section className="panel">
       <h3>File a missing-person report</h3>
       <form onSubmit={submit}>
-        <fieldset className="reconcile-form" disabled={!data || busy || loading || !data.sitios.length}>
-          <label>Sitio<select value={formSitio || ''} onChange={e => setForm(f => ({ ...f, sitio: e.target.value, resident: '', event: '' }))}>
-            {data?.sitios.map(si => <option key={si.sitio_id} value={si.sitio_id}>{si.sitio_name}</option>)}</select></label>
+        <fieldset className="reconcile-form" disabled={!data || busy || loading || !data.barangays.length}>
+          <label>Barangay<select value={formBarangay || ''} onChange={e => setForm(f => ({ ...f, barangay: e.target.value, resident: '', event: '' }))}>
+            {data?.barangays.map(si => <option key={si.barangay_id} value={si.barangay_id}>{si.barangay_name}</option>)}</select></label>
           <label>Active disaster event (optional)<select value={form.event} onChange={set('event')}>
-            <option value="">None</option>{sitioEvents.map(e => <option key={e.event_id} value={e.event_id}>{e.name}</option>)}</select></label>
+            <option value="">None</option>{barangayEvents.map(e => <option key={e.event_id} value={e.event_id}>{e.name}</option>)}</select></label>
           <label className="reconcile-wide">Registered resident (optional — fills the details below)
             <select value={form.resident} onChange={e => pickResident(e.target.value)}>
               <option value="">Not registered / unknown</option>
-              {sitioResidents.map(r => <option key={r.uid} value={r.uid}>{fullName(r)}{r.latest_status ? ` — ${statusLabels[r.latest_status]}` : ''}</option>)}
+              {barangayResidents.map(r => <option key={r.uid} value={r.uid}>{fullName(r)}{r.latest_status ? ` — ${statusLabels[r.latest_status]}` : ''}</option>)}
             </select></label>
           <label>Full name<input required maxLength={200} value={form.name} onChange={set('name')} /></label>
           <label>Sex<select value={form.sex} onChange={set('sex')}><option value="">Unknown</option><option value="male">Male</option><option value="female">Female</option></select></label>
@@ -221,11 +221,11 @@ export function RescueReconciliationPage() {
 
     {result && result.unaccounted.length > 0 && <section className="panel">
       <h3>Unaccounted registered residents</h3>
-      <p className="reconcile-muted">Residents of sitios with an active disaster event who are not in the rescued directory and have no open report.</p>
+      <p className="reconcile-muted">Residents of barangays with an active disaster event who are not in the rescued directory and have no open report.</p>
       <div className="reconcile-table-wrap"><table className="reconcile-table">
-        <thead><tr><th>Name</th><th>Sitio</th><th>Latest evacuation status</th><th>Logged</th></tr></thead>
+        <thead><tr><th>Name</th><th>Barangay</th><th>Latest evacuation status</th><th>Logged</th></tr></thead>
         <tbody>{result.unaccounted.map(r => <tr key={r.uid}>
-          <td>{fullName(r)}</td><td>{sitioName(r.sitio_id)}</td>
+          <td>{fullName(r)}</td><td>{barangayName(r.barangay_id)}</td>
           <td>{r.latest_status ? statusLabels[r.latest_status] : 'No evacuation record'}</td>
           <td>{formatTime(r.latest_logged_at)}</td>
         </tr>)}</tbody>
@@ -237,9 +237,9 @@ export function RescueReconciliationPage() {
         <input className="reconcile-search" type="search" placeholder="Search name or center" value={directorySearch} onChange={e => setDirectorySearch(e.target.value)} /></div>
       {result && !directory.length && <p>No safely evacuated residents{directorySearch ? ' match your search' : ' in your scope'}.</p>}
       {directory.length > 0 && <div className="reconcile-table-wrap"><table className="reconcile-table">
-        <thead><tr><th>Name</th><th>Sitio</th><th>Sex</th><th>Age</th><th>Evacuation center</th><th>Evacuated</th></tr></thead>
+        <thead><tr><th>Name</th><th>Barangay</th><th>Sex</th><th>Age</th><th>Evacuation center</th><th>Evacuated</th></tr></thead>
         <tbody>{directory.map(r => <tr key={r.uid}>
-          <td>{fullName(r)}</td><td>{sitioName(r.sitio_id)}</td><td>{r.sex ?? '—'}</td>
+          <td>{fullName(r)}</td><td>{barangayName(r.barangay_id)}</td><td>{r.sex ?? '—'}</td>
           <td>{ageOn(r.birthdate, new Date()) ?? '—'}</td><td>{r.center_name ?? '—'}</td>
           <td>{formatTime(r.evacuated_at ?? r.latest_logged_at)}</td>
         </tr>)}</tbody>

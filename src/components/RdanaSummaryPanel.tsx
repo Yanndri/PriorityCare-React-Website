@@ -32,7 +32,7 @@ export function RdanaSummaryPanel() {
   }
   return <section className="panel rdana-panel">
     <div className="section-header"><div><span className="panel-kicker">24–48 HOUR SITUATION REPORTING</span><h3>RDANA Situation Summary</h3></div><span>Prototype draft</span></div>
-    <p>Generate a summary of recorded activity in your assigned sitio over the last 24 or 48 hours. The shelter section covers shared facilities across all sitios and shows current conditions, not historical occupancy.</p>
+    <p>Generate a summary of recorded activity in your assigned barangay over the last 24 or 48 hours. The shelter section covers shared facilities across all barangays and shows current conditions, not historical occupancy.</p>
     <fieldset disabled={loading} className="resident-edit-fields">
       <div className="edit-form-grid"><label><span>Reporting window</span><select value={hours} onChange={(e) => { setHours(Number(e.target.value) as 24 | 48); setDraft(''); setReviewed(false) }}><option value={24}>Last 24 hours</option><option value={48}>Last 48 hours</option></select></label></div>
       <label className="resident-notes">Incident context / assessment notes (optional)<textarea maxLength={2000} value={context} onChange={(e) => { setContext(e.target.value); setDraft(''); setReviewed(false) }} placeholder="Event name, affected area, and verified assessment notes. Do not enter personal identifiers." /></label>

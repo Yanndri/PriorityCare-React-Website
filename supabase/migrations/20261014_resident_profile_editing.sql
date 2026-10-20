@@ -5,7 +5,7 @@ begin;
 create table if not exists public.households (
   household_id uuid primary key default gen_random_uuid(),
   household_name text not null check (length(btrim(household_name)) between 1 and 200),
-  sitio_id integer not null references public.sitios(sitio_id),
+  barangay_id integer not null references public.barangays(barangay_id),
   head_uid uuid not null unique references public.residents(uid),
   household_members jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now(),
@@ -21,7 +21,7 @@ drop policy if exists "Administrators read assigned households" on public.househ
 create policy "Administrators read assigned households" on public.households for select to authenticated
 using (exists (select 1 from public.users actor where actor.uid = auth.uid()
   and actor.account_status = 'active' and (actor.role::text = 'super_admin'
-    or (actor.role::text = 'admin' and actor.assigned_sitio_id = households.sitio_id))));
+    or (actor.role::text = 'admin' and actor.assigned_barangay_id = households.barangay_id))));
 
 create table if not exists public.resident_profile_details (
   resident_uid uuid primary key references public.residents(uid) on delete cascade,
@@ -43,7 +43,7 @@ for select to authenticated using (exists (
   select 1 from public.users actor join public.residents r on r.uid = resident_uid
   where actor.uid = auth.uid() and actor.account_status = 'active'
     and (actor.role::text = 'super_admin' or
-      (actor.role::text = 'admin' and actor.assigned_sitio_id = r.sitio_id))
+      (actor.role::text = 'admin' and actor.assigned_barangay_id = r.barangay_id))
 ));
 
 create or replace function public.assert_resident_edit_access(p_uid uuid)
@@ -57,7 +57,7 @@ begin
       and subject.role::text = 'resident'
       and (
         actor.role::text = 'super_admin'
-        or (actor.role::text = 'admin' and actor.assigned_sitio_id = resident.sitio_id)
+        or (actor.role::text = 'admin' and actor.assigned_barangay_id = resident.barangay_id)
       )
   ) then
     raise exception 'Active administrator access to this resident is required.' using errcode = '42501';
@@ -72,12 +72,12 @@ declare result jsonb;
 begin
   perform public.assert_resident_edit_access(p_uid);
   select jsonb_build_object(
-    'sitio_name', s.sitio_name,
+    'barangay_name', s.barangay_name,
     'households', (select coalesce(jsonb_agg(jsonb_build_object(
       'household_id', hh.household_id, 'household_name', hh.household_name,
       'head_name', concat_ws(' ', hu.f_name, hu.m_name, hu.l_name)
     ) order by hh.household_name), '[]'::jsonb) from public.households hh
-      join public.users hu on hu.uid = hh.head_uid where hh.sitio_id = r.sitio_id),
+      join public.users hu on hu.uid = hh.head_uid where hh.barangay_id = r.barangay_id),
     'registered_members', (select coalesce(jsonb_agg(jsonb_build_object(
       'uid', mu.uid, 'name', concat_ws(' ', mu.f_name, mu.m_name, mu.l_name),
       'is_head', mu.uid = h.head_uid
@@ -104,7 +104,7 @@ begin
     )
   ) into result
   from public.residents r join public.users u on u.uid = r.uid
-  join public.sitios s on s.sitio_id = r.sitio_id
+  join public.barangays s on s.barangay_id = r.barangay_id
   left join public.resident_profile_details d on d.resident_uid = r.uid
   left join public.households h on h.household_id = d.household_id
   where r.uid = p_uid;
@@ -120,7 +120,7 @@ declare result jsonb;
 begin
   if not exists (select 1 from public.households h join public.users actor on actor.uid = auth.uid()
     where h.household_id = p_household_id and actor.account_status = 'active'
-      and (actor.role::text = 'super_admin' or (actor.role::text = 'admin' and actor.assigned_sitio_id = h.sitio_id))) then
+      and (actor.role::text = 'super_admin' or (actor.role::text = 'admin' and actor.assigned_barangay_id = h.barangay_id))) then
     raise exception 'Administrator access to this household is required.' using errcode = '42501';
   end if;
   select jsonb_build_object('household_members', h.household_members, 'household_revision', h.updated_at,
@@ -144,12 +144,12 @@ declare
   selected_household uuid;
   old_household uuid;
   household_revision timestamptz;
-  target_sitio integer;
+  target_barangay integer;
 begin
   -- Serialize saves for this resident, including the first supplemental record.
   perform 1 from public.residents where uid = p_uid for update;
   perform public.assert_resident_edit_access(p_uid);
-  select sitio_id into target_sitio from public.residents where uid = p_uid;
+  select barangay_id into target_barangay from public.residents where uid = p_uid;
   selected_household := nullif(p_profile->>'household_id', '')::uuid;
   select household_id into old_household from public.resident_profile_details where resident_uid = p_uid;
   if old_household is distinct from selected_household and exists (
@@ -194,14 +194,14 @@ begin
   end if;
   if selected_household is not null then
     select updated_at into household_revision from public.households
-      where household_id = selected_household and sitio_id = target_sitio for update;
-    if not found then raise exception 'Select a household in this resident''s sitio.'; end if;
+      where household_id = selected_household and barangay_id = target_barangay for update;
+    if not found then raise exception 'Select a household in this resident''s barangay.'; end if;
     if household_revision is distinct from nullif(p_profile->>'household_revision','')::timestamptz then
       raise exception 'This household was edited by another administrator. Reopen it before saving.';
     end if;
   elsif coalesce(btrim(p_profile->>'household_name'),'') <> '' then
-    insert into public.households(household_name,sitio_id,head_uid,updated_by)
-      values(btrim(p_profile->>'household_name'),target_sitio,p_uid,auth.uid()) returning household_id into selected_household;
+    insert into public.households(household_name,barangay_id,head_uid,updated_by)
+      values(btrim(p_profile->>'household_name'),target_barangay,p_uid,auth.uid()) returning household_id into selected_household;
   elsif jsonb_array_length(p_profile->'household_members') > 0 then
     raise exception 'Create or select a household before adding dependents.';
   end if;

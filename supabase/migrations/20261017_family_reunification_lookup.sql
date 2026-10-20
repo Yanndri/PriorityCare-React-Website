@@ -21,21 +21,21 @@ revoke all on public.reunification_lookup_audit from public, anon, authenticated
 -- Internal helper; not callable from the browser.
 create or replace function public.reunification_people()
 returns table (
-  uid uuid, full_name text, sex text, birthdate date, home_sitio_id integer, home_sitio text,
+  uid uuid, full_name text, sex text, birthdate date, home_barangay_id integer, home_barangay text,
   latest_status text, latest_logged_at timestamptz, evacuated_at timestamptz,
   center_id integer, center_name text, center_status text,
   household_id uuid, household_name text, open_missing_report boolean
 ) language sql stable security definer set search_path = '' as $$
   select r.uid,
          concat_ws(' ', u.f_name, nullif(u.m_name, ''), u.l_name),
-         r.sex::text, r.birthdate, r.sitio_id, s.sitio_name,
+         r.sex::text, r.birthdate, r.barangay_id, s.barangay_name,
          le.evac_status, le.logged_at, le.evacuated_at,
          le.evac_center_id, c.center_name, c.status,
          h.household_id, h.household_name,
          exists (select 1 from public.missing_person_reports m where m.resident_uid = r.uid and m.status = 'missing')
   from public.residents r
   join public.users u on u.uid = r.uid
-  left join public.sitios s on s.sitio_id = r.sitio_id
+  left join public.barangays s on s.barangay_id = r.barangay_id
   left join lateral (
     select er.evac_status::text as evac_status, er.logged_at, er.evacuated_at, er.evac_center_id
     from public.evacuation_records er where er.resident_uid = r.uid
@@ -48,8 +48,8 @@ returns table (
 $$;
 revoke all on function public.reunification_people() from public, anon, authenticated;
 
--- Search every evacuation center and the resident registry, across all sitios.
--- Reunification is cross-sitio by nature, so any active admin may search; results carry only
+-- Search every evacuation center and the resident registry, across all barangays.
+-- Reunification is cross-barangay by nature, so any active admin may search; results carry only
 -- what is needed to reunite people (no contact numbers, addresses or medical details).
 -- p_query: name words (each must match; case- and accent-insensitive, e.g. jose = José). p_center_id: limit to one center.
 -- At least one of them is required. Returns at most 100 people.
@@ -75,7 +75,7 @@ begin
   select count(*), coalesce(jsonb_agg(jsonb_build_object(
       'uid', h.uid, 'full_name', h.full_name, 'sex', h.sex,
       'age', case when h.birthdate is not null then extract(year from age((now() at time zone 'Asia/Manila')::date, h.birthdate))::int end,
-      'home_sitio', h.home_sitio, 'latest_status', h.latest_status, 'latest_logged_at', h.latest_logged_at,
+      'home_barangay', h.home_barangay, 'latest_status', h.latest_status, 'latest_logged_at', h.latest_logged_at,
       'evacuated_at', h.evacuated_at, 'center_id', h.center_id, 'center_name', h.center_name,
       'center_status', h.center_status, 'household_id', h.household_id, 'household_name', h.household_name,
       'open_missing_report', h.open_missing_report)), '[]'::jsonb)
@@ -115,7 +115,7 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object(
         'uid', p.uid, 'full_name', p.full_name, 'sex', p.sex,
         'age', case when p.birthdate is not null then extract(year from age((now() at time zone 'Asia/Manila')::date, p.birthdate))::int end,
-        'is_head', h.head_uid = p.uid, 'home_sitio', p.home_sitio,
+        'is_head', h.head_uid = p.uid, 'home_barangay', p.home_barangay,
         'latest_status', p.latest_status, 'latest_logged_at', p.latest_logged_at,
         'center_id', p.center_id, 'center_name', p.center_name, 'open_missing_report', p.open_missing_report
       ) order by (h.head_uid = p.uid) desc, p.full_name), '[]'::jsonb)

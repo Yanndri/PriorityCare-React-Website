@@ -10,15 +10,15 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer,f_name text,l_name text);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer,f_name text,l_name text);
     create table public.disability_types(disability_id integer primary key,disability_name text unique);
-    insert into public.sitios values(1,'Sitio One');
+    insert into public.barangays values(1,'Barangay One');
     insert into public.disability_types values(1,'Visual'),(2,'Hearing'),(3,'Physical'),(4,'Intellectual'),(5,'Psychosocial');
     grant usage on schema public,auth to authenticated,anon;`)
-  for (const [n, role, status, sitio] of [[1,'admin','active',1],[4,'admin','suspended',1],[5,'super_admin','active',null],[20,'resident','active',null]]) {
+  for (const [n, role, status, barangay] of [[1,'admin','active',1],[4,'admin','suspended',1],[5,'super_admin','active',null],[20,'resident','active',null]]) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4,$5,$6)', [uid(n), role, status, sitio, `U${n}`, 'X'])
+    await db.query('insert into public.users values($1,$2,$3,$4,$5,$6)', [uid(n), role, status, barangay, `U${n}`, 'X'])
   }
   await db.exec(await migration('20261014_disaster_events.sql'))
   const sql = await migration('20261017_equipment_matching_rules.sql')

@@ -22,7 +22,7 @@ export function buildDromicReport(data: RdanaData, context: string, relief: Reli
   const manifestBasis = (basis: string) => data.missingReports && !data.missingReports.available ? data.missingReports.reason : data.missingReports ? basis : 'Missing-person manifest not included'
   const declared = data.declaredEvents?.available ? eventsDuringWindow(data.declaredEvents.data, data.window) : null
   const population: ReportTable = { name: 'Population', scope: `Current registered resident accounts: ${data.scope}. Not assessed disaster-affected population.`, headers: ['Metric', 'Count', 'Basis / gaps'], rows: [
-    ['Registered resident accounts', residents.length, 'Current sitio registration; not an affected-person count'],
+    ['Registered resident accounts', residents.length, 'Current barangay registration; not an affected-person count'],
     ['Linked registered households', profiles ? new Set(profiles.map((row) => row.household_id).filter(Boolean)).size : unavailable, 'Unique linked households; not an affected-family count'],
     ['Male resident accounts', residents.filter((row) => row.sex === 'male').length, 'Recorded sex'],
     ['Female resident accounts', residents.filter((row) => row.sex === 'female').length, 'Recorded sex'],
@@ -39,7 +39,7 @@ export function buildDromicReport(data: RdanaData, context: string, relief: Reli
     ['Dependent population', 'Not assessed', 'Dependents without resident accounts are excluded from account counts'],
     ['Total affected people / families', 'Not assessed', 'Requires disaster assessment and event linkage'],
   ] }
-  const shelters: ReportTable = { name: 'Shelters', scope: 'Current shared facilities across all sitios, at retrieval. Not historical occupancy for the reporting window.', headers: ['Facility', 'Status', 'Safe capacity', 'Recorded evacuees', 'Available slots'], rows: [] }
+  const shelters: ReportTable = { name: 'Shelters', scope: 'Current shared facilities across all barangays, at retrieval. Not historical occupancy for the reporting window.', headers: ['Facility', 'Status', 'Safe capacity', 'Recorded evacuees', 'Available slots'], rows: [] }
   if (data.shelters.available) {
     shelters.rows = unique(data.shelters.data, (row) => String(row.center_id)).map((center) => [
       center.center_name ?? `Facility ${center.center_id}`, center.status ?? 'Unknown', center.capacity ?? 'Not set', center.occupied,
@@ -58,10 +58,10 @@ export function buildDromicReport(data: RdanaData, context: string, relief: Reli
   const summary: ReportTable = { name: 'Summary', scope: `Period activity: ${data.scope}. Shelter and population sections are current snapshots.`, headers: ['Metric', 'Value', 'Interpretation'], rows: [
     ['Reporting window (hours)', data.window.hours, 'Creation/completion timestamps; start inclusive, end exclusive'],
     ['SOS alerts created in period', sos?.length ?? unavailable, data.sos.available ? 'Distinct alerts, not rescued people' : data.sos.reason],
-    ['Resident accounts reporting SOS', sos ? new Set(sos.map((row) => row.resident_uid)).size : unavailable, 'Distinct accounts within this sitio'],
+    ['Resident accounts reporting SOS', sos ? new Set(sos.map((row) => row.resident_uid)).size : unavailable, 'Distinct accounts within this barangay'],
     ['Safely-evacuated records completed in period', completed?.length ?? unavailable, data.completedEvacuations.available ? 'Requires completion timestamp and current safely_evacuated status' : data.completedEvacuations.reason],
     ['Deaths / injuries', 'Not assessed', 'No casualty-assessment records'],
-    ['Open missing-person reports (at retrieval)', manifestValue(manifest?.openNow), manifestBasis('Missing-person manifest, sitio-scoped; unresolved reports, not a casualty count; failed evacuations are not counted as missing')],
+    ['Open missing-person reports (at retrieval)', manifestValue(manifest?.openNow), manifestBasis('Missing-person manifest, barangay-scoped; unresolved reports, not a casualty count; failed evacuations are not counted as missing')],
     ['Missing-person reports filed in period', manifestValue(manifest?.filed), manifestBasis('Report filing timestamps within the window')],
     ['Missing persons marked found in period', manifestValue(manifest?.found), manifestBasis('Reconciliation timestamps within the window')],
     ['Declared disaster events active in period', declared ? declared.length : data.declaredEvents ? unavailable : 'Not assessed', declared ? (declared.map((event) => `${event.name} (${event.hazard_type})`).join('; ') || 'None in the register') : data.declaredEvents && !data.declaredEvents.available ? data.declaredEvents.reason : 'Event register not included'],

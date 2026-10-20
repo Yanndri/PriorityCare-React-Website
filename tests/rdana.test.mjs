@@ -7,7 +7,7 @@ const window = makeReportWindow(24, end)
 const available = (data) => ({ available: true, data })
 const unavailable = { available: false, reason: 'Query failed' }
 const fixture = () => ({
-  window, scope: 'Sitio 1', fetchedAt: '2026-10-14T04:00:05Z',
+  window, scope: 'Barangay 1', fetchedAt: '2026-10-14T04:00:05Z',
   residents: [{ uid: 'a', birthdate: '1966-10-14', mobility_status: 'non_ambulatory' },
     { uid: 'b', birthdate: '2026-01-01', mobility_status: 'ambulatory' }],
   sos: available([]), loggedEvacuations: available([]), completedEvacuations: available([]),

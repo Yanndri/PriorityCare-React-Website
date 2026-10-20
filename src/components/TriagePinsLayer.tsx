@@ -93,7 +93,7 @@ export function TriagePinsLayer({ residents }: { residents: Resident[] }) {
               <div className="triage-muted">{TRIAGE_LEVELS[pin.triage].label} · VPI {pin.score}/{pin.maxScore}{pin.incomplete ? ' (at least)' : ''}</div>
             </div>
           </div>
-          <div className="triage-muted">{pin.sitio}{pin.floodZone ? ' · Flood zone' : ''} · {pin.members.length} {pin.members.length === 1 ? 'person' : 'people'}</div>
+          <div className="triage-muted">{pin.barangay}{pin.floodZone ? ' · Flood zone' : ''} · {pin.members.length} {pin.members.length === 1 ? 'person' : 'people'}</div>
           <ul className="triage-members">
             {pin.members.map(m => <li key={m.id}>
               <div><strong>{m.name}</strong>{!m.hasAccount && <span className="triage-muted"> (dependent, no account)</span>}

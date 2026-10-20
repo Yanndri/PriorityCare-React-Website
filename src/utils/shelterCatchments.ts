@@ -1,9 +1,9 @@
-// Module 2.2 — sitio catchments mapped to designated primary / alternate shelters.
+// Module 2.2 — barangay catchments mapped to designated primary / alternate shelters.
 // Pure helpers (no Supabase) so they can be unit-tested.
 
-export type PlanSitio = {
-  sitio_id: number
-  sitio_name: string
+export type PlanBarangay = {
+  barangay_id: number
+  barangay_name: string
   editable: boolean
   residents: number
   dependents: number
@@ -24,13 +24,16 @@ export type PlanCenter = {
   gps_lat: number | string | null
   gps_long: number | string | null
   primary_for: number[]
+  // Barangay admins: how many other barangays (hidden from them) use this as their primary shelter.
+  other_barangays_planned?: number
+  barangay_id?: number | null
   planned_population: number | string
 }
 
 export type ShelterPlanData = {
   generated_at: string
   can_edit_all: boolean
-  sitios: PlanSitio[]
+  barangays: PlanBarangay[]
   centers: PlanCenter[]
 }
 
@@ -40,13 +43,13 @@ export type LoadStatus = 'ok' | 'near' | 'over' | 'unknown' | 'unused'
 export function shelterLoad(center: PlanCenter) {
   const planned = Number(center.planned_population) || 0
   const capacity = center.capacity ?? null
-  if (!center.primary_for.length) return { planned, capacity, ratio: null, status: 'unused' as LoadStatus }
+  if (!center.primary_for.length && !center.other_barangays_planned) return { planned, capacity, ratio: null, status: 'unused' as LoadStatus }
   if (!capacity) return { planned, capacity, ratio: null, status: 'unknown' as LoadStatus }
   const ratio = planned / capacity
   return { planned, capacity, ratio, status: (ratio > 1 ? 'over' : ratio >= 0.85 ? 'near' : 'ok') as LoadStatus }
 }
 
-export function sitioPopulation(s: PlanSitio) {
+export function barangayPopulation(s: PlanBarangay) {
   return (Number(s.residents) || 0) + (Number(s.dependents) || 0)
 }
 
@@ -59,8 +62,8 @@ function point(lat: unknown, lng: unknown): [number, number] | null {
 
 export type CatchmentLine = {
   key: string
-  sitioId: number
-  sitioName: string
+  barangayId: number
+  barangayName: string
   centerId: number
   centerName: string
   role: 'primary' | 'alternate'
@@ -69,21 +72,21 @@ export type CatchmentLine = {
   distanceKm: number
 }
 
-/** Straight-line links from each sitio's resident centroid to its assigned shelters (not road routes). */
+/** Straight-line links from each barangay's resident centroid to its assigned shelters (not road routes). */
 export function catchmentLines(data: ShelterPlanData) {
   const centers = new Map(data.centers.map(c => [c.center_id, c]))
   const lines: CatchmentLine[] = []
   const missing: string[] = []
-  for (const s of data.sitios) {
+  for (const s of data.barangays) {
     if (s.primary_center_id === null) continue
     const from = point(s.centroid_lat, s.centroid_long)
-    if (!from) { missing.push(`${s.sitio_name}: no resident GPS to place the sitio`); continue }
+    if (!from) { missing.push(`${s.barangay_name}: no resident GPS to place the barangay`); continue }
     const targets: [number, 'primary' | 'alternate'][] = [[s.primary_center_id, 'primary'], ...s.alternate_center_ids.map(id => [id, 'alternate'] as [number, 'alternate'])]
     for (const [id, role] of targets) {
       const c = centers.get(id)
       const to = c ? point(c.gps_lat, c.gps_long) : null
-      if (!c || !to) { missing.push(`${s.sitio_name} → ${c?.center_name ?? `center ${id}`}: shelter has no GPS`); continue }
-      lines.push({ key: `${s.sitio_id}-${id}`, sitioId: s.sitio_id, sitioName: s.sitio_name, centerId: id, centerName: c.center_name,
+      if (!c || !to) { missing.push(`${s.barangay_name} → ${c?.center_name ?? `center ${id}`}: shelter has no GPS`); continue }
+      lines.push({ key: `${s.barangay_id}-${id}`, barangayId: s.barangay_id, barangayName: s.barangay_name, centerId: id, centerName: c.center_name,
         role, from, to, distanceKm: haversineKm(from, to) })
     }
   }
@@ -101,7 +104,7 @@ export function validatePlan(primary: number | null, alternates: number[], cente
   if (primary === null && alternates.length) return 'Choose a primary shelter before adding alternates.'
   if (alternates.length > 3) return 'Choose at most 3 alternate shelters.'
   const all = primary === null ? alternates : [primary, ...alternates]
-  if (new Set(all).size !== all.length) return 'Each shelter can appear only once in a sitio plan.'
+  if (new Set(all).size !== all.length) return 'Each shelter can appear only once in a barangay plan.'
   if (primary !== null && centers.find(c => c.center_id === primary)?.status === 'closed') return 'A closed evacuation center cannot be a primary shelter.'
   if (note.length > 500) return 'Keep the note under 500 characters.'
   return ''

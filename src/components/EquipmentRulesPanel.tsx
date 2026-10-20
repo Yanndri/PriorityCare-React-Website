@@ -54,7 +54,7 @@ export function EquipmentRulesPanel() {
       {data?.can_edit && <button type="button" className="primary-button" disabled={busy}
         onClick={() => setDraft({ ruleId: null, kind: 'needs_keyword', value: '', equipment: '', note: '', active: true })}>New rule</button>}
     </div>
-    {!data?.can_edit && data && <p className="dispatch-muted">Rules apply to every sitio, so only a super admin can change them.</p>}
+    {!data?.can_edit && data && <p className="dispatch-muted">Rules apply to every barangay, so only a super admin can change them.</p>}
     {error && <p role="alert" className="dispatch-error">{error}</p>}
     {notice && <p role="status" className="dispatch-notice">{notice}</p>}
 

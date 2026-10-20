@@ -4,9 +4,9 @@ Apply `supabase/migrations/20261017_family_reunification_lookup.sql` (after the 
 
 Open **Family Reunification** in the admin sidebar.
 
-- **Search by name** (at least 2 letters; every word must match; case- and accent-insensitive, so `jose` finds `José`). Searches **all evacuation centers and the resident registry across every sitio** — families get separated across sitios, so this is intentionally not limited to the admin's own sitio.
+- **Search by name** (at least 2 letters; every word must match; case- and accent-insensitive, so `jose` finds `José`). Searches **all evacuation centers and the resident registry across every barangay** — families get separated across barangays, so this is intentionally not limited to the admin's own barangay.
 - **Or pick an evacuation center** to list everyone currently sheltered there (optionally narrowed by name).
-- Each result shows sex/age, home sitio, current status (Sheltered / In transit / Rescue pending / Not reached / No record), the center and since when, household, and a **Reported missing** flag when an open missing-person report exists.
+- Each result shows sex/age, home barangay, current status (Sheltered / In transit / Rescue pending / Not reached / No record), the center and since when, household, and a **Reported missing** flag when an open missing-person report exists.
 - **View family** shows every registered household member and where each one is, warns when the family is split across centers or when members are not confirmed in a shelter, and lists the household's dependents who have no account (their location is unknown — check with the household head).
 
 Location = the resident's latest evacuation record. Only `safely_evacuated` with a center counts as "in a shelter".

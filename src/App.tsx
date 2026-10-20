@@ -24,6 +24,7 @@ import { DispatchPage } from './pages/DispatchPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EvacCentersPage } from './pages/EvacCentersPage'
+import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
 import { EditResidentModal } from './components/EditResidentModal'
 import { AuditTrailPanel } from './components/AuditTrailPanel'
 import { SuperAdminSection } from './pages/SuperAdminDashboard'
@@ -31,7 +32,7 @@ import { SuperAdminSection } from './pages/SuperAdminDashboard'
 import { exportReport } from './utils/exportReport'
 
 import {
-  ALL_SITIOS,
+  ALL_BARANGAYS,
   deleteResidentProfile,
   fetchDashboardDataFromSupabase,
   rejectResidentUser,
@@ -55,11 +56,11 @@ type AppProps = {
   profile: StaffProfile
 }
 
-type SitioOption = { sitio_id: number; sitio_name: string }
+type BarangayOption = { barangay_id: number; barangay_name: string }
 
 // One dashboard shell for both staff roles.
-// Admin: the assigned sitio only; the scope cannot be changed.
-// Super Admin: all sitios by default, or one sitio picked in the scope
+// Admin: the assigned barangay only; the scope cannot be changed.
+// Super Admin: all barangays by default, or one barangay picked in the scope
 // selector, plus the Super Admin management tabs.
 function App({ profile }: AppProps) {
   const navigate = useNavigate()
@@ -68,9 +69,9 @@ function App({ profile }: AppProps) {
 
   const [activeMenu, setActiveMenu] = useState<MenuKey>('home')
   const [scope, setScope] = useState<string>(
-    isSuperAdmin ? ALL_SITIOS : String(profile.assignedSitioId ?? ''),
+    isSuperAdmin ? ALL_BARANGAYS : String(profile.assignedBarangayId ?? ''),
   )
-  const [sitioOptions, setSitioOptions] = useState<SitioOption[]>([])
+  const [barangayOptions, setBarangayOptions] = useState<BarangayOption[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] =
     useState<'All' | Status>('All')
@@ -93,10 +94,10 @@ function App({ profile }: AppProps) {
         : 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.',
     )
 
-  const [assignedSitioId, setAssignedSitioId] =
+  const [assignedBarangayId, setAssignedBarangayId] =
     useState<string | null>(null)
 
-  const [assignedSitioName, setAssignedSitioName] =
+  const [assignedBarangayName, setAssignedBarangayName] =
     useState('')
 
   const [verifyingResidentId, setVerifyingResidentId] =
@@ -108,19 +109,19 @@ function App({ profile }: AppProps) {
   const [savingResidentId, setSavingResidentId] =
     useState<number | string | null>(null)
 
-  // Super Admin scope selector: every sitio.
+  // Super Admin scope selector: every barangay.
   useEffect(() => {
     if (!isSuperAdmin || !hasSupabaseConfig) return
     let cancelled = false
 
     supabase
-      .from('sitios')
-      .select('sitio_id, sitio_name')
-      .order('sitio_name')
+      .from('barangays')
+      .select('barangay_id, barangay_name')
+      .order('barangay_name')
       .then(({ data, error }) => {
         if (cancelled) return
-        if (error) console.error('Failed to load sitios:', error)
-        else setSitioOptions((data ?? []) as SitioOption[])
+        if (error) console.error('Failed to load barangays:', error)
+        else setBarangayOptions((data ?? []) as BarangayOption[])
       })
 
     return () => {
@@ -135,50 +136,50 @@ function App({ profile }: AppProps) {
     async function loadAdminDashboard() {
       try {
         // An Admin's scope always comes from their verified profile.
-        const sitioId = isSuperAdmin
+        const barangayId = isSuperAdmin
           ? scope
-          : String(profile.assignedSitioId ?? '')
+          : String(profile.assignedBarangayId ?? '')
 
-        const allSitios = isSuperAdmin && sitioId === ALL_SITIOS
+        const allBarangays = isSuperAdmin && barangayId === ALL_BARANGAYS
 
-        if (!allSitios && !/^[1-9][0-9]*$/.test(sitioId)) {
+        if (!allBarangays && !/^[1-9][0-9]*$/.test(barangayId)) {
           throw new Error(
             isSuperAdmin
-              ? 'Choose a sitio from the scope selector.'
-              : 'Your account has no assigned sitio. Contact the Super Admin.',
+              ? 'Choose a barangay from the scope selector.'
+              : 'Your account has no assigned barangay. Contact the Super Admin.',
           )
         }
 
-        let sitioName = 'All sitios'
+        let barangayName = 'All barangays'
 
-        if (!allSitios) {
-          const { data: sitio, error: sitioError } =
+        if (!allBarangays) {
+          const { data: barangay, error: barangayError } =
             await supabase
-              .from('sitios')
-              .select('sitio_id, sitio_name')
-              .eq('sitio_id', sitioId)
+              .from('barangays')
+              .select('barangay_id, barangay_name')
+              .eq('barangay_id', barangayId)
               .maybeSingle()
 
-          if (sitioError) throw sitioError
+          if (barangayError) throw barangayError
 
-          if (!sitio) {
+          if (!barangay) {
             throw new Error(
               isSuperAdmin
-                ? 'This sitio could not be found.'
-                : 'Your assigned sitio could not be found.',
+                ? 'This barangay could not be found.'
+                : 'Your assigned barangay could not be found.',
             )
           }
 
-          sitioName = String(sitio.sitio_name ?? 'Assigned Sitio')
+          barangayName = String(barangay.barangay_name ?? 'Assigned Barangay')
         }
 
         const data =
-          await fetchDashboardDataFromSupabase(sitioId)
+          await fetchDashboardDataFromSupabase(barangayId)
 
         if (cancelled) return
 
-        setAssignedSitioId(sitioId)
-        setAssignedSitioName(sitioName)
+        setAssignedBarangayId(barangayId)
+        setAssignedBarangayName(barangayName)
         setDashboardData(data)
         setDatabaseError(null)
       } catch (error) {
@@ -212,7 +213,7 @@ function App({ profile }: AppProps) {
     return () => {
       cancelled = true
     }
-  }, [isSuperAdmin, profile.assignedSitioId, scope])
+  }, [isSuperAdmin, profile.assignedBarangayId, scope])
 
   function changeScope(next: string) {
     if (!isSuperAdmin || next === scope) return
@@ -225,16 +226,16 @@ function App({ profile }: AppProps) {
     navigate(LOGIN_PATH, { replace: true })
   }
 
-  // Always refresh the scope already loaded (an Admin's assigned sitio).
+  // Always refresh the scope already loaded (an Admin's assigned barangay).
   async function reloadDashboardData() {
-    if (!assignedSitioId) {
+    if (!assignedBarangayId) {
       throw new Error(
-        'No assigned sitio is available. Please log in again.',
+        'No assigned barangay is available. Please log in again.',
       )
     }
 
     const data =
-      await fetchDashboardDataFromSupabase(assignedSitioId)
+      await fetchDashboardDataFromSupabase(assignedBarangayId)
 
     setDashboardData(data)
     setDatabaseError(null)
@@ -314,7 +315,7 @@ function App({ profile }: AppProps) {
       console.error('Failed to delete resident:', error)
 
       window.alert(
-        'Unable to delete this resident. Check your access permissions and try again.',
+        error instanceof Error ? error.message : 'Unable to delete this resident.',
       )
     }
   }
@@ -333,9 +334,9 @@ function App({ profile }: AppProps) {
     })
   }, [liveResidents, searchTerm, statusFilter])
 
-  // Location filter options: the sitios actually present in the data.
+  // Location filter options: the barangays actually present in the data.
   const locationOptions = useMemo(
-    () => [...new Set(liveResidents.map((resident) => resident.sitio).filter(Boolean))].sort(),
+    () => [...new Set(liveResidents.map((resident) => resident.barangay).filter(Boolean))].sort(),
     [liveResidents],
   )
 
@@ -357,8 +358,8 @@ function App({ profile }: AppProps) {
         label: 'Total Registered',
         value: liveResidents.length,
         note: isSuperAdmin
-          ? assignedSitioId === ALL_SITIOS ? 'All sitios' : 'Selected sitio'
-          : 'Assigned sitio',
+          ? assignedBarangayId === ALL_BARANGAYS ? 'All barangays' : 'Selected barangay'
+          : 'Assigned barangay',
         tone: 'black',
       },
       {
@@ -380,7 +381,7 @@ function App({ profile }: AppProps) {
         tone: 'blue',
       },
     ]
-  }, [liveResidents, isSuperAdmin, assignedSitioId])
+  }, [liveResidents, isSuperAdmin, assignedBarangayId])
 
   const constraintStats = useMemo(() => {
     return getConstraintStats(liveResidents)
@@ -391,19 +392,20 @@ function App({ profile }: AppProps) {
     'Dashboard'
 
   const scopeLabel = isSuperAdmin
-    ? assignedSitioId === ALL_SITIOS ? 'All sitios' : assignedSitioName
-    : assignedSitioName
+    ? assignedBarangayId === ALL_BARANGAYS ? 'All barangays' : assignedBarangayName
+    : assignedBarangayName
   const generatedBy = `${profile.fullName || profile.email} (${isSuperAdmin ? 'Super Admin' : 'Admin'})`
 
-  // Super Admin management tabs do not depend on the sitio data.
+  // Super Admin management tabs do not depend on the barangay data.
   const isManagementTab =
     isSuperAdmin &&
-    (activeMenu === 'sitioOverview' ||
+    (activeMenu === 'barangayOverview' ||
       activeMenu === 'adminAccounts' ||
+      activeMenu === 'responderAccounts' ||
       activeMenu === 'activityLogs')
 
-  function openSitio(sitioId: number) {
-    changeScope(String(sitioId))
+  function openBarangay(barangayId: number) {
+    changeScope(String(barangayId))
     setActiveMenu('home')
   }
 
@@ -424,7 +426,7 @@ function App({ profile }: AppProps) {
         />
 
         <main className="page-content">
-          <div className="admin-sitio-banner">
+          <div className="admin-barangay-banner">
             <div>
               <span>
                 {isSuperAdmin ? 'Super Admin · Viewing' : 'Admin Dashboard'}
@@ -439,29 +441,30 @@ function App({ profile }: AppProps) {
                   disabled={isLoadingDatabase}
                   onChange={(event) => changeScope(event.target.value)}
                 >
-                  <option value={ALL_SITIOS}>All sitios</option>
-                  {sitioOptions.map((sitio) => (
-                    <option key={sitio.sitio_id} value={String(sitio.sitio_id)}>
-                      {sitio.sitio_name}
+                  <option value={ALL_BARANGAYS}>All barangays</option>
+                  {barangayOptions.map((barangay) => (
+                    <option key={barangay.barangay_id} value={String(barangay.barangay_id)}>
+                      {barangay.barangay_name}
                     </option>
                   ))}
                 </select>
               </label>
             ) : (
-              <span className="sitio-status">
-                Assigned Sitio
+              <span className="barangay-status">
+                Assigned Barangay
               </span>
             )}
           </div>
 
           {isManagementTab ? (
             <>
-              {activeMenu === 'sitioOverview' && (
-                <SuperAdminSection view="sitios" onOpenSitio={openSitio} />
+              {activeMenu === 'barangayOverview' && (
+                <SuperAdminSection view="barangays" onOpenBarangay={openBarangay} />
               )}
               {activeMenu === 'adminAccounts' && (
-                <SuperAdminSection view="accounts" onOpenSitio={openSitio} />
+                <SuperAdminSection view="accounts" onOpenBarangay={openBarangay} />
               )}
+              {activeMenu === 'responderAccounts' && <ResponderAccountsPage />}
               {activeMenu === 'activityLogs' && <AuditTrailPanel />}
             </>
           ) : isLoadingDatabase ? (
@@ -475,13 +478,13 @@ function App({ profile }: AppProps) {
               <p>
                 {isSuperAdmin
                   ? 'Choose another scope, or check the database connection.'
-                  : 'Confirm that you are logged in with an active Admin account and that your assigned sitio is configured.'}
+                  : 'Confirm that you are logged in with an active Admin account and that your assigned barangay is configured.'}
               </p>
             </div>
           ) : (
           <>
           {isSuperAdmin && activeMenu === 'home' && (
-            <SuperAdminSection view="overview" onOpenSitio={openSitio} />
+            <SuperAdminSection view="overview" onOpenBarangay={openBarangay} />
           )}
 
           <PageTitle
@@ -531,7 +534,7 @@ function App({ profile }: AppProps) {
           )}
 
           {activeMenu === 'geoMap' && (
-            <GeoMapPage residents={liveResidents} />
+            <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters} />
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
@@ -558,6 +561,7 @@ function App({ profile }: AppProps) {
             <EvacCentersPage
               onReload={reloadDashboardData}
               centers={liveEvacuationCenters}
+              barangayOptions={isSuperAdmin ? barangayOptions : undefined}
             />
           )}
           </>
@@ -585,7 +589,7 @@ function matchesSearch(
 
   return (
     resident.name.toLowerCase().includes(search) ||
-    resident.sitio.toLowerCase().includes(search) ||
+    resident.barangay.toLowerCase().includes(search) ||
     resident.constraint.toLowerCase().includes(search)
   )
 }

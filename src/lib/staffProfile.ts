@@ -11,7 +11,7 @@ export type StaffRole = 'admin' | 'super_admin'
 export type StaffProfile = {
   uid: string
   role: StaffRole
-  assignedSitioId: number | null
+  assignedBarangayId: number | null
   fullName: string
   email: string
 }
@@ -28,7 +28,7 @@ type ProfileRow = {
   uid: string
   role: string
   account_status: string
-  assigned_sitio_id: number | null
+  assigned_barangay_id: number | null
   f_name: string | null
   l_name: string | null
   email: string | null
@@ -45,7 +45,7 @@ export async function fetchStaffProfile(): Promise<StaffProfile | null> {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('uid, role, account_status, assigned_sitio_id, f_name, l_name, email')
+    .select('uid, role, account_status, assigned_barangay_id, f_name, l_name, email')
     .eq('uid', data.user.id)
     .maybeSingle<ProfileRow>()
 
@@ -69,16 +69,16 @@ export async function fetchStaffProfile(): Promise<StaffProfile | null> {
     )
   }
 
-  if (profile.role === 'admin' && profile.assigned_sitio_id === null) {
+  if (profile.role === 'admin' && profile.assigned_barangay_id === null) {
     throw new StaffAccessError(
-      'Your account has no assigned sitio. Contact the Super Admin.',
+      'Your account has no assigned barangay. Contact the Super Admin.',
     )
   }
 
   return {
     uid: profile.uid,
     role: profile.role,
-    assignedSitioId: profile.assigned_sitio_id,
+    assignedBarangayId: profile.assigned_barangay_id,
     fullName: [profile.f_name, profile.l_name]
       .filter((part) => part && part.trim())
       .join(' '),

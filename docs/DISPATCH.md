@@ -7,7 +7,7 @@ Open **Dispatch** in the admin sidebar.
 ## Board
 
 - **Needs a ticket** — active SOS alerts and open missing-person reports in your scope that have no live ticket. **Create ticket** pre-fills the form (resident, location, suggested priority and equipment).
-- **New ticket** — sitio, optional disaster event, optional resident, what is needed, priority, location (coordinates and/or landmark), equipment to bring, instructions, and optionally a unit to assign immediately.
+- **New ticket** — barangay, optional disaster event, optional resident, what is needed, priority, location (coordinates and/or landmark), equipment to bring, instructions, and optionally a unit to assign immediately.
   - Suggested priority: SOS level 3 or a High VPI → **Critical**; SOS level 2 or Moderate VPI → **High**; else **Normal**.
   - Suggested equipment comes from mobility (non-ambulatory → stretcher, semi-ambulatory → wheelchair), pregnancy and infants in the household. Suggestions only — trained personnel confirm.
   - Units are listed with how many of the needed items they carry and how many live tickets they already have.
@@ -19,7 +19,7 @@ Safety rules enforced by the database: only one live ticket per SOS alert or mis
 
 ## Units
 
-Create responder units with a name, home sitio (or barangay-wide — super admin only), capabilities/equipment carried, and members (active **rescuer** accounts). Sitio admins manage their sitio's units; any admin can assign any active unit (to borrow a team from another sitio).
+Create responder units with a name, home barangay (or barangay-wide — super admin only), capabilities/equipment carried, and members (active **rescuer** accounts). Barangay admins manage their barangay's units; any admin can assign any active unit (to borrow a team from another barangay).
 
 ## For the rescuer app (Module 5.6)
 
@@ -27,9 +27,9 @@ Create responder units with a name, home sitio (or barangay-wide — super admin
 
 ## Access
 
-Admins see and act on their sitio's tickets; super admins on all. Browsers have no direct table access.
+Admins see and act on their barangay's tickets; super admins on all. Browsers have no direct table access.
 
-Mock data: three active SOS alerts for mock residents, units "Barangay Rescue 1" and "Sitio 3 Alpha Team", one critical ticket en route and one resolved ticket.
+Mock data: three active SOS alerts for mock residents, units "Barangay Rescue 1" and "Barangay 3 Alpha Team", one critical ticket en route and one resolved ticket.
 
 Validation:
 
@@ -45,7 +45,7 @@ Equipment suggestions come from **editable rules** (`supabase/migrations/2026101
 
 - Household dependents without accounts are checked too (age, pregnancy, their needs text), labelled by name.
 - Keyword matching is whole-word and case-insensitive (“cane” does not match “hurricane”).
-- Only super admins change rules (they apply to every sitio); rules are turned off rather than removed, and every change is audited. Everyone else can read them.
+- Only super admins change rules (they apply to every barangay); rules are turned off rather than removed, and every change is audited. Everyone else can read them.
 - The ticket form lists each suggested item with why. Residents' **Verification** detail shows **Disabilities** and **Rescue Equipment Needs**, including which profile facts are still unknown.
 - If the rules can't be loaded, the built-in defaults (same as the seeded rules) are used.
 

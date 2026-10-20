@@ -24,9 +24,9 @@ const state = {
   },
   authUsers: new Map(),
   users: [],
-  sitios: [
-    { sitio_id: 1, sitio_name: 'Alpha' },
-    { sitio_id: 2, sitio_name: 'Bravo' },
+  barangays: [
+    { barangay_id: 1, barangay_name: 'Alpha' },
+    { barangay_id: 2, barangay_name: 'Bravo' },
   ],
   failNextProfileInsert: null,
   deletedAuthUsers: [],
@@ -41,9 +41,9 @@ function resetState() {
     [ADMIN, { id: ADMIN, email: 'admin@example.com' }],
   ])
   state.users = [
-    { uid: SUPER, role: 'super_admin', account_status: 'active', email: 'super@example.com', f_name: 'S', l_name: 'A', contact_no: '09170000001', assigned_sitio_id: null },
-    { uid: SUSPENDED_SUPER, role: 'super_admin', account_status: 'suspended', email: 'old@example.com', f_name: 'O', l_name: 'S', contact_no: '09170000002', assigned_sitio_id: null },
-    { uid: ADMIN, role: 'admin', account_status: 'active', email: 'admin@example.com', f_name: 'A', l_name: 'D', contact_no: '09170000003', assigned_sitio_id: 1 },
+    { uid: SUPER, role: 'super_admin', account_status: 'active', email: 'super@example.com', f_name: 'S', l_name: 'A', contact_no: '09170000001', assigned_barangay_id: null },
+    { uid: SUSPENDED_SUPER, role: 'super_admin', account_status: 'suspended', email: 'old@example.com', f_name: 'O', l_name: 'S', contact_no: '09170000002', assigned_barangay_id: null },
+    { uid: ADMIN, role: 'admin', account_status: 'active', email: 'admin@example.com', f_name: 'A', l_name: 'D', contact_no: '09170000003', assigned_barangay_id: 1 },
   ]
   state.failNextProfileInsert = null
   state.deletedAuthUsers = []
@@ -60,7 +60,7 @@ function pick(row, cols) {
 
 function from(table) {
   const q = { table, filters: [], cols: '*', insertRow: null, updateRow: null, order: null }
-  const rows = () => (table === 'users' ? state.users : state.sitios)
+  const rows = () => (table === 'users' ? state.users : state.barangays)
   const run = () => {
     if (q.insertRow) {
       if (state.failNextProfileInsert) {
@@ -77,7 +77,7 @@ function from(table) {
       if (!['active', 'suspended'].includes(r.account_status)) {
         return { data: null, error: { code: '23514', message: 'check' } }
       }
-      if (!state.sitios.some((s) => s.sitio_id === r.assigned_sitio_id)) {
+      if (!state.barangays.some((s) => s.barangay_id === r.assigned_barangay_id)) {
         return { data: null, error: { code: '23503', message: 'fk' } }
       }
       state.users.push({ ...r })
@@ -213,7 +213,7 @@ const valid = () => ({
   m_name: '',
   l_name: 'Reyes',
   contact_no: '09171234567',
-  assigned_sitio_id: 2,
+  assigned_barangay_id: 2,
 })
 
 test.beforeEach(resetState)
@@ -254,10 +254,10 @@ test('server-side validation rejects bad input with 400 and creates nothing', as
     { contact_no: '123' },
     { f_name: 'x'.repeat(101) },
     { m_name: 42 },
-    { assigned_sitio_id: '' },
-    { assigned_sitio_id: 'abc' },
-    { assigned_sitio_id: -1 },
-    { assigned_sitio_id: 99 }, // does not exist
+    { assigned_barangay_id: '' },
+    { assigned_barangay_id: 'abc' },
+    { assigned_barangay_id: -1 },
+    { assigned_barangay_id: 99 }, // does not exist
     { uid: 'not-a-uuid' },
   ]
   for (const patch of cases) {
@@ -269,7 +269,7 @@ test('server-side validation rejects bad input with 400 and creates nothing', as
   assert.equal(state.users.length, 3)
 })
 
-test('creates Auth user + admin profile with correct role, sitio, and status', async () => {
+test('creates Auth user + admin profile with correct role, barangay, and status', async () => {
   const res = await call('POST', '/api/super-admin/admins', { token: 'super-token', body: valid() })
   assert.equal(res.statusCode, 201, res.body?.message)
   const args = fakeSupabase.auth.admin.lastCreateArgs
@@ -279,7 +279,7 @@ test('creates Auth user + admin profile with correct role, sitio, and status', a
   const profile = state.users.find((u) => u.email === 'new.admin@example.com')
   assert.ok(profile)
   assert.equal(profile.role, 'admin')
-  assert.equal(profile.assigned_sitio_id, 2)
+  assert.equal(profile.assigned_barangay_id, 2)
   assert.equal(profile.account_status, 'active')
   assert.equal(profile.m_name, null)
   assert.ok(state.authUsers.has(profile.uid), 'profile uid matches Auth user id')
@@ -293,8 +293,8 @@ test('creates Auth user + admin profile with correct role, sitio, and status', a
   const dash = await call('GET', '/api/super-admin/dashboard', { token: 'super-token' })
   assert.equal(dash.statusCode, 200)
   assert.equal(dash.body.admins.length, 2, 'new admin appears in dashboard list')
-  assert.equal(dash.body.admins.filter((a) => a.assigned_sitio_id === 2).length, 1)
-  assert.equal(dash.body.sitios.length, 2)
+  assert.equal(dash.body.admins.filter((a) => a.assigned_barangay_id === 2).length, 1)
+  assert.equal(dash.body.barangays.length, 2)
 })
 
 test('honours an optional custom UUID', async () => {
@@ -362,11 +362,11 @@ test('manage admin: suspend bans sign-in, reactivate restores it', async () => {
   assert.match(res.body.message, /reactivated/)
 })
 
-test('manage admin: reassigns the sitio without touching sign-in', async () => {
-  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { assigned_sitio_id: 2 } })
+test('manage admin: reassigns the barangay without touching sign-in', async () => {
+  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { assigned_barangay_id: 2 } })
   assert.equal(res.statusCode, 200)
-  assert.equal(adminRow().assigned_sitio_id, 2)
-  assert.equal(res.body.admin.assigned_sitio_id, 2)
+  assert.equal(adminRow().assigned_barangay_id, 2)
+  assert.equal(res.body.admin.assigned_barangay_id, 2)
   assert.equal(state.bans.length, 0)
 })
 
@@ -377,8 +377,8 @@ test('manage admin: rejects bad input and protected accounts', async () => {
     [adminPath(), { role: 'super_admin' }, 400],
     [adminPath(), { account_status: 'suspended', role: 'super_admin' }, 400],
     [adminPath(), { account_status: 'deleted' }, 400],
-    [adminPath(), { assigned_sitio_id: 99 }, 400],
-    [adminPath(), { assigned_sitio_id: 'abc' }, 400],
+    [adminPath(), { assigned_barangay_id: 99 }, 400],
+    [adminPath(), { assigned_barangay_id: 'abc' }, 400],
     [adminPath(SUPER), { account_status: 'suspended' }, 400], // own account
     [adminPath(SUSPENDED_SUPER), { account_status: 'active' }, 404], // a super admin
     [adminPath('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'), { account_status: 'suspended' }, 404],
@@ -388,7 +388,7 @@ test('manage admin: rejects bad input and protected accounts', async () => {
     assert.equal(res.statusCode, status, `${p} ${JSON.stringify(body)} -> ${res.statusCode} ${res.body?.message}`)
   }
   assert.equal(adminRow().account_status, 'active')
-  assert.equal(adminRow().assigned_sitio_id, 1)
+  assert.equal(adminRow().assigned_barangay_id, 1)
   assert.equal(adminRow().role, 'admin')
   assert.equal(state.users.find((u) => u.uid === SUSPENDED_SUPER).account_status, 'suspended')
   assert.equal(state.bans.length, 0)
@@ -396,10 +396,10 @@ test('manage admin: rejects bad input and protected accounts', async () => {
 
 test('manage admin: if Auth cannot be updated, the profile change is undone', async () => {
   state.failNextBan = true
-  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { account_status: 'suspended', assigned_sitio_id: 2 } })
+  const res = await call('PATCH', adminPath(), { token: 'super-token', body: { account_status: 'suspended', assigned_barangay_id: 2 } })
   assert.equal(res.statusCode, 500)
   assert.equal(adminRow().account_status, 'active')
-  assert.equal(adminRow().assigned_sitio_id, 1)
+  assert.equal(adminRow().assigned_barangay_id, 1)
 })
 
 // ---------- startup key check ----------

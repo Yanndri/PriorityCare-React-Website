@@ -80,7 +80,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     'PROTOTYPE DRAFT — administrator review required; not an official completed RDANA form.',
     `Reporting period: ${manila(data.window.start)} to ${manila(data.window.end)} (Asia/Manila)`,
     `Window: ${data.window.hours} hours; start inclusive, end exclusive.`,
-    `Geographic population scope: ${data.scope} (residents currently registered in this sitio).`,
+    `Geographic population scope: ${data.scope} (residents currently registered in this barangay).`,
     `Retrieved: ${manila(data.fetchedAt)} (Asia/Manila)`,
     '',
     '1. INCIDENT / ASSESSMENT CONTEXT',
@@ -89,7 +89,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
   if (data.declaredEvents?.available) {
     const events = eventsDuringWindow(data.declaredEvents.data, data.window)
     lines.push(events.length
-      ? `Declared disaster events active during the period (register; sitio-scoped): ${events.length}.`
+      ? `Declared disaster events active during the period (register; barangay-scoped): ${events.length}.`
       : 'Declared disaster events active during the period: none recorded in the register.')
     for (const event of events) lines.push(`- ${event.name} — ${event.hazard_type}; onset ${manila(event.started_at)}; ${event.status === 'resolved' && event.resolved_at ? `resolved ${manila(event.resolved_at)}` : 'still active at retrieval'}.`)
     if (events.length) lines.push('Declarations are reference records; affected areas are not assessed and individual records are not attributed to an event.')
@@ -124,7 +124,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     lines.push(`Accounts with recorded assistance notes: ${data.profiles.data.filter((row) => row.vulnerability_needs?.trim()).length}.`)
   } else lines.push(`Pregnancy, household linkage, and supplemental needs: ${unavailable(data.profiles.reason)}.`)
   lines.push(data.disabilityResidents.available ? `Resident accounts with recorded disability categories: ${new Set(data.disabilityResidents.data).size}. No record does not prove an assessed absence.` : `Disability records: ${unavailable(data.disabilityResidents.reason)}.`)
-  lines.push('Dependent household members without resident accounts are not included in these account counts.', '', '4. CURRENT SHARED SHELTER SNAPSHOT (ALL SITIOS, AT RETRIEVAL)')
+  lines.push('Dependent household members without resident accounts are not included in these account counts.', '', '4. CURRENT SHARED SHELTER SNAPSHOT (ALL BARANGAYS, AT RETRIEVAL)')
   if (data.shelters.available) {
     const centers = unique(data.shelters.data, (row) => String(row.center_id))
     const active = centers.filter((center) => center.status === 'active')
@@ -136,7 +136,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
   lines.push('', '5. DAMAGE, NEEDS, AND VALIDATION GAPS')
   if (data.missingReports?.available) {
     const manifest = manifestActivity(data.missingReports.data, data.window)
-    lines.push(`Missing-person manifest (sitio-scoped): reports filed in period ${manifest.filed}; marked found in period ${manifest.found}; withdrawn in period ${manifest.withdrawn}; open reports at retrieval ${manifest.openNow}. Open reports are unresolved cases, not a casualty count.`)
+    lines.push(`Missing-person manifest (barangay-scoped): reports filed in period ${manifest.filed}; marked found in period ${manifest.found}; withdrawn in period ${manifest.withdrawn}; open reports at retrieval ${manifest.openNow}. Open reports are unresolved cases, not a casualty count.`)
   } else if (data.missingReports) lines.push(`Missing-person manifest: ${unavailable(data.missingReports.reason)}.`)
   lines.push(data.missingReports
     ? 'Deaths, injuries, damaged homes, infrastructure damage, and total disaster-affected people/families: Not assessed.'
@@ -147,18 +147,18 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     '', '6. METHOD AND REVIEW',
     'Activity is based on stored creation, logging, or completion timestamps. Records without the relevant timestamp are excluded from window totals.',
     'Statuses are current recorded values, not a reconstruction of status changes during the reporting period.',
-    'Population scope follows current sitio registration. Shelter figures are facility-wide and must not be added to registered population totals.',
+    'Population scope follows current barangay registration. Shelter figures are facility-wide and must not be added to registered population totals.',
     'Data is retrieved in multiple read-only queries, not one transactional snapshot. Later transfers, profile edits, and status changes can affect the next generated draft.',
     '',
     '7. DATA SOURCES',
-    `Registered residents (sitio registry): retrieved, ${residents.length} account(s).`,
+    `Registered residents (barangay registry): retrieved, ${residents.length} account(s).`,
     ...([
       ['SOS alerts (creation time)', data.sos],
       ['Evacuation records (logged time)', data.loggedEvacuations],
       ['Evacuation records (completion time)', data.completedEvacuations],
       ['Supplemental resident assessments', data.profiles],
       ['Resident disability categories', data.disabilityResidents],
-      ['Evacuation facility catalog (all sitios)', data.shelters],
+      ['Evacuation facility catalog (all barangays)', data.shelters],
       ...(data.declaredEvents ? [['Disaster event register', data.declaredEvents] as const] : []),
       ...(data.missingReports ? [['Missing-person manifest', data.missingReports] as const] : []),
     ] as const).map(([label, section]) => `${label}: ${section.available ? 'retrieved' : unavailable(section.reason)}.`),

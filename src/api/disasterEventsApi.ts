@@ -3,18 +3,18 @@ import { supabase } from '../lib/supabaseClient'
 export const hazardLabels = { flood: 'Flood', fire: 'Fire', earthquake: 'Earthquake', landslide: 'Landslide' } as const
 export type HazardType = keyof typeof hazardLabels
 export type DisasterEvent = {
-  event_id: string; sitio_id: number; name: string; hazard_type: HazardType
+  event_id: string; barangay_id: number; name: string; hazard_type: HazardType
   location_description: string; latitude: number | null; longitude: number | null
   started_at: string; notes: string; status: 'active' | 'resolved'
   declared_at: string; declared_by: string; resolved_at: string | null
   resolved_by: string | null; resolution_reason: string | null
 }
 export type EventRegister = {
-  sitios: { sitio_id: number; sitio_name: string }[]
+  barangays: { barangay_id: number; barangay_name: string }[]
   events: DisasterEvent[]
 }
 export type DeclarationInput = {
-  sitio: number; name: string; hazard: HazardType; location: string
+  barangay: number; name: string; hazard: HazardType; location: string
   startedAt: string; notes: string; latitude: number | null; longitude: number | null
 }
 function eventError(error: { code?: string; message: string }) {
@@ -28,7 +28,7 @@ export async function getEventRegister(): Promise<EventRegister> {
 }
 export async function declareEvent(input: DeclarationInput) {
   const { data, error } = await supabase.rpc('declare_disaster_event', {
-    p_sitio: input.sitio, p_name: input.name.trim(), p_hazard: input.hazard,
+    p_barangay: input.barangay, p_name: input.name.trim(), p_hazard: input.hazard,
     p_location: input.location.trim(), p_started_at: input.startedAt, p_notes: input.notes.trim(),
     p_lat: input.latitude, p_long: input.longitude,
   })

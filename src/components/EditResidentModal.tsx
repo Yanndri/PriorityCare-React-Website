@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Resident } from '../types/dashboard'
-import { fetchResidentProfile, fetchHousehold, type HouseholdMember, type ResidentProfileDetails, type ResidentProfileInput } from '../api/residentProfileApi'
+import { fetchResidentProfile, fetchHousehold, type HouseholdMember, type MemberMobility, type ResidentProfileDetails, type ResidentProfileInput } from '../api/residentProfileApi'
 
 type Props = {
   resident: Resident | null
@@ -74,7 +74,7 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="resident-editor-title">
       <section className="edit-modal">
         <div className="request-modal-header">
-          <div><h3 id="resident-editor-title">Edit Demographics & Household Needs</h3><p>{resident.name} · {details?.sitio_name ?? resident.sitio}</p></div>
+          <div><h3 id="resident-editor-title">Edit Demographics & Household Needs</h3><p>{resident.name} · {details?.barangay_name ?? resident.barangay}</p></div>
           <button type="button" className="modal-close-button" aria-label="Close resident editor" disabled={isSaving} onClick={onClose}>×</button>
         </div>
         {loading && <p role="status">Loading resident profile…</p>}
@@ -113,10 +113,10 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
           <fieldset disabled={isSaving || householdLoading} className="resident-edit-fields">
             <legend>Shared household</legend>
             <div className="edit-form-grid">
-              <label><span>Household in this sitio</span><select value={profile.household_id} onChange={(e) => void selectHousehold(e.target.value)}><option value="">No household / create a new one</option>{details.households.map((household) => <option key={household.household_id} value={household.household_id}>{household.household_name} — Head: {household.head_name}</option>)}</select></label>
+              <label><span>Household in this barangay</span><select value={profile.household_id} onChange={(e) => void selectHousehold(e.target.value)}><option value="">No household / create a new one</option>{details.households.map((household) => <option key={household.household_id} value={household.household_id}>{household.household_name} — Head: {household.head_name}</option>)}</select></label>
               {!profile.household_id && <label><span>New household name (optional)</span><input maxLength={200} value={profile.household_name} onChange={(e) => setField('household_name', e.target.value)} placeholder="Dela Cruz household" /></label>}
             </div>
-            {!profile.household_id && <p>Creating a household makes this resident its head. Other resident accounts in this sitio can join it using this same selector.</p>}
+            {!profile.household_id && <p>Creating a household makes this resident its head. Other resident accounts in this barangay can join it using this same selector.</p>}
             {details.registered_members.length > 0 && <><h4>Registered household members</h4>{details.registered_members.map((member) => <p key={member.uid}>{member.name}{member.is_head ? ' (Household head)' : ''}</p>)}</>}
             <h4>Dependents without resident accounts</h4>
             <p>These dependents are shared across the household. Do not duplicate someone with their own resident account. Unknown birthdates can be left blank.</p>
@@ -128,13 +128,14 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
                 <label><span>Birthdate (optional)</span><input type="date" max={today} value={member.birthdate} onChange={(e) => setMember(index, { birthdate: e.target.value })} /></label>
                 <label><span>Sex (optional)</span><select value={member.sex} onChange={(e) => setMember(index, { sex: e.target.value as HouseholdMember['sex'] })}><option value="">Not recorded</option><option value="male">Male</option><option value="female">Female</option></select></label>
                 <label className="resident-check"><input type="checkbox" checked={member.is_pregnant} onChange={(e) => setMember(index, { is_pregnant: e.target.checked })} /><span>Pregnant</span></label>
+                <label><span>Mobility</span><select value={member.mobility ?? 'ambulatory'} onChange={(e) => setMember(index, { mobility: e.target.value as MemberMobility })}><option value="ambulatory">Walks unaided</option><option value="assisted">Needs assistance</option><option value="wheelchair">Wheelchair</option><option value="bedridden">Bedridden</option></select></label>
                 <label><span>Disability / assistance needs</span><input maxLength={2000} value={member.needs} onChange={(e) => setMember(index, { needs: e.target.value })} /></label>
               </div>
               <button type="button" className="secondary-button" onClick={() => setField('household_members', profile.household_members.filter((_, i) => i !== index))}>Remove from draft</button>
             </section>)}
-            <button type="button" className="secondary-button" disabled={profile.household_members.length >= 30} onClick={() => setField('household_members', [...profile.household_members, { name: '', relationship: '', birthdate: '', sex: '', is_pregnant: false, needs: '' }])}>Add dependent</button>
+            <button type="button" className="secondary-button" disabled={profile.household_members.length >= 30} onClick={() => setField('household_members', [...profile.household_members, { name: '', relationship: '', birthdate: '', sex: '', is_pregnant: false, needs: '', mobility: 'ambulatory' }])}>Add dependent</button>
           </fieldset>
-          <p>Saving recalculates the prototype VPI on the Home dashboard. Verification and sitio assignment stay in their existing workflows.</p>
+          <p>Saving recalculates the prototype VPI on the Home dashboard. Verification and barangay assignment stay in their existing workflows.</p>
           <div className="request-modal-actions"><button type="button" className="secondary-button" disabled={isSaving || householdLoading} onClick={onClose}>Cancel</button><button type="submit" className="verify-button large" disabled={isSaving || householdLoading}>{householdLoading ? 'Loading household…' : isSaving ? 'Saving…' : 'Save Changes'}</button></div>
         </form>}
         {!profile && !loading && <button type="button" className="secondary-button" onClick={onClose}>Close</button>}

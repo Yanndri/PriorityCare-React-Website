@@ -10,7 +10,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   TouchEvent as ReactTouchEvent,
 } from 'react'
-import type { Resident } from '../types/dashboard'
+import type { EvacuationCenter, Resident } from '../types/dashboard'
 
 import {
   MapContainer,
@@ -179,6 +179,7 @@ const evacuationIcon = new L.Icon({
 
 type GeoMapPageProps = {
   residents?: Resident[]
+  centers?: EvacuationCenter[]
 }
 
 // ======================================================
@@ -280,7 +281,7 @@ async function loadWeatherRisk(): Promise<{
   }
 }
 
-export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
+export function GeoMapPage({ residents = [], centers = [] }: GeoMapPageProps) {
 
   // ====================================================
   // 🌍 MAP MODES
@@ -314,7 +315,7 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
     useState<FloodArea[]>([])
 
   // ====================================================
-  // 🪟 PANEL POSITION
+  // 🪟 PANEL POBARANGAYN
   // ====================================================
 
   const mapSectionRef =
@@ -1226,34 +1227,23 @@ export function GeoMapPage({ residents = [] }: GeoMapPageProps) {
           />
 
           {/* 🏠 HOUSEHOLD TRIAGE PINS (Module 4.3): one pin per household, coloured by VPI urgency */}
-          {/* 🧭 SITIO → SHELTER CATCHMENT LINKS (Module 2.2) */}
+          {/* 🧭 BARANGAY → SHELTER CATCHMENT LINKS (Module 2.2) */}
           <CatchmentLinesLayer />
           <TriagePinsLayer residents={residents} />
 
           {/* 🟢 EVACUATION CENTER */}
 
-          <Marker
-            position={[
-              10.315,
-              123.885,
-            ]}
-
-            icon={
-              evacuationIcon
-            }
-          >
-
-            <Popup>
-
-              <Icon name="building" /> Cebu City Gym
-
-              <br />
-
-              Evacuation Center
-
-            </Popup>
-
-          </Marker>
+          {centers
+            .filter((center) => Number.isFinite(center.gpsLat) && Number.isFinite(center.gpsLong) && center.status.toLowerCase() !== 'closed')
+            .map((center) => (
+              <Marker key={`center-${center.id ?? center.name}`} position={[center.gpsLat!, center.gpsLong!]} icon={evacuationIcon}>
+                <Popup>
+                  <Icon name="building" /> {center.name}
+                  <br />
+                  {center.occupancyKnown ? `${center.occupied} / ${center.capacity} people` : 'Evacuation Center'}
+                </Popup>
+              </Marker>
+            ))}
 
           {/* 🌊 FLOOD AREAS */}
 

@@ -8,7 +8,7 @@ import { AuditTrailPanel } from '../components/analytics/AuditTrailPanel'
 
 // Appendix N, Module 3: Statutory Disaster Analytics & Report Generation.
 // Every view reads live, role-scoped records: the database functions and the
-// existing report builders limit data to the signed-in administrator's sitio.
+// existing report builders limit data to the signed-in administrator's barangay.
 
 const tabs = [
   { key: 'reconciliation', label: 'Rescued vs. Missing', title: 'Reconcile Master Rescued Directory vs. Missing Persons Manifest' },

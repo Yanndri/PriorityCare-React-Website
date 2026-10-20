@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { EvacuationCenter } from '../types/dashboard'
 import { registerFacility, setFacilityCapacity } from '../api/facilityApi'
-import { FACILITY_TYPES, validateCapacity, validateFacility } from '../utils/facility'
+import { FACILITY_TYPES, facilityTypeLabel, validateCapacity, validateFacility } from '../utils/facility'
 import { FacilityLocationPicker } from './FacilityLocationPicker'
 
 type Props = {
@@ -10,10 +10,13 @@ type Props = {
   existingCenters?: EvacuationCenter[]
   onClose: () => void
   onSaved: () => Promise<void>
+  // Super admins only; admins always register in their own barangay.
+  barangayOptions?: { barangay_id: number; barangay_name: string }[]
 }
-export function FacilityForm({ center, existingCenters = [], onClose, onSaved }: Props) {
+export function FacilityForm({ center, existingCenters = [], barangayOptions, onClose, onSaved }: Props) {
   const [name, setName] = useState('')
   const [type, setType] = useState<typeof FACILITY_TYPES[number]>('school')
+  const [barangay, setBarangay] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
   const [capacity, setCapacity] = useState(center?.capacityConfirmed ? String(center.capacity) : '')
@@ -29,7 +32,7 @@ export function FacilityForm({ center, existingCenters = [], onClose, onSaved }:
     setSaving(true); setError('')
     try {
       if (center?.id != null) await setFacilityCapacity(center.id, input.capacity, center.capacityConfirmed ? center.capacity : null)
-      else await registerFacility(input)
+      else await registerFacility(input, barangayOptions ? (barangay ? Number(barangay) : null) : undefined)
       setSaved(true)
       try { await onSaved(); onClose() }
       catch { setError('Saved successfully, but the list could not refresh. Close this form and refresh the website. Do not register it again.') }
@@ -42,7 +45,11 @@ export function FacilityForm({ center, existingCenters = [], onClose, onSaved }:
       <form onSubmit={submit}><fieldset disabled={saving || saved} className="resident-edit-fields"><div className="edit-form-grid">
         {!center && <>
           <label><span>Facility name</span><input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label><span>Facility type</span><select value={type} onChange={(e) => setType(e.target.value as typeof type)}>{FACILITY_TYPES.map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></label>
+          <label><span>Facility type</span><select value={type} onChange={(e) => setType(e.target.value as typeof type)}>{FACILITY_TYPES.map((item) => <option key={item} value={item}>{item === 'makeshift' ? 'Temporary shelter (this disaster only)' : facilityTypeLabel(item)}</option>)}</select></label>
+          {barangayOptions && <label><span>Barangay</span><select value={barangay} onChange={(e) => setBarangay(e.target.value)}>
+            <option value="">Municipal (all barangays)</option>
+            {barangayOptions.map((option) => <option key={option.barangay_id} value={option.barangay_id}>{option.barangay_name}</option>)}
+          </select></label>}
           <label><span>GPS latitude</span><input required type="number" step="any" min={-90} max={90} value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label>
           <label><span>GPS longitude</span><input required type="number" step="any" min={-180} max={180} value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label>
           <FacilityLocationPicker

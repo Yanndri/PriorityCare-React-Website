@@ -1,4 +1,9 @@
-export const FACILITY_TYPES = ['school', 'covered_court', 'barangay_hall', 'church', 'other'] as const
+export const FACILITY_TYPES = ['school', 'covered_court', 'barangay_hall', 'church', 'makeshift', 'other'] as const
+export const FACILITY_TYPE_LABELS: Record<string, string> = {
+  school: 'School', covered_court: 'Covered court', barangay_hall: 'Barangay hall', church: 'Church',
+  makeshift: 'Temporary shelter', other: 'Other',
+}
+export const facilityTypeLabel = (type: string) => FACILITY_TYPE_LABELS[type] ?? type.replaceAll('_', ' ')
 export type FacilityInput = { name: string; type: typeof FACILITY_TYPES[number]; latitude: number; longitude: number; capacity: number }
 export function validateCapacity(capacity: number) {
   return Number.isInteger(capacity) && capacity >= 1 && capacity <= 1_000_000

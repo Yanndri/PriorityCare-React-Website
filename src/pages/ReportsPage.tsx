@@ -7,7 +7,7 @@ import { reportTimestamp } from '../utils/reportStamp'
 
 type ReportsPageProps = {
   stats: StatCardData[]
-  // The data the figures cover: a sitio name, or "All sitios".
+  // The data the figures cover: a barangay name, or "All barangays".
   scopeLabel: string
   // Who is printing, e.g. "Ana Alpha (Admin)".
   generatedBy: string

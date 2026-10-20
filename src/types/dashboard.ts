@@ -13,8 +13,9 @@ export type MenuKey =
   | 'dataMining'
   | 'evacCenters'
   // Super Admin only
-  | 'sitioOverview'
+  | 'barangayOverview'
   | 'adminAccounts'
+  | 'responderAccounts'
   | 'activityLogs'
 
 export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
@@ -34,7 +35,7 @@ export type VerificationDocument = {
 export type Resident = {
   id: number | string
   name: string
-  sitio: string
+  barangay: string
   constraint: Constraint
   status: Status
   floodZone: boolean
@@ -51,12 +52,15 @@ export type Resident = {
   isHouseholdHead?: boolean
   vulnerabilityNeeds?: string
   householdMembers?: {
+    member_id?: string
     name: string
     relationship: string
     birthdate: string
     sex: string
     is_pregnant: boolean
     needs: string
+    mobility?: string
+    age_group?: string
   }[]
   address?: string
   landmark?: string
@@ -77,7 +81,7 @@ export type Alert = {
 export type EvacuationCenterResident = {
   id: number | string
   name: string
-  sitio: string
+  barangay: string
   constraint: Constraint
   evacuationStatus: string
 }
@@ -88,6 +92,11 @@ export type EvacuationCenter = {
   capacityConfirmed?: boolean
   occupancyKnown?: boolean
   facilityType?: string
+  barangayId?: number | null
+  barangayName?: string | null
+  // False when this admin can see the centre (their shelter plan uses it) but not change it.
+  editable?: boolean
+  households?: number
   gpsLat?: number
   gpsLong?: number
   id?: number | string
@@ -119,7 +128,7 @@ export type ConstraintStat = {
 export type EvacuationHistoryRecord = {
   id: number | string
   residentName: string
-  sitio: string
+  barangay: string
   constraint: Constraint
   status: 'Safely Evacuated' | 'Missing / Relocated' | 'Pending' | 'In Transit'
   evacuationCenter: string

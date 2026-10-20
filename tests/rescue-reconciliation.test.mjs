@@ -6,12 +6,12 @@ import {
 
 const asOf = new Date('2026-10-14T04:00:00Z')
 const resident = (uid, f, l, extra = {}) => ({
-  uid, sitio_id: 1, f_name: f, m_name: null, l_name: l, sex: 'male', birthdate: '1990-05-01',
+  uid, barangay_id: 1, f_name: f, m_name: null, l_name: l, sex: 'male', birthdate: '1990-05-01',
   latest_status: 'safely_evacuated', latest_logged_at: '2026-10-14T02:00:00Z', evacuated_at: '2026-10-14T02:00:00Z',
   center_id: 10, center_name: 'Central School', ...extra,
 })
 const report = (id, name, extra = {}) => ({
-  report_id: id, sitio_id: 1, event_id: null, resident_uid: null, full_name: name, sex: 'male', approx_age: 36,
+  report_id: id, barangay_id: 1, event_id: null, resident_uid: null, full_name: name, sex: 'male', approx_age: 36,
   last_seen_location: 'Riverside', last_seen_at: null, reporter_name: 'Neighbor', reporter_contact: '', notes: '',
   status: 'missing', matched_resident_uid: null, reconciled_at: null, reconciliation_note: null,
   reported_at: '2026-10-14T03:00:00Z', ...extra,
@@ -50,15 +50,15 @@ test('scoring rejects conflicting sex/age and rewards agreement', () => {
 test('reconcile classifies the manifest and finds unaccounted residents', () => {
   const data = {
     generated_at: asOf.toISOString(),
-    sitios: [{ sitio_id: 1, sitio_name: 'Sitio 1' }, { sitio_id: 2, sitio_name: 'Sitio 2' }],
-    events: [{ event_id: 'e1', sitio_id: 1, name: 'Flood', hazard_type: 'flood', status: 'active', started_at: '' },
-      { event_id: 'e2', sitio_id: 2, name: 'Old', hazard_type: 'fire', status: 'resolved', started_at: '' }],
+    barangays: [{ barangay_id: 1, barangay_name: 'Barangay 1' }, { barangay_id: 2, barangay_name: 'Barangay 2' }],
+    events: [{ event_id: 'e1', barangay_id: 1, name: 'Flood', hazard_type: 'flood', status: 'active', started_at: '' },
+      { event_id: 'e2', barangay_id: 2, name: 'Old', hazard_type: 'fire', status: 'resolved', started_at: '' }],
     residents: [
       resident('juan', 'Juan', 'Dela Cruz'),
       resident('maria', 'Maria', 'Santos', { sex: 'female', latest_status: 'failed', center_name: null }),
       resident('pedro', 'Pedro', 'Reyes', { latest_status: null }),
       resident('ana', 'Ana', 'Lim', { sex: 'female', latest_status: 'in_transit' }),
-      resident('liza', 'Liza', 'Gomez', { sitio_id: 2, sex: 'female', latest_status: null }),
+      resident('liza', 'Liza', 'Gomez', { barangay_id: 2, sex: 'female', latest_status: null }),
       resident('jon', 'Jon', 'Dela Cruz', { birthdate: null }),
     ],
     reports: [
@@ -77,12 +77,12 @@ test('reconcile classifies the manifest and finds unaccounted residents', () => 
   assert.ok(result.open[1].candidates.every(c => c.resident.latest_status === 'safely_evacuated'))
   assert.equal(result.open[3].linkedResident.uid, 'maria')
   assert.deepEqual(result.rescued.map(r => r.uid).sort(), ['jon', 'juan'])
-  // Pedro and Ana in active-event sitio 1; Maria is excluded because she is already reported; Liza's sitio has no active event.
+  // Pedro and Ana in active-event barangay 1; Maria is excluded because she is already reported; Liza's barangay has no active event.
   assert.deepEqual(result.unaccounted.map(r => r.uid).sort(), ['ana', 'pedro'])
   assert.deepEqual(result.summary, { rescued: 2, openReports: 4, linkedRescued: 1, probable: 1, possible: 0,
     noMatch: 2, found: 1, withdrawn: 1, unaccounted: 2 })
 
-  const csv = reconciliationCsv(result, id => `Sitio ${id}`)
+  const csv = reconciliationCsv(result, id => `Barangay ${id}`)
   assert.ok(csv.startsWith('﻿"Section"'))
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'))
   assert.equal(csv.split('\r\n').length, 1 + 4 + 2 + 2 + 2)

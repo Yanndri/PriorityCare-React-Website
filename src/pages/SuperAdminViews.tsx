@@ -3,7 +3,7 @@ import { CreateAdminForm } from '../components/CreateAdminForm'
 import {
   updateAdminAccount,
   type AdminAccount,
-  type Sitio,
+  type Barangay,
 } from '../api/superAdminApi'
 
 // Super Admin-only views rendered inside the shared dashboard shell
@@ -21,11 +21,11 @@ function adminDisplayName(admin: AdminAccount) {
 
 type AccountsData = {
   admins: AdminAccount[]
-  sitios: Sitio[]
+  barangays: Barangay[]
 }
 
 // System Dashboard summary (shown above the system-wide operational stats)
-export function SuperAdminOverview({ admins, sitios }: AccountsData) {
+export function SuperAdminOverview({ admins, barangays }: AccountsData) {
   const activeAdmins = admins.filter(
     (admin) => admin.account_status === 'active',
   ).length
@@ -34,20 +34,20 @@ export function SuperAdminOverview({ admins, sitios }: AccountsData) {
     (admin) => admin.account_status === 'suspended',
   ).length
 
-  const unstaffedSitios = sitios.filter(
-    (sitio) =>
+  const unstaffedBarangays = barangays.filter(
+    (barangay) =>
       !admins.some(
         (admin) =>
           admin.account_status === 'active' &&
-          admin.assigned_sitio_id === sitio.sitio_id,
+          admin.assigned_barangay_id === barangay.barangay_id,
       ),
   ).length
 
   return (
     <section className="super-admin-stats" aria-label="Administrator summary">
       <article className="super-admin-card">
-        <span>Sitios</span>
-        <strong>{sitios.length}</strong>
+        <span>Barangays</span>
+        <strong>{barangays.length}</strong>
       </article>
 
       <article className="super-admin-card">
@@ -61,8 +61,8 @@ export function SuperAdminOverview({ admins, sitios }: AccountsData) {
       </article>
 
       <article className="super-admin-card">
-        <span>Sitios without an active Admin</span>
-        <strong>{unstaffedSitios}</strong>
+        <span>Barangays without an active Admin</span>
+        <strong>{unstaffedBarangays}</strong>
       </article>
     </section>
   )
@@ -73,27 +73,27 @@ export function SuperAdminOverview({ admins, sitios }: AccountsData) {
 // again by the backend (requireSuperAdmin).
 function AdminAccountRow({
   admin,
-  sitios,
+  barangays,
   onChanged,
 }: {
   admin: AdminAccount
-  sitios: Sitio[]
+  barangays: Barangay[]
   onChanged: () => Promise<void>
 }) {
-  const [sitioChoice, setSitioChoice] = useState(
-    admin.assigned_sitio_id === null ? '' : String(admin.assigned_sitio_id),
+  const [barangayChoice, setBarangayChoice] = useState(
+    admin.assigned_barangay_id === null ? '' : String(admin.assigned_barangay_id),
   )
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const sitio = sitios.find(
-    (item) => item.sitio_id === admin.assigned_sitio_id,
+  const barangay = barangays.find(
+    (item) => item.barangay_id === admin.assigned_barangay_id,
   )
   const name = adminDisplayName(admin)
   const isActive = admin.account_status === 'active'
-  const sitioChanged =
-    sitioChoice !== '' && Number(sitioChoice) !== admin.assigned_sitio_id
+  const barangayChanged =
+    barangayChoice !== '' && Number(barangayChoice) !== admin.assigned_barangay_id
 
   async function apply(
     label: string,
@@ -135,37 +135,37 @@ function AdminAccountRow({
       </td>
       <td>{admin.email}</td>
       <td>
-        <div className="admin-sitio-edit">
+        <div className="admin-barangay-edit">
           <select
-            aria-label={`Assigned sitio for ${admin.email}`}
-            value={sitioChoice}
+            aria-label={`Assigned barangay for ${admin.email}`}
+            value={barangayChoice}
             disabled={Boolean(busy)}
-            onChange={(event) => setSitioChoice(event.target.value)}
+            onChange={(event) => setBarangayChoice(event.target.value)}
           >
-            {admin.assigned_sitio_id === null && (
+            {admin.assigned_barangay_id === null && (
               <option value="">Unassigned</option>
             )}
-            {sitios.map((item) => (
-              <option key={item.sitio_id} value={item.sitio_id}>
-                {item.sitio_name}
+            {barangays.map((item) => (
+              <option key={item.barangay_id} value={item.barangay_id}>
+                {item.barangay_name}
               </option>
             ))}
           </select>
           <button
             type="button"
             className="secondary-button"
-            disabled={!sitioChanged || Boolean(busy)}
+            disabled={!barangayChanged || Boolean(busy)}
             onClick={() =>
               void apply('Saving…', {
-                assigned_sitio_id: Number(sitioChoice),
+                assigned_barangay_id: Number(barangayChoice),
               })
             }
           >
             Assign
           </button>
         </div>
-        <small className="admin-current-sitio">
-          Current: {sitio?.sitio_name ?? 'Unassigned'}
+        <small className="admin-current-barangay">
+          Current: {barangay?.barangay_name ?? 'Unassigned'}
         </small>
       </td>
       <td>
@@ -198,10 +198,10 @@ function AdminAccountRow({
   )
 }
 
-// Admin Account Management: create, assign sitio, suspend / reactivate
+// Admin Account Management: create, assign barangay, suspend / reactivate
 export function SuperAdminAdminAccounts({
   admins,
-  sitios,
+  barangays,
   reload,
 }: AccountsData & { reload: () => Promise<void> }) {
   const [showCreate, setShowCreate] = useState(false)
@@ -213,7 +213,7 @@ export function SuperAdminAdminAccounts({
           <div>
             <h2>Admin Accounts</h2>
             <p>
-              Assign each Admin to one sitio, or suspend and reactivate
+              Assign each Admin to one barangay, or suspend and reactivate
               accounts. Super Admin accounts are not listed and cannot be
               changed here.
             </p>
@@ -230,7 +230,7 @@ export function SuperAdminAdminAccounts({
       </section>
 
       {showCreate && (
-        <CreateAdminForm sitios={sitios} onCreated={() => reload()} />
+        <CreateAdminForm barangays={barangays} onCreated={() => reload()} />
       )}
 
       <section className="super-admin-section">
@@ -241,7 +241,7 @@ export function SuperAdminAdminAccounts({
                 <th>Name</th>
                 <th>User ID</th>
                 <th>Email</th>
-                <th>Assigned Sitio</th>
+                <th>Assigned Barangay</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -250,9 +250,9 @@ export function SuperAdminAdminAccounts({
             <tbody>
               {admins.map((admin) => (
                 <AdminAccountRow
-                  key={`${admin.uid}-${admin.account_status}-${admin.assigned_sitio_id}`}
+                  key={`${admin.uid}-${admin.account_status}-${admin.assigned_barangay_id}`}
                   admin={admin}
-                  sitios={sitios}
+                  barangays={barangays}
                   onChanged={reload}
                 />
               ))}
@@ -270,25 +270,25 @@ export function SuperAdminAdminAccounts({
   )
 }
 
-// Sitio Overview: every sitio, its Admins, and a shortcut to its data
-export function SuperAdminSitioOverview({
+// Barangay Overview: every barangay, its Admins, and a shortcut to its data
+export function SuperAdminBarangayOverview({
   admins,
-  sitios,
-  onOpenSitio,
-}: AccountsData & { onOpenSitio: (sitioId: number) => void }) {
+  barangays,
+  onOpenBarangay,
+}: AccountsData & { onOpenBarangay: (barangayId: number) => void }) {
   return (
     <section className="super-admin-section">
-      <h2>Sitio Overview</h2>
+      <h2>Barangay Overview</h2>
       <p>
-        Every registered sitio and its Admins. Open a sitio to limit the
-        dashboard modules to that sitio.
+        Every registered barangay and its Admins. Open a barangay to limit the
+        dashboard modules to that barangay.
       </p>
 
       <div className="super-admin-table-wrap">
         <table className="super-admin-table">
           <thead>
             <tr>
-              <th>Sitio</th>
+              <th>Barangay</th>
               <th>Active Admins</th>
               <th>Admin email</th>
               <th>Dashboard</th>
@@ -296,44 +296,44 @@ export function SuperAdminSitioOverview({
           </thead>
 
           <tbody>
-            {sitios.map((sitio) => {
-              const sitioAdmins = admins.filter(
+            {barangays.map((barangay) => {
+              const barangayAdmins = admins.filter(
                 (admin) =>
-                  admin.assigned_sitio_id === sitio.sitio_id &&
+                  admin.assigned_barangay_id === barangay.barangay_id &&
                   admin.account_status === 'active',
               )
 
               return (
-                <tr key={sitio.sitio_id}>
-                  <td>{sitio.sitio_name}</td>
+                <tr key={barangay.barangay_id}>
+                  <td>{barangay.barangay_name}</td>
                   <td>
-                    {sitioAdmins.length
-                      ? sitioAdmins
+                    {barangayAdmins.length
+                      ? barangayAdmins
                           .map((admin) => adminDisplayName(admin) || admin.email)
                           .join(', ')
                       : 'None'}
                   </td>
                   <td>
-                    {sitioAdmins.length
-                      ? sitioAdmins.map((admin) => admin.email).join(', ')
+                    {barangayAdmins.length
+                      ? barangayAdmins.map((admin) => admin.email).join(', ')
                       : '—'}
                   </td>
                   <td>
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() => onOpenSitio(sitio.sitio_id)}
+                      onClick={() => onOpenBarangay(barangay.barangay_id)}
                     >
-                      View this sitio
+                      View this barangay
                     </button>
                   </td>
                 </tr>
               )
             })}
 
-            {sitios.length === 0 && (
+            {barangays.length === 0 && (
               <tr>
-                <td colSpan={4}>No Sitios found.</td>
+                <td colSpan={4}>No Barangays found.</td>
               </tr>
             )}
           </tbody>

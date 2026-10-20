@@ -77,7 +77,7 @@ export function FamilyReunificationPage() {
   return <div className="reunite-page">
     <section className="panel">
       <h3>Find a family member</h3>
-      <p className="reunite-muted">Searches every evacuation center and the resident registry across all sitios. Results show only what is needed to reunite people — no contact numbers, addresses or medical details. Every lookup is logged.</p>
+      <p className="reunite-muted">Searches every evacuation center and the resident registry across all barangays. Results show only what is needed to reunite people — no contact numbers, addresses or medical details. Every lookup is logged.</p>
       <form className="reunite-search" onSubmit={e => void runSearch(e)}>
         <label className="reunite-grow"><span>Name</span>
           <input type="search" value={query} maxLength={100} onChange={e => setQuery(e.target.value)} placeholder="e.g. Mercado, or Lorna Mercado" autoFocus /></label>
@@ -97,11 +97,11 @@ export function FamilyReunificationPage() {
         {result.has_more && <span className="reunite-muted">Showing the first 100 — refine the name to narrow results.</span>}</div>
       {!result.people.length && <p>No one matches. Check spelling, try only the surname, or file a report on the Missing Persons page.</p>}
       {result.people.length > 0 && <div className="reunite-table-wrap"><table className="reunite-table">
-        <thead><tr><th>Name</th><th>Sex / age</th><th>Home sitio</th><th>Status</th><th>Current location</th><th>Household</th><th /></tr></thead>
+        <thead><tr><th>Name</th><th>Sex / age</th><th>Home barangay</th><th>Status</th><th>Current location</th><th>Household</th><th /></tr></thead>
         <tbody>{result.people.map(p => <tr key={p.uid} className={selected?.uid === p.uid ? 'selected' : ''}>
           <td><strong>{p.full_name}</strong>{p.open_missing_report && <div><span className="reunite-badge bad">Reported missing</span></div>}</td>
           <td>{[p.sex, p.age !== null ? `${p.age} yrs` : null].filter(Boolean).join(' · ') || '—'}</td>
-          <td>{p.home_sitio ?? '—'}</td>
+          <td>{p.home_barangay ?? '—'}</td>
           <td><StatusBadge status={p.latest_status} /></td>
           <td><Location p={p} />{p.center_id !== null && p.latest_status === 'safely_evacuated' && sheltered(p.center_id) !== undefined &&
             <div className="reunite-muted"><small>{sheltered(p.center_id)} sheltered there</small></div>}</td>
@@ -121,7 +121,7 @@ export function FamilyReunificationPage() {
         <div className="reunite-members">
           {members.map(m => <article key={m.uid} className={m.uid === selected.uid ? 'current' : ''}>
             <div className="reunite-head"><strong>{m.full_name}</strong><StatusBadge status={m.latest_status} /></div>
-            <p className="reunite-muted">{[m.is_head ? 'Household head' : null, m.sex, m.age !== null ? `${m.age} yrs` : null, m.home_sitio].filter(Boolean).join(' · ')}</p>
+            <p className="reunite-muted">{[m.is_head ? 'Household head' : null, m.sex, m.age !== null ? `${m.age} yrs` : null, m.home_barangay].filter(Boolean).join(' · ')}</p>
             <p><Location p={m} /></p>
             {m.open_missing_report && <span className="reunite-badge bad">Reported missing</span>}
           </article>)}

@@ -9,7 +9,7 @@ import { ageAt } from './rdana.ts'
 
 export type MissingReport = {
   report_id: string
-  sitio_id: number
+  barangay_id: number
   event_id: string | null
   resident_uid: string | null
   full_name: string
@@ -27,7 +27,7 @@ export type MissingReport = {
 
 export type DirectoryResident = {
   uid: string
-  sitio_id: number
+  barangay_id: number
   f_name: string | null
   m_name: string | null
   l_name: string | null
@@ -42,8 +42,8 @@ export type DirectoryResident = {
 
 export type ReconciliationData = {
   generated_at: string
-  sitios: { sitio_id: number; sitio_name: string }[]
-  events: { event_id: string; sitio_id: number; name: string; hazard_type: string; status: string; started_at: string }[]
+  barangays: { barangay_id: number; barangay_name: string }[]
+  events: { event_id: string; barangay_id: number; name: string; hazard_type: string; status: string; started_at: string }[]
   reports: MissingReport[]
   residents: DirectoryResident[]
 }
@@ -134,10 +134,10 @@ export function reconcile(data: ReconciliationData, asOf = data.generated_at): R
   const residentsById = new Map(data.residents.map((resident) => [resident.uid, resident]))
   const rescuedDirectory = data.residents.filter(isRescued)
 
-  // Open reports that share a resident link or normalized name in the same sitio.
+  // Open reports that share a resident link or normalized name in the same barangay.
   const openKeys = new Map<string, number>()
   const keyOf = (report: MissingReport) =>
-    report.resident_uid ? `uid:${report.resident_uid}` : `name:${report.sitio_id}:${nameTokens(report.full_name).sort().join(' ')}`
+    report.resident_uid ? `uid:${report.resident_uid}` : `name:${report.barangay_id}:${nameTokens(report.full_name).sort().join(' ')}`
   for (const report of data.reports) {
     if (report.status === 'missing') openKeys.set(keyOf(report), (openKeys.get(keyOf(report)) ?? 0) + 1)
   }
@@ -150,7 +150,7 @@ export function reconcile(data: ReconciliationData, asOf = data.generated_at): R
       discrepancies.push('Linked resident is not in the scoped resident registry (transferred or removed).')
     }
     if (report.status === 'missing' && (openKeys.get(keyOf(report)) ?? 0) > 1) {
-      discrepancies.push('Possible duplicate: another open report has the same resident link or name in this sitio.')
+      discrepancies.push('Possible duplicate: another open report has the same resident link or name in this barangay.')
     }
 
     if (report.status === 'withdrawn') {
@@ -199,7 +199,7 @@ export function reconcile(data: ReconciliationData, asOf = data.generated_at): R
     let conflicting = 0
     let nameOnly = 0
     for (const resident of data.residents) {
-      if (resident.sitio_id !== report.sitio_id || !namesAgree(report.full_name, resident)) continue
+      if (resident.barangay_id !== report.barangay_id || !namesAgree(report.full_name, resident)) continue
       const age = ageAt(resident.birthdate, asOf)
       const residentSex = normalizedSex(resident.sex)
       const sexKnown = reportSex !== null && residentSex !== null
@@ -252,15 +252,15 @@ export function manilaTime(value: string | null | undefined) {
 }
 
 export function reconciliationTables(data: ReconciliationData, result: ReconciliationResult) {
-  const sitioName = new Map(data.sitios.map((sitio) => [sitio.sitio_id, sitio.sitio_name]))
+  const barangayName = new Map(data.barangays.map((barangay) => [barangay.barangay_id, barangay.barangay_name]))
   const eventName = new Map(data.events.map((event) => [event.event_id, `${event.name} (${event.hazard_type})`]))
   const manifest = {
     name: 'Manifest reconciliation',
-    headers: ['Report ID', 'Reported name', 'Sitio', 'Disaster event', 'Reported (Asia/Manila)', 'Last seen', 'Report status', 'Reconciliation outcome', 'Linked / matched resident', 'Resident latest evacuation status', 'Corroborated candidates', 'Evidence', 'Discrepancies'],
+    headers: ['Report ID', 'Reported name', 'Barangay', 'Disaster event', 'Reported (Asia/Manila)', 'Last seen', 'Report status', 'Reconciliation outcome', 'Linked / matched resident', 'Resident latest evacuation status', 'Corroborated candidates', 'Evidence', 'Discrepancies'],
     rows: result.rows.map((row) => [
       row.report.report_id,
       row.report.full_name,
-      sitioName.get(row.report.sitio_id) ?? `Sitio ${row.report.sitio_id}`,
+      barangayName.get(row.report.barangay_id) ?? `Barangay ${row.report.barangay_id}`,
       row.report.event_id ? eventName.get(row.report.event_id) ?? row.report.event_id : 'Not linked',
       manilaTime(row.report.reported_at),
       [row.report.last_seen_location, row.report.last_seen_at ? manilaTime(row.report.last_seen_at) : ''].filter(Boolean).join(' — ') || 'Not recorded',
@@ -275,9 +275,9 @@ export function reconciliationTables(data: ReconciliationData, result: Reconcili
   }
   const directory = {
     name: 'Master rescued directory',
-    headers: ['Resident ID', 'Name', 'Sitio', 'Evacuation center', 'Evacuated at (Asia/Manila)', 'Record logged at (Asia/Manila)'],
+    headers: ['Resident ID', 'Name', 'Barangay', 'Evacuation center', 'Evacuated at (Asia/Manila)', 'Record logged at (Asia/Manila)'],
     rows: result.rescuedDirectory.map((resident) => [
-      resident.uid, residentName(resident), sitioName.get(resident.sitio_id) ?? `Sitio ${resident.sitio_id}`,
+      resident.uid, residentName(resident), barangayName.get(resident.barangay_id) ?? `Barangay ${resident.barangay_id}`,
       resident.center_name ?? 'Not recorded', manilaTime(resident.evacuated_at), manilaTime(resident.latest_logged_at),
     ]),
   }

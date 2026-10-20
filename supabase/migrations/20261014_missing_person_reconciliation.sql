@@ -5,7 +5,7 @@ begin;
 
 create table if not exists public.missing_person_reports (
   report_id uuid primary key default gen_random_uuid(),
-  sitio_id integer not null references public.sitios(sitio_id),
+  barangay_id integer not null references public.barangays(barangay_id),
   event_id uuid references public.disaster_events(event_id),
   resident_uid uuid references public.residents(uid),
   full_name text not null check (length(btrim(full_name)) between 1 and 200),
@@ -32,8 +32,8 @@ create table if not exists public.missing_person_reports (
 -- One open report per registered resident.
 create unique index if not exists missing_person_reports_open_resident
   on public.missing_person_reports(resident_uid) where status = 'missing' and resident_uid is not null;
-create index if not exists missing_person_reports_sitio_status
-  on public.missing_person_reports(sitio_id, status);
+create index if not exists missing_person_reports_barangay_status
+  on public.missing_person_reports(barangay_id, status);
 
 create table if not exists public.missing_person_report_audit (
   audit_id bigint generated always as identity primary key,
@@ -60,27 +60,27 @@ revoke all on function public.latest_evacuation_status(uuid) from public, anon, 
 
 create or replace function public.get_rescue_reconciliation()
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare result jsonb; actor_role text; actor_sitio integer;
+declare result jsonb; actor_role text; actor_barangay integer;
 begin
   perform public.assert_disaster_admin();
-  select role::text, assigned_sitio_id into actor_role, actor_sitio from public.users where uid = auth.uid();
-  if (select count(*) from public.missing_person_reports where actor_role = 'super_admin' or sitio_id = actor_sitio) > 5000 then
+  select role::text, assigned_barangay_id into actor_role, actor_barangay from public.users where uid = auth.uid();
+  if (select count(*) from public.missing_person_reports where actor_role = 'super_admin' or barangay_id = actor_barangay) > 5000 then
     raise exception 'Missing-person manifest exceeds 5,000 reports. Add server pagination before loading it.';
   end if;
-  if (select count(*) from public.residents where actor_role = 'super_admin' or sitio_id = actor_sitio) > 20000 then
+  if (select count(*) from public.residents where actor_role = 'super_admin' or barangay_id = actor_barangay) > 20000 then
     raise exception 'Resident registry exceeds 20,000 records. Add server pagination before reconciling.';
   end if;
   select jsonb_build_object(
     'generated_at', clock_timestamp(),
-    'sitios', (select coalesce(jsonb_agg(jsonb_build_object('sitio_id', s.sitio_id, 'sitio_name', s.sitio_name) order by s.sitio_name), '[]'::jsonb)
-      from public.sitios s where actor_role = 'super_admin' or s.sitio_id = actor_sitio),
-    'events', (select coalesce(jsonb_agg(jsonb_build_object('event_id', e.event_id, 'sitio_id', e.sitio_id, 'name', e.name,
+    'barangays', (select coalesce(jsonb_agg(jsonb_build_object('barangay_id', s.barangay_id, 'barangay_name', s.barangay_name) order by s.barangay_name), '[]'::jsonb)
+      from public.barangays s where actor_role = 'super_admin' or s.barangay_id = actor_barangay),
+    'events', (select coalesce(jsonb_agg(jsonb_build_object('event_id', e.event_id, 'barangay_id', e.barangay_id, 'name', e.name,
         'hazard_type', e.hazard_type, 'status', e.status, 'started_at', e.started_at) order by e.declared_at desc), '[]'::jsonb)
-      from public.disaster_events e where actor_role = 'super_admin' or e.sitio_id = actor_sitio),
+      from public.disaster_events e where actor_role = 'super_admin' or e.barangay_id = actor_barangay),
     'reports', (select coalesce(jsonb_agg(to_jsonb(m) order by m.reported_at desc, m.report_id), '[]'::jsonb)
-      from public.missing_person_reports m where actor_role = 'super_admin' or m.sitio_id = actor_sitio),
+      from public.missing_person_reports m where actor_role = 'super_admin' or m.barangay_id = actor_barangay),
     'residents', (select coalesce(jsonb_agg(jsonb_build_object(
-        'uid', r.uid, 'sitio_id', r.sitio_id,
+        'uid', r.uid, 'barangay_id', r.barangay_id,
         'f_name', u.f_name, 'm_name', u.m_name, 'l_name', u.l_name,
         'sex', r.sex::text, 'birthdate', r.birthdate,
         'latest_status', le.evac_status, 'latest_logged_at', le.logged_at, 'evacuated_at', le.evacuated_at,
@@ -94,7 +94,7 @@ begin
         order by er.logged_at desc nulls last, er.evacuated_at desc nulls last, er.record_id limit 1
       ) le on true
       left join public.evacuation_centers c on c.center_id = le.evac_center_id
-      where actor_role = 'super_admin' or r.sitio_id = actor_sitio)
+      where actor_role = 'super_admin' or r.barangay_id = actor_barangay)
   ) into result;
   return result;
 end;
@@ -103,29 +103,29 @@ revoke all on function public.get_rescue_reconciliation() from public, anon;
 grant execute on function public.get_rescue_reconciliation() to authenticated;
 
 create or replace function public.file_missing_person_report(
-  p_sitio integer, p_event_id uuid, p_resident_uid uuid, p_full_name text,
+  p_barangay integer, p_event_id uuid, p_resident_uid uuid, p_full_name text,
   p_sex text, p_age integer, p_last_seen_location text, p_last_seen_at timestamptz,
   p_reporter_name text, p_reporter_contact text, p_notes text
 )
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare new_report public.missing_person_reports;
 begin
-  perform public.assert_disaster_admin(p_sitio);
-  if p_sitio is null then raise exception 'Select a sitio.'; end if;
+  perform public.assert_disaster_admin(p_barangay);
+  if p_barangay is null then raise exception 'Select a barangay.'; end if;
   if p_event_id is not null and not exists (select 1 from public.disaster_events e
-      where e.event_id = p_event_id and e.sitio_id = p_sitio and e.status = 'active') then
-    raise exception 'The linked disaster event must be an active event in the same sitio.';
+      where e.event_id = p_event_id and e.barangay_id = p_barangay and e.status = 'active') then
+    raise exception 'The linked disaster event must be an active event in the same barangay.';
   end if;
   if p_resident_uid is not null and not exists (select 1 from public.residents r
-      where r.uid = p_resident_uid and r.sitio_id = p_sitio) then
-    raise exception 'The linked resident is not registered in this sitio.';
+      where r.uid = p_resident_uid and r.barangay_id = p_barangay) then
+    raise exception 'The linked resident is not registered in this barangay.';
   end if;
   if p_last_seen_at is not null and (not isfinite(p_last_seen_at) or p_last_seen_at > clock_timestamp()) then
     raise exception 'Last-seen time must be valid and cannot be in the future.';
   end if;
-  insert into public.missing_person_reports(sitio_id, event_id, resident_uid, full_name, sex, approx_age,
+  insert into public.missing_person_reports(barangay_id, event_id, resident_uid, full_name, sex, approx_age,
       last_seen_location, last_seen_at, reporter_name, reporter_contact, notes, reported_by)
-    values (p_sitio, p_event_id, p_resident_uid, btrim(p_full_name), nullif(btrim(coalesce(p_sex, '')), ''), p_age,
+    values (p_barangay, p_event_id, p_resident_uid, btrim(p_full_name), nullif(btrim(coalesce(p_sex, '')), ''), p_age,
       btrim(coalesce(p_last_seen_location, '')), p_last_seen_at, btrim(p_reporter_name),
       btrim(coalesce(p_reporter_contact, '')), btrim(coalesce(p_notes, '')), auth.uid())
     returning * into new_report;
@@ -149,7 +149,7 @@ begin
   perform public.assert_disaster_admin();
   select * into old_report from public.missing_person_reports where report_id = p_report_id for update;
   if not found then raise exception 'Report was not found.'; end if;
-  perform public.assert_disaster_admin(old_report.sitio_id);
+  perform public.assert_disaster_admin(old_report.barangay_id);
   if old_report.status <> 'missing' then raise exception 'Report is already closed. Refresh the manifest.'; end if;
   if length(note) > 1000 then raise exception 'Keep the note under 1,000 characters.'; end if;
   if p_resident_uid is null then
@@ -158,8 +158,8 @@ begin
     if old_report.resident_uid is not null and old_report.resident_uid <> p_resident_uid then
       raise exception 'This report is linked to a different registered resident.';
     end if;
-    if not exists (select 1 from public.residents r where r.uid = p_resident_uid and r.sitio_id = old_report.sitio_id) then
-      raise exception 'The matched resident is not registered in this sitio.';
+    if not exists (select 1 from public.residents r where r.uid = p_resident_uid and r.barangay_id = old_report.barangay_id) then
+      raise exception 'The matched resident is not registered in this barangay.';
     end if;
     if coalesce(public.latest_evacuation_status(p_resident_uid), '') <> 'safely_evacuated' then
       raise exception 'The matched resident is not in the Master Rescued Directory (latest record is not safely evacuated).';
@@ -184,7 +184,7 @@ begin
   perform public.assert_disaster_admin();
   select * into old_report from public.missing_person_reports where report_id = p_report_id for update;
   if not found then raise exception 'Report was not found.'; end if;
-  perform public.assert_disaster_admin(old_report.sitio_id);
+  perform public.assert_disaster_admin(old_report.barangay_id);
   if old_report.status <> 'missing' then raise exception 'Report is already closed. Refresh the manifest.'; end if;
   if p_reason is null or length(btrim(p_reason)) not between 1 and 1000 then
     raise exception 'Enter a withdrawal reason of 1–1,000 characters.';

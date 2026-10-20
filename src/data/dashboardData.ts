@@ -5,8 +5,8 @@ import type { MenuItem, MenuKey } from '../types/dashboard'
 // Hiding a tab is only a convenience: the backend and the database decide
 // what each role may read or change.
 
-// Operational modules shared by Admin (assigned sitio) and Super Admin
-// (all sitios or the sitio chosen in the scope selector).
+// Operational modules shared by Admin (assigned barangay) and Super Admin
+// (all barangays or the barangay chosen in the scope selector).
 const operationalItems: MenuItem[] = [
   { key: 'verification', label: 'Resident Verification' },
   { key: 'geoMap', label: 'Geospatial Map' },
@@ -26,8 +26,9 @@ export const adminMenuItems: MenuItem[] = [
 
 export const superAdminMenuItems: MenuItem[] = [
   { key: 'home', label: 'System Dashboard' },
-  { key: 'sitioOverview', label: 'Sitio Overview' },
+  { key: 'barangayOverview', label: 'Barangay Overview' },
   { key: 'adminAccounts', label: 'Admin Account Management' },
+  { key: 'responderAccounts', label: 'Rescuer Accounts' },
   ...operationalItems.map((item) =>
     item.key === 'reports' ? { ...item, label: 'Reports and Analytics' } : item,
   ),
@@ -46,7 +47,8 @@ export const menuIcons: Record<MenuKey, string> = {
   dispatch: 'ambulance',
   reports: 'file-chart-line',
   dataMining: 'chart-histogram',
-  sitioOverview: 'map-location-track',
+  barangayOverview: 'map-location-track',
   adminAccounts: 'user-gear',
+  responderAccounts: 'id-badge',
   activityLogs: 'list-check',
 }

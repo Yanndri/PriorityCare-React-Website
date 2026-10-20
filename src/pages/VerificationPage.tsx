@@ -125,8 +125,8 @@ function VerificationRequestModal({
         <div className="request-detail-grid">
           <DetailItem label="Resident Name" value={resident.name} />
           <DetailItem label="Status" value={resident.status} />
-          <DetailItem label="Sitio / Area" value={resident.sitio} />
-          <DetailItem label="Submitted Address" value={resident.address ?? resident.sitio} />
+          <DetailItem label="Barangay / Area" value={resident.barangay} />
+          <DetailItem label="Submitted Address" value={resident.address ?? resident.barangay} />
           <DetailItem label="Landmark" value={resident.landmark ?? 'No landmark provided'} />
           <DetailItem label="Mobility" value={resident.mobilityStatus?.replaceAll('_', ' ') || resident.constraint} />
           <DetailItem label="Pregnant" value={resident.isPregnant === undefined ? 'Not recorded' : resident.isPregnant ? 'Yes' : 'No'} />
@@ -297,7 +297,7 @@ function DocumentPreview({ document }: DocumentPreviewProps) {
 }
 
 function isImageUrl(url: string) {
-  const lowerUrl = url.toLowerCase()
+  const lowerUrl = url.toLowerCase().split('?')[0]
 
   return (
     lowerUrl.endsWith('.png') ||

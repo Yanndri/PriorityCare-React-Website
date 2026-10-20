@@ -66,7 +66,7 @@ export function DromicExportPanel() {
     </fieldset>
     {busy&&<p role="status">{busy}</p>}{error&&<p role="alert" className="dashboard-error">{error}</p>}{notice&&<p role="status">{notice}</p>}
     {report&&<>
-      <p><strong>Population scope:</strong> {report.scope}. <strong>Shared shelter scope:</strong> all sitios. Retrieved {new Date(report.generatedAt).toLocaleString('en-PH',{timeZone:'Asia/Manila'})} (Asia/Manila).</p>
+      <p><strong>Population scope:</strong> {report.scope}. <strong>Shared shelter scope:</strong> all barangays. Retrieved {new Date(report.generatedAt).toLocaleString('en-PH',{timeZone:'Asia/Manila'})} (Asia/Manila).</p>
       {report.relief&&<p><strong>Attached relief planning date:</strong> {report.relief.date}; {report.relief.rows.length} selected facilities. These are requisition estimates, not distributions.</p>}
       {report.tables.map((table)=><details className="relief-facility" key={table.name}><summary>{table.name} preview</summary><p>{table.scope}</p><div className="relief-table-wrap"><table className="relief-table"><thead><tr>{table.headers.map((header)=><th key={header}>{header}</th>)}</tr></thead><tbody>{table.rows.map((row,index)=><tr key={index}>{row.map((cell,col)=><td key={col}>{cell}</td>)}</tr>)}</tbody></table></div></details>)}
       <label className="resident-check"><input disabled={Boolean(busy)} type="checkbox" checked={reviewed} onChange={(e)=>setReviewed(e.target.checked)}/><span>I reviewed the scope, planning date, figures, and missing assessments. This is a prototype draft.</span></label>

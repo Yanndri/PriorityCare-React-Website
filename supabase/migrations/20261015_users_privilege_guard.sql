@@ -22,10 +22,10 @@
 --
 -- Effect:
 --   anon / authenticated (browser, mobile app):
---     - INSERT: allowed only for non-admin roles with no assigned sitio
+--     - INSERT: allowed only for non-admin roles with no assigned barangay
 --       and account_status 'active' (resident/rescuer sign-up still works).
 --     - UPDATE: may not change uid, role, account_status, or
---       assigned_sitio_id on any row; may not change an admin's or super
+--       assigned_barangay_id on any row; may not change an admin's or super
 --       admin's email. is_verified and profile fields still work.
 --     - DELETE: may not delete admin or super_admin rows.
 --     - TRUNCATE: revoked (TRUNCATE bypasses row triggers).
@@ -36,7 +36,7 @@
 -- Rollback:
 --   drop trigger if exists users_privilege_guard on public.users;
 --   drop function if exists public.guard_users_privileged_columns();
---   grant truncate on public.users, public.sitios to anon, authenticated;
+--   grant truncate on public.users, public.barangays to anon, authenticated;
 
 create or replace function public.guard_users_privileged_columns()
 returns trigger
@@ -51,7 +51,7 @@ begin
 
   if tg_op = 'INSERT' then
     if new.role::text in ('admin', 'super_admin')
-       or new.assigned_sitio_id is not null
+       or new.assigned_barangay_id is not null
        or new.account_status is distinct from 'active' then
       raise exception 'Administrator accounts can only be created by the PriorityCare backend.'
         using errcode = '42501';
@@ -63,8 +63,8 @@ begin
     if new.uid is distinct from old.uid
        or new.role is distinct from old.role
        or new.account_status is distinct from old.account_status
-       or new.assigned_sitio_id is distinct from old.assigned_sitio_id then
-      raise exception 'Role, account status, and sitio assignment can only be changed by the PriorityCare backend.'
+       or new.assigned_barangay_id is distinct from old.assigned_barangay_id then
+      raise exception 'Role, account status, and barangay assignment can only be changed by the PriorityCare backend.'
         using errcode = '42501';
     end if;
 
@@ -93,4 +93,4 @@ create trigger users_privilege_guard
   for each row execute function public.guard_users_privileged_columns();
 
 revoke truncate on table public.users from anon, authenticated;
-revoke truncate on table public.sitios from anon, authenticated;
+revoke truncate on table public.barangays from anon, authenticated;

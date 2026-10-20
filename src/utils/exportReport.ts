@@ -13,7 +13,7 @@ type ExportReportArgs = {
   alerts: Alert[]
   evacuationCenters: EvacuationCenter[]
   evacuationHistory?: EvacuationHistoryRecord[]
-  // Which data the report covers (a sitio name, or "All sitios").
+  // Which data the report covers (a barangay name, or "All barangays").
   scopeLabel?: string
   // Who generated it, e.g. "Ana Alpha (Admin)".
   generatedBy?: string
@@ -69,10 +69,10 @@ function buildSummarySection(stats: StatCardData[]) {
 function buildResidentsSection(residents: Resident[]) {
   const rows = [
     ['Residents'],
-    ['Name', 'Sitio', 'Constraint', 'Status', 'Flood Zone', 'Last Updated'],
+    ['Name', 'Barangay', 'Constraint', 'Status', 'Flood Zone', 'Last Updated'],
     ...residents.map((resident) => [
       resident.name,
-      resident.sitio,
+      resident.barangay,
       resident.constraint,
       resident.status,
       resident.floodZone ? 'Yes' : 'No',
@@ -116,7 +116,7 @@ function buildEvacuationHistorySection(evacuationHistory: EvacuationHistoryRecor
     ['Evacuation History / Data Mining'],
     [
       'Resident',
-      'Sitio',
+      'Barangay',
       'Constraint',
       'Status',
       'Evacuation Center',
@@ -128,7 +128,7 @@ function buildEvacuationHistorySection(evacuationHistory: EvacuationHistoryRecor
     ],
     ...evacuationHistory.map((record) => [
       record.residentName,
-      record.sitio,
+      record.barangay,
       record.constraint,
       record.status,
       record.evacuationCenter,

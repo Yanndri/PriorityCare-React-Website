@@ -10,24 +10,24 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer,f_name text,m_name text,l_name text);
-    create table public.residents(uid uuid primary key references public.users(uid),sitio_id integer,sex text,birthdate date);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer,f_name text,m_name text,l_name text);
+    create table public.residents(uid uuid primary key references public.users(uid),barangay_id integer,sex text,birthdate date);
     create table public.evacuation_centers(center_id integer primary key,center_name text,status text);
     create table public.evacuation_records(record_id uuid primary key,resident_uid uuid references public.residents(uid),
       rescuer_uid uuid,evac_center_id integer,evac_status text,evacuated_at timestamptz,logged_at timestamptz);
-    create table public.households(household_id uuid primary key,household_name text,sitio_id integer,head_uid uuid unique,household_members jsonb);
+    create table public.households(household_id uuid primary key,household_name text,barangay_id integer,head_uid uuid unique,household_members jsonb);
     create table public.resident_profile_details(resident_uid uuid primary key,household_id uuid);
-    insert into public.sitios values(1,'Sitio One'),(2,'Sitio Two');
+    insert into public.barangays values(1,'Barangay One'),(2,'Barangay Two');
     insert into public.evacuation_centers values(10,'Central School','active'),(11,'Covered Court','active');
     grant usage on schema public,auth to authenticated,anon;`)
-  for (const [n, role, status, sitio, f, l] of [
+  for (const [n, role, status, barangay, f, l] of [
     [1,'admin','active',1,'Ana','Admin'],[2,'admin','active',2,'Ben','Admin'],[4,'admin','suspended',1,'Sus','P'],
-    [5,'super_admin','active',null,'Sue','Per'],[6,'admin','active',null,'No','Sitio'],
+    [5,'super_admin','active',null,'Sue','Per'],[6,'admin','active',null,'No','Barangay'],
     [20,'resident','active',null,'Jose','Mercado'],[21,'resident','active',null,'Lorna','Mercado'],
     [22,'resident','active',null,'Pedro','Mercado'],[30,'resident','active',null,'Liza','Gomez'],[31,'resident','active',null,'José','Santos']]) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, sitio, f, l])
+    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, barangay, f, l])
   }
   await db.exec(`insert into public.residents values
       ('${uid(20)}',1,'male','1958-03-12'),('${uid(21)}',1,'female','1961-07-02'),('${uid(22)}',1,'male','2010-01-01'),
@@ -54,7 +54,7 @@ try {
   const search = async (q, center = null) => (await db.query('select public.search_evacuees($1,$2) as d', [q, center])).rows[0].d
   const household = async id => (await db.query('select public.get_evacuee_household($1) as d', [id])).rows[0].d
 
-  // Sitio 2 admin can find sitio 1 evacuees: reunification is cross-sitio.
+  // Barangay 2 admin can find barangay 1 evacuees: reunification is cross-barangay.
   await actor(2)
   const r = await search('mercado')
   assert.deepEqual(r.people.map(p => p.full_name), ['Jose Mercado', 'Lorna Mercado', 'Pedro Mercado'])
@@ -65,7 +65,7 @@ try {
   assert.equal(byName['Pedro Mercado'].center_name, null)
   assert.equal(byName['Jose Mercado'].household_name, 'Mercado Household')
   assert.equal(byName['Lorna Mercado'].household_id, uid(800))
-  assert.equal(byName['Jose Mercado'].home_sitio, 'Sitio One')
+  assert.equal(byName['Jose Mercado'].home_barangay, 'Barangay One')
   assert.equal(typeof byName['Jose Mercado'].age, 'number')
   assert.ok(!('contact_no' in byName['Jose Mercado']))
   assert.equal(r.has_more, false)

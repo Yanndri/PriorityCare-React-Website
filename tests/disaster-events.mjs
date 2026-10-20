@@ -7,13 +7,13 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer);
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    insert into public.sitios values(1,'Sitio One'),(2,'Sitio Two');
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    insert into public.barangays values(1,'Barangay One'),(2,'Barangay Two');
     grant usage on schema public,auth to authenticated,anon;`)
-  for (const [n, role, status, sitio] of [[1,'admin','active',1],[2,'admin','active',2],[3,'resident','active',1],[4,'admin','suspended',1],[5,'super_admin','active',null],[6,'admin','active',null]]) {
+  for (const [n, role, status, barangay] of [[1,'admin','active',1],[2,'admin','active',2],[3,'resident','active',1],[4,'admin','suspended',1],[5,'super_admin','active',null],[6,'admin','active',null]]) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4)', [uid(n),role,status,sitio])
+    await db.query('insert into public.users values($1,$2,$3,$4)', [uid(n),role,status,barangay])
   }
   const migration = await readFile(new URL('../supabase/migrations/20261014_disaster_events.sql', import.meta.url), 'utf8')
   await db.exec(migration); await db.exec(migration)
@@ -23,7 +23,7 @@ try {
     await db.exec(`set role ${role}`)
   }
   const declare = (overrides={}) => {
-    const p = {sitio:1,name:'Riverside flood',hazard:'flood',location:'Riverside',onset:'2020-01-01T00:00:00Z',notes:'Test',lat:10.3,lng:123.9,...overrides}
+    const p = {barangay:1,name:'Riverside flood',hazard:'flood',location:'Riverside',onset:'2020-01-01T00:00:00Z',notes:'Test',lat:10.3,lng:123.9,...overrides}
     return db.query('select public.declare_disaster_event($1,$2,$3,$4,$5,$6,$7,$8) as id', Object.values(p))
   }
   const catalog = async () => (await db.query('select public.get_disaster_event_register() as data')).rows[0].data
@@ -31,9 +31,9 @@ try {
   await actor(1)
   const id = (await declare()).rows[0].id
   assert.equal((await catalog()).events[0].event_id, id)
-  assert.equal((await catalog()).sitios.length, 1)
+  assert.equal((await catalog()).barangays.length, 1)
   await assert.rejects(declare({name:' RIVERSIDE FLOOD '}), /already exists/)
-  for (const overrides of [{sitio:2},{sitio:null},{hazard:'typhoon'},{onset:'2999-01-01T00:00:00Z'},{onset:'infinity'},{lat:null,lng:123},{lat:100},{name:' '},{location:''},{notes:'x'.repeat(2001)}]) {
+  for (const overrides of [{barangay:2},{barangay:null},{hazard:'typhoon'},{onset:'2999-01-01T00:00:00Z'},{onset:'infinity'},{lat:null,lng:123},{lat:100},{name:' '},{location:''},{notes:'x'.repeat(2001)}]) {
     await assert.rejects(declare(overrides))
   }
   for (const hazard of ['fire','earthquake','landslide']) await declare({hazard,lat:null,lng:null})
@@ -50,8 +50,8 @@ try {
   await actor(null,'anon'); await assert.rejects(catalog(), /permission denied/)
   await assert.rejects(declare(), /permission denied/)
   await actor(5)
-  assert.equal((await catalog()).sitios.length, 2)
-  await declare({sitio:2})
+  assert.equal((await catalog()).barangays.length, 2)
+  await declare({barangay:2})
   assert.equal((await catalog()).events.length, 5)
   await assert.rejects(resolve(id,' '), /resolution reason/)
   await resolve(id)

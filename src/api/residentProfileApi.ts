@@ -1,12 +1,17 @@
 import { supabase } from '../lib/supabaseClient'
 
+export type MemberMobility = 'ambulatory' | 'assisted' | 'wheelchair' | 'bedridden'
 export type HouseholdMember = {
+  member_id?: string
   name: string
   relationship: string
   birthdate: string
   sex: '' | 'male' | 'female'
   is_pregnant: boolean
   needs: string
+  mobility?: MemberMobility
+  age_group?: '' | 'infant' | 'child' | 'adult' | 'senior'
+  disability_ids?: number[]
 }
 export type ResidentProfileInput = {
   revision: string | null
@@ -34,7 +39,7 @@ export type ResidentProfileInput = {
 export type ResidentProfileDetails = {
   profile: ResidentProfileInput
   disability_types: { disability_id: number; disability_name: string }[]
-  sitio_name: string
+  barangay_name: string
   households: { household_id: string; household_name: string; head_name: string }[]
   registered_members: { uid: string; name: string; is_head: boolean }[]
 }

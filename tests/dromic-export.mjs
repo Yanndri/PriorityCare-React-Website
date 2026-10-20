@@ -12,7 +12,7 @@ if(!out)throw new Error('Pass a temporary QA output directory.')
 await fs.mkdir(out,{recursive:true})
 const ok=(data)=>({available:true,data})
 const data={
-  window:{hours:24,start:'2026-10-13T04:00:00Z',end:'2026-10-14T04:00:00Z'},scope:'Sitio Niño',fetchedAt:'2026-10-14T04:00:05Z',
+  window:{hours:24,start:'2026-10-13T04:00:00Z',end:'2026-10-14T04:00:00Z'},scope:'Barangay Niño',fetchedAt:'2026-10-14T04:00:05Z',
   residents:[{uid:'a',birthdate:'1966-10-14',sex:'male',mobility_status:'non_ambulatory'},
     {uid:'b',birthdate:'2026-01-01',sex:'female',mobility_status:'ambulatory'}],
   profiles:ok([{resident_uid:'a',household_id:'family',is_pregnant:false,vulnerability_needs:'Wheelchair'},

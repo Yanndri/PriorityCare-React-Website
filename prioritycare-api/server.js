@@ -209,10 +209,10 @@ app.get("/api/test-db", requireSuperAdmin, async (req, res) => {
 
 // ============================================
 // LEGACY MYSQL ROUTES
-// These return residents from EVERY sitio (with contact details), so they
+// These return residents from EVERY barangay (with contact details), so they
 // must never be public. The website does not call them (it reads Supabase
 // directly), so they are limited to an active Super Admin. Admins use the
-// sitio-scoped Supabase queries instead.
+// barangay-scoped Supabase queries instead.
 // ============================================
 
 // ============================================
@@ -238,10 +238,10 @@ app.get("/api/residents", requireSuperAdmin, async (req, res) => {
         residents.GPS_Lat,
         residents.GPS_Long,
         residents.last_heartbeat,
-        sitios.sitio_name
+        barangays.barangay_name
       FROM residents
       INNER JOIN users ON residents.uid = users.uid
-      INNER JOIN sitios ON residents.sitio_id = sitios.sitio_id
+      INNER JOIN barangays ON residents.barangay_id = barangays.barangay_id
       ORDER BY residents.uid DESC
     `);
 
@@ -271,10 +271,10 @@ app.get("/api/map/residents", requireSuperAdmin, async (req, res) => {
         residents.mobility_status,
         residents.GPS_Lat,
         residents.GPS_Long,
-        sitios.sitio_name
+        barangays.barangay_name
       FROM residents
       INNER JOIN users ON residents.uid = users.uid
-      INNER JOIN sitios ON residents.sitio_id = sitios.sitio_id
+      INNER JOIN barangays ON residents.barangay_id = barangays.barangay_id
       WHERE users.is_verified = 1
         AND residents.GPS_Lat IS NOT NULL
         AND residents.GPS_Long IS NOT NULL
@@ -341,19 +341,19 @@ app.get(
   requireSuperAdmin,
   async (req, res) => {
     try {
-      const [adminResult, sitioResult] = await Promise.all([
+      const [adminResult, barangayResult] = await Promise.all([
         supabaseAdmin
           .from("users")
           .select(
-            "uid, email, f_name, l_name, account_status, assigned_sitio_id"
+            "uid, email, f_name, l_name, account_status, assigned_barangay_id"
           )
           .eq("role", "admin")
           .order("email"),
 
         supabaseAdmin
-          .from("sitios")
-          .select("sitio_id, sitio_name")
-          .order("sitio_name"),
+          .from("barangays")
+          .select("barangay_id, barangay_name")
+          .order("barangay_name"),
       ]);
 
       if (adminResult.error) {
@@ -367,20 +367,20 @@ app.get(
         });
       }
 
-      if (sitioResult.error) {
+      if (barangayResult.error) {
         console.error(
-          "Failed to load sitios:",
-          sitioResult.error.message
+          "Failed to load barangays:",
+          barangayResult.error.message
         );
 
         return res.status(500).json({
-          message: "Unable to load sitios.",
+          message: "Unable to load barangays.",
         });
       }
 
       return res.json({
         admins: adminResult.data || [],
-        sitios: sitioResult.data || [],
+        barangays: barangayResult.data || [],
       });
     } catch (error) {
       console.error(
@@ -414,7 +414,7 @@ app.post(
         m_name,
         l_name,
         contact_no,
-        assigned_sitio_id,
+        assigned_barangay_id,
         uid,
       } = req.body || {};
 
@@ -430,13 +430,13 @@ app.post(
         !f_name.trim() ||
         !l_name.trim() ||
         !contact_no.trim() ||
-        assigned_sitio_id === undefined ||
-        assigned_sitio_id === null ||
-        assigned_sitio_id === ""
+        assigned_barangay_id === undefined ||
+        assigned_barangay_id === null ||
+        assigned_barangay_id === ""
       ) {
         return res.status(400).json({
           message:
-            "Email, password, first name, last name, contact number, and sitio are required.",
+            "Email, password, first name, last name, contact number, and barangay are required.",
         });
       }
 
@@ -492,23 +492,23 @@ app.post(
       }
 
       if (
-        typeof assigned_sitio_id !== "number" &&
-        typeof assigned_sitio_id !== "string"
+        typeof assigned_barangay_id !== "number" &&
+        typeof assigned_barangay_id !== "string"
       ) {
         return res.status(400).json({
-          message: "Invalid sitio selection.",
+          message: "Invalid barangay selection.",
         });
       }
 
-      const sitioId = Number(assigned_sitio_id);
+      const barangayId = Number(assigned_barangay_id);
       const normalizedEmail = email.trim().toLowerCase();
 
       if (
-        !Number.isSafeInteger(sitioId) ||
-        sitioId <= 0
+        !Number.isSafeInteger(barangayId) ||
+        barangayId <= 0
       ) {
         return res.status(400).json({
-          message: "Please select a valid sitio.",
+          message: "Please select a valid barangay.",
         });
       }
 
@@ -559,28 +559,28 @@ app.post(
         }
       }
 
-      // Confirm the selected sitio exists.
-      const { data: sitio, error: sitioError } =
+      // Confirm the selected barangay exists.
+      const { data: barangay, error: barangayError } =
         await supabaseAdmin
-          .from("sitios")
-          .select("sitio_id")
-          .eq("sitio_id", sitioId)
+          .from("barangays")
+          .select("barangay_id")
+          .eq("barangay_id", barangayId)
           .maybeSingle();
 
-      if (sitioError) {
+      if (barangayError) {
         console.error(
-          "Sitio lookup failed:",
-          sitioError.message
+          "Barangay lookup failed:",
+          barangayError.message
         );
 
         return res.status(500).json({
-          message: "Unable to verify the selected sitio.",
+          message: "Unable to verify the selected barangay.",
         });
       }
 
-      if (!sitio) {
+      if (!barangay) {
         return res.status(400).json({
-          message: "The selected sitio does not exist.",
+          message: "The selected barangay does not exist.",
         });
       }
 
@@ -684,12 +684,12 @@ app.post(
                 : null,
             l_name: l_name.trim(),
             contact_no: contact_no.trim(),
-            assigned_sitio_id: sitioId,
+            assigned_barangay_id: barangayId,
             account_status: "active",
             is_verified: false,
           })
           .select(
-            "uid, email, f_name, l_name, account_status, assigned_sitio_id"
+            "uid, email, f_name, l_name, account_status, assigned_barangay_id"
           )
           .single();
 
@@ -767,7 +767,7 @@ app.post(
 
 // ============================================
 // MANAGE ADMIN ACCOUNT — SUPER ADMIN ONLY
-// Suspend, reactivate, or reassign the sitio of an existing Admin.
+// Suspend, reactivate, or reassign the barangay of an existing Admin.
 // Super Admin accounts cannot be changed through this endpoint.
 // ============================================
 
@@ -803,13 +803,13 @@ app.patch(
         });
       }
 
-      const allowed = ["account_status", "assigned_sitio_id"];
+      const allowed = ["account_status", "assigned_barangay_id"];
       const keys = Object.keys(body);
 
       if (!keys.length || keys.some((key) => !allowed.includes(key))) {
         return res.status(400).json({
           message:
-            "Send account_status and/or assigned_sitio_id only.",
+            "Send account_status and/or assigned_barangay_id only.",
         });
       }
 
@@ -825,48 +825,48 @@ app.patch(
         changes.account_status = body.account_status;
       }
 
-      if (body.assigned_sitio_id !== undefined) {
-        const sitioId = Number(body.assigned_sitio_id);
+      if (body.assigned_barangay_id !== undefined) {
+        const barangayId = Number(body.assigned_barangay_id);
 
         if (
-          (typeof body.assigned_sitio_id !== "number" &&
-            typeof body.assigned_sitio_id !== "string") ||
-          !Number.isSafeInteger(sitioId) ||
-          sitioId <= 0
+          (typeof body.assigned_barangay_id !== "number" &&
+            typeof body.assigned_barangay_id !== "string") ||
+          !Number.isSafeInteger(barangayId) ||
+          barangayId <= 0
         ) {
           return res.status(400).json({
-            message: "Please select a valid sitio.",
+            message: "Please select a valid barangay.",
           });
         }
 
-        const { data: sitio, error: sitioError } =
+        const { data: barangay, error: barangayError } =
           await supabaseAdmin
-            .from("sitios")
-            .select("sitio_id")
-            .eq("sitio_id", sitioId)
+            .from("barangays")
+            .select("barangay_id")
+            .eq("barangay_id", barangayId)
             .maybeSingle();
 
-        if (sitioError) {
-          console.error("Sitio lookup failed:", sitioError.message);
+        if (barangayError) {
+          console.error("Barangay lookup failed:", barangayError.message);
 
           return res.status(500).json({
-            message: "Unable to verify the selected sitio.",
+            message: "Unable to verify the selected barangay.",
           });
         }
 
-        if (!sitio) {
+        if (!barangay) {
           return res.status(400).json({
-            message: "The selected sitio does not exist.",
+            message: "The selected barangay does not exist.",
           });
         }
 
-        changes.assigned_sitio_id = sitioId;
+        changes.assigned_barangay_id = barangayId;
       }
 
       const { data: target, error: targetError } =
         await supabaseAdmin
           .from("users")
-          .select("uid, role, account_status, assigned_sitio_id")
+          .select("uid, role, account_status, assigned_barangay_id")
           .eq("uid", uid)
           .maybeSingle();
 
@@ -891,7 +891,7 @@ app.patch(
           .eq("uid", uid)
           .eq("role", "admin")
           .select(
-            "uid, email, f_name, l_name, account_status, assigned_sitio_id"
+            "uid, email, f_name, l_name, account_status, assigned_barangay_id"
           )
           .single();
 
@@ -929,7 +929,7 @@ app.patch(
             .from("users")
             .update({
               account_status: target.account_status,
-              assigned_sitio_id: target.assigned_sitio_id,
+              assigned_barangay_id: target.assigned_barangay_id,
             })
             .eq("uid", uid);
 
@@ -962,6 +962,425 @@ app.patch(
       return res.status(500).json({
         message: "Unable to update the Admin account.",
       });
+    }
+  }
+);
+
+// ============================================
+// RESPONDER (RESCUER) ACCOUNTS — SUPER ADMIN ONLY
+// ============================================
+// RA 10121 Sec. 13 and NDRRMC MC No. 64 s. 2021 (amended by MC No. 02
+// s. 2024): community disaster volunteers are accredited and issued IDs at
+// the municipal/city level through the LDRRMO. There is no rescuer
+// self-signup; the municipal admin creates the account together with the
+// volunteer's accreditation record.
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIsoDate(value) {
+  if (typeof value !== "string" || !ISO_DATE_PATTERN.test(value)) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value
+    ? null
+    : value;
+}
+
+// Optional roster details (NDRRMP 2020-2030 Outcome 13: trained, protected volunteers).
+function normalizeRosterDetails({ trainings, insurance_ref }) {
+  const list = trainings === undefined || trainings === null ? [] : trainings;
+
+  if (
+    !Array.isArray(list) ||
+    list.length > 20 ||
+    list.some((item) => typeof item !== "string" || !item.trim() || item.trim().length > 100)
+  ) {
+    return { error: "List up to 20 trainings, each at most 100 characters." };
+  }
+
+  if (
+    insurance_ref !== undefined &&
+    insurance_ref !== null &&
+    (typeof insurance_ref !== "string" || insurance_ref.trim().length > 100)
+  ) {
+    return { error: "Insurance reference must be at most 100 characters." };
+  }
+
+  return {
+    trainings: [...new Set(list.map((item) => item.trim()))],
+    insurance_ref:
+      typeof insurance_ref === "string" && insurance_ref.trim() ? insurance_ref.trim() : null,
+  };
+}
+
+function validateAccreditation({ accreditation_no, organization, accredited_on, valid_until }) {
+  if (
+    typeof accreditation_no !== "string" ||
+    accreditation_no.trim().length < 3 ||
+    accreditation_no.trim().length > 50
+  ) {
+    return "Accreditation number must be 3 to 50 characters.";
+  }
+
+  if (
+    typeof organization !== "string" ||
+    organization.trim().length < 2 ||
+    organization.trim().length > 150
+  ) {
+    return "Enter the organization that fields this responder (2 to 150 characters).";
+  }
+
+  const from = parseIsoDate(accredited_on);
+  const until = parseIsoDate(valid_until);
+
+  if (!from || !until) {
+    return "Accreditation dates must be valid dates (YYYY-MM-DD).";
+  }
+
+  if (until <= from) {
+    return "The accreditation must expire after the date it was issued.";
+  }
+
+  return null;
+}
+
+app.post(
+  "/api/super-admin/rescuers",
+  requireSuperAdmin,
+  async (req, res) => {
+    let createdUserId = null;
+
+    try {
+      const {
+        email,
+        password,
+        f_name,
+        m_name,
+        l_name,
+        contact_no,
+        assigned_barangay_id,
+        accreditation_no,
+        organization,
+        accredited_on,
+        valid_until,
+        trainings,
+        insurance_ref,
+      } = req.body || {};
+
+      if (
+        typeof email !== "string" ||
+        typeof password !== "string" ||
+        typeof f_name !== "string" ||
+        typeof l_name !== "string" ||
+        typeof contact_no !== "string" ||
+        !email.trim() ||
+        !f_name.trim() ||
+        !l_name.trim() ||
+        !contact_no.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            "Email, password, first name, last name, contact number, and barangay are required.",
+        });
+      }
+
+      if (password.length < 8 || Buffer.byteLength(password, "utf8") > 72) {
+        return res.status(400).json({
+          message: "Password must be 8 to 72 characters long.",
+        });
+      }
+
+      if (m_name !== undefined && m_name !== null && typeof m_name !== "string") {
+        return res.status(400).json({ message: "Middle name must be text." });
+      }
+
+      if (
+        email.trim().length > 100 ||
+        f_name.trim().length > 100 ||
+        l_name.trim().length > 100 ||
+        (typeof m_name === "string" && m_name.trim().length > 100) ||
+        contact_no.trim().length > 50
+      ) {
+        return res.status(400).json({
+          message:
+            "Email and names must be at most 100 characters; contact number at most 50.",
+        });
+      }
+
+      const contactDigits = contact_no.replace(/\D/g, "");
+
+      if (
+        !/^\+?[0-9][0-9\s-]*$/.test(contact_no.trim()) ||
+        contactDigits.length < 7 ||
+        contactDigits.length > 15
+      ) {
+        return res.status(400).json({
+          message:
+            "Contact number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).",
+        });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return res.status(400).json({
+          message: "Please enter a valid email address.",
+        });
+      }
+
+      const barangayId = Number(assigned_barangay_id);
+
+      if (!Number.isSafeInteger(barangayId) || barangayId <= 0) {
+        return res.status(400).json({
+          message: "Please select the responder's barangay.",
+        });
+      }
+
+      const accreditationError = validateAccreditation({
+        accreditation_no,
+        organization,
+        accredited_on,
+        valid_until,
+      });
+
+      if (accreditationError) {
+        return res.status(400).json({ message: accreditationError });
+      }
+
+      const roster = normalizeRosterDetails({ trainings, insurance_ref });
+
+      if (roster.error) {
+        return res.status(400).json({ message: roster.error });
+      }
+
+      const { data: barangay, error: barangayError } = await supabaseAdmin
+        .from("barangays")
+        .select("barangay_id")
+        .eq("barangay_id", barangayId)
+        .maybeSingle();
+
+      if (barangayError) {
+        console.error("Barangay lookup failed:", barangayError.message);
+        return res.status(500).json({
+          message: "Unable to verify the selected barangay.",
+        });
+      }
+
+      if (!barangay) {
+        return res.status(400).json({
+          message: "The selected barangay does not exist.",
+        });
+      }
+
+      const { data: authResult, error: authError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: normalizedEmail,
+          password,
+          email_confirm: true,
+        });
+
+      if (authError || !authResult.user) {
+        console.error("Rescuer Auth creation failed:", authError?.message);
+
+        if (authError?.code === "email_exists") {
+          return res.status(409).json({
+            message: "An account with this email already exists.",
+          });
+        }
+
+        return res.status(400).json({
+          message: authError?.message || "Unable to create the Auth account.",
+        });
+      }
+
+      createdUserId = authResult.user.id;
+
+      const { error: profileError } = await supabaseAdmin.from("users").insert({
+        uid: createdUserId,
+        role: "rescuer",
+        email: normalizedEmail,
+        f_name: f_name.trim(),
+        m_name: typeof m_name === "string" && m_name.trim() ? m_name.trim() : null,
+        l_name: l_name.trim(),
+        contact_no: contact_no.trim(),
+        assigned_barangay_id: barangayId,
+        account_status: "active",
+        is_verified: true,
+      });
+
+      if (profileError) {
+        console.error("Rescuer profile creation failed:", profileError.message);
+        await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+        createdUserId = null;
+
+        return res.status(profileError.code === "23505" ? 409 : 500).json({
+          message:
+            profileError.code === "23505"
+              ? "An account with this email or contact number already exists."
+              : "The responder profile could not be created.",
+        });
+      }
+
+      const { error: accreditationInsertError } = await supabaseAdmin
+        .from("responder_accreditations")
+        .insert({
+          uid: createdUserId,
+          accreditation_no: accreditation_no.trim(),
+          organization: organization.trim(),
+          accredited_on,
+          valid_until,
+          trainings: roster.trainings,
+          insurance_ref: roster.insurance_ref,
+          updated_by: req.superAdmin.id,
+        });
+
+      if (accreditationInsertError) {
+        console.error(
+          "Accreditation record failed:",
+          accreditationInsertError.message
+        );
+        // Deleting the Auth user cascades to public.users.
+        await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+        createdUserId = null;
+
+        return res.status(accreditationInsertError.code === "23505" ? 409 : 500).json({
+          message:
+            accreditationInsertError.code === "23505"
+              ? "This accreditation number is already registered to another responder."
+              : accreditationInsertError.code === "42P01"
+                ? "Responder accreditation needs the 20261019_11_responder_accreditation.sql database migration."
+                : "The accreditation record could not be saved.",
+        });
+      }
+
+      return res.status(201).json({
+        message: "Responder account created.",
+        rescuer: { uid: createdUserId, email: normalizedEmail },
+      });
+    } catch (error) {
+      console.error("Create Rescuer endpoint failed:", error.message);
+
+      if (createdUserId) {
+        await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+      }
+
+      return res.status(500).json({
+        message: "Unable to create the responder account.",
+      });
+    }
+  }
+);
+
+// Suspend / reactivate a responder, or renew their accreditation.
+app.patch(
+  "/api/super-admin/rescuers/:uid",
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const uid = String(req.params.uid || "").trim().toLowerCase();
+      const {
+        account_status,
+        organization,
+        accredited_on,
+        valid_until,
+        accreditation_no,
+        trainings,
+        insurance_ref,
+      } = req.body || {};
+
+      if (!UUID_PATTERN.test(uid)) {
+        return res.status(400).json({ message: "Invalid responder account ID." });
+      }
+
+      const { data: target, error: targetError } = await supabaseAdmin
+        .from("users")
+        .select("uid, role")
+        .eq("uid", uid)
+        .maybeSingle();
+
+      if (targetError) {
+        console.error("Rescuer lookup failed:", targetError.message);
+        return res.status(500).json({ message: "Unable to find the responder." });
+      }
+
+      if (!target || target.role !== "rescuer") {
+        return res.status(404).json({ message: "Responder account not found." });
+      }
+
+      if (account_status !== undefined) {
+        if (account_status !== "active" && account_status !== "suspended") {
+          return res.status(400).json({ message: "Invalid account status." });
+        }
+
+        const { error } = await supabaseAdmin
+          .from("users")
+          .update({ account_status })
+          .eq("uid", uid);
+
+        if (error) {
+          console.error("Rescuer status update failed:", error.message);
+          return res.status(500).json({ message: "Unable to update the account status." });
+        }
+
+        // A suspended responder cannot sign in to the field app.
+        const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(uid, {
+          ban_duration: account_status === "suspended" ? SUSPENDED_BAN_DURATION : "none",
+        });
+
+        if (banError) {
+          console.error("Rescuer Auth status update failed:", banError.message);
+          return res.status(500).json({
+            message: "The status was saved, but signing in could not be updated. Try again.",
+          });
+        }
+      }
+
+      if (valid_until !== undefined) {
+        const accreditationError = validateAccreditation({
+          accreditation_no,
+          organization,
+          accredited_on,
+          valid_until,
+        });
+
+        if (accreditationError) {
+          return res.status(400).json({ message: accreditationError });
+        }
+
+        const roster = normalizeRosterDetails({ trainings, insurance_ref });
+
+        if (roster.error) {
+          return res.status(400).json({ message: roster.error });
+        }
+
+        const { error } = await supabaseAdmin
+          .from("responder_accreditations")
+          .upsert({
+            uid,
+            accreditation_no: accreditation_no.trim(),
+            organization: organization.trim(),
+            accredited_on,
+            valid_until,
+            trainings: roster.trainings,
+            insurance_ref: roster.insurance_ref,
+            updated_at: new Date().toISOString(),
+            updated_by: req.superAdmin.id,
+          });
+
+        if (error) {
+          console.error("Accreditation update failed:", error.message);
+          return res.status(error.code === "23505" ? 409 : 500).json({
+            message:
+              error.code === "23505"
+                ? "This accreditation number is already registered to another responder."
+                : "Unable to save the accreditation.",
+          });
+        }
+      }
+
+      return res.json({ message: "Responder updated." });
+    } catch (error) {
+      console.error("Manage Rescuer endpoint failed:", error.message);
+      return res.status(500).json({ message: "Unable to update the responder." });
     }
   }
 );

@@ -21,7 +21,9 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
     const draft = drafts[key] ?? emptyDraft
     const manualPeople = draft.people.trim() !== ''
     const people = manualPeople ? count(draft.people) : center.occupancyKnown ? center.occupied : NaN
-    const households = draft.households.trim() !== '' ? count(draft.households) : people === 0 ? 0 : NaN
+    // Households come from check-ins too, unless the planner typed a population for another date.
+    const recordedHouseholds = !manualPeople && center.households !== undefined ? center.households : NaN
+    const households = draft.households.trim() !== '' ? count(draft.households) : people === 0 ? 0 : recordedHouseholds
     const stock = { ffps: count(draft.ffps), waterLiters: count(draft.waterLiters), hygieneKits: count(draft.hygieneKits) }
     let error = rateError || validateReliefPopulation({ people, households })
     let demand: ReturnType<typeof calculateReliefDemand> | null = null
@@ -88,7 +90,7 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
       <label><span>Potable water liters per person per day</span><input type="number" min={0} max={10000} step={0.001} value={rateInputs.waterPerPerson} onChange={(e) => setRateInputs({ ...rateInputs, waterPerPerson: e.target.value })} /></label>
       <label><span>Hygiene kits per household per day</span><input type="number" min={0} max={10000} step={0.001} value={rateInputs.kitsPerHousehold} onChange={(e) => setRateInputs({ ...rateInputs, kitsPerHousehold: e.target.value })} /></label>
     </div>
-    <p>People may start from the current recorded facility occupancy. Household counts must be confirmed at the desk; resident accounts are not automatically treated as separate households. For another date, enter the population for that date.</p>
+    <p>People and households fill in from shelter check-ins (each walk-in group counts as one household). Type over them only to correct a count, or to plan for another date.</p>
     {rateError && <p className="vpi-missing">Enter all three rates to calculate demand. No official rate is assumed.</p>}
     {rows.length === 0 && <p>No active facilities available. Closed centers are excluded from daily planning.</p>}
     {rows.map((row) => <details className="relief-facility" key={row.key} open>
@@ -97,7 +99,7 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
       {!excluded[row.key] && <>
         <div className="edit-form-grid">
           <label><span>People ({row.manualPeople ? 'manual' : row.center.occupancyKnown ? 'using current records' : 'enter manually'})</span><input type="number" min={0} max={1_000_000} step={1} value={row.draft.people} placeholder={row.center.occupancyKnown ? String(row.center.occupied) : 'Required'} onChange={(e) => field(row.key, 'people', e.target.value)} /></label>
-          <label><span>Distinct evacuated households</span><input type="number" min={0} max={1_000_000} step={1} value={row.draft.households} placeholder={row.people === 0 ? '0' : 'Confirm at desk'} onChange={(e) => field(row.key, 'households', e.target.value)} /></label>
+          <label><span>Distinct evacuated households</span><input type="number" min={0} max={1_000_000} step={1} value={row.draft.households} placeholder={Number.isFinite(row.households) ? String(row.households) : 'Confirm at desk'} onChange={(e) => field(row.key, 'households', e.target.value)} /></label>
           <label><span>Usable FFP stock assigned to this center</span><input type="number" min={0} step={1} value={row.draft.ffps} onChange={(e) => field(row.key, 'ffps', e.target.value)} /></label>
           <label><span>Usable potable-water stock (whole liters)</span><input type="number" min={0} step={1} value={row.draft.waterLiters} onChange={(e) => field(row.key, 'waterLiters', e.target.value)} /></label>
           <label><span>Usable hygiene-kit stock</span><input type="number" min={0} step={1} value={row.draft.hygieneKits} onChange={(e) => field(row.key, 'hygieneKits', e.target.value)} /></label>

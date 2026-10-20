@@ -10,9 +10,9 @@ try {
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    create table public.sitios(sitio_id integer primary key,sitio_name text);
-    create table public.users(uid uuid primary key,role text,account_status text,assigned_sitio_id integer,f_name text,m_name text,l_name text);
-    create table public.residents(uid uuid primary key references public.users(uid),sitio_id integer,sex text,birthdate date);
+    create table public.barangays(barangay_id integer primary key,barangay_name text);
+    create table public.users(uid uuid primary key,role text,account_status text,assigned_barangay_id integer,f_name text,m_name text,l_name text);
+    create table public.residents(uid uuid primary key references public.users(uid),barangay_id integer,sex text,birthdate date);
     create table public.evacuation_centers(center_id integer primary key,center_name text);
     create table public.evacuation_records(record_id uuid primary key,resident_uid uuid references public.residents(uid),
       rescuer_uid uuid,evac_center_id integer,evac_status text,evacuated_at timestamptz,logged_at timestamptz);
@@ -22,16 +22,16 @@ try {
     create table public.verification_documents(doc_id integer primary key,uid uuid,type_id integer,file_url text,review_status text,
       uploaded_at timestamptz,reviewed_by uuid,reviewed_at timestamptz,rejection_reason text);
     create table public.sos_alerts(alert_id uuid primary key,resident_uid varchar,alert_level integer,alert_type varchar,status varchar,created_at timestamptz);
-    insert into public.sitios values(1,'Sitio One'),(2,'Sitio Two');
+    insert into public.barangays values(1,'Barangay One'),(2,'Barangay Two');
     insert into public.evacuation_centers values(10,'Central School');
     insert into public.document_types values(1,'Barangay ID');
     grant usage on schema public,auth to authenticated,anon;`)
-  for (const [n, role, status, sitio, f, l] of [
+  for (const [n, role, status, barangay, f, l] of [
     [1,'admin','active',1,'Ana','Admin'],[2,'admin','active',2,'Ben','Admin'],[4,'admin','suspended',1,'Sus','P'],
     [5,'super_admin','active',null,'Sue','Per'],[7,'rescuer','active',null,'Rico','Rescuer'],
     [20,'resident','active',null,'Juan','Dela Cruz'],[30,'resident','active',null,'Liza','Gomez']]) {
     await db.query('insert into auth.users values($1)', [uid(n)])
-    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, sitio, f, l])
+    await db.query('insert into public.users values($1,$2,$3,$4,$5,null,$6)', [uid(n), role, status, barangay, f, l])
   }
   await db.exec(`insert into public.residents values('${uid(20)}',1,'male','1990-01-01'),('${uid(30)}',2,'female','1990-01-01');
     insert into public.evacuation_records values
@@ -79,9 +79,9 @@ try {
 
   await actor(1)
   const t1 = await timeline()
-  assert.equal(t1.scope, 'Sitio One')
+  assert.equal(t1.scope, 'Barangay One')
   const kinds = t1.events.map(e => `${e.category}:${e.action}`)
-  // Sitio 1 admin: Juan's records, facility-wide center changes, own event/report, Juan's document + SOS. Not Liza (sitio 2).
+  // Barangay 1 admin: Juan's records, facility-wide center changes, own event/report, Juan's document + SOS. Not Liza (barangay 2).
   assert.ok(!t1.events.some(e => e.subject === 'Liza Gomez'))
   assert.equal(t1.events.filter(e => e.category === 'evacuation').length, 2)
   const evac = t1.events.filter(e => e.category === 'evacuation')
@@ -93,7 +93,7 @@ try {
     'missing_person:Missing-person report filed', 'missing_person:Missing person marked found',
     'verification:Verification document uploaded', 'verification:Verification document reviewed', 'sos:SOS alert raised',
     'evacuation_change:Evacuation record deleted']) assert.ok(kinds.includes(k), k)
-  assert.ok(!kinds.includes('evacuation_change:Evacuation record edited')) // that edit was for Liza (sitio 2)
+  assert.ok(!kinds.includes('evacuation_change:Evacuation record edited')) // that edit was for Liza (barangay 2)
   const del = t1.events.find(e => e.action === 'Evacuation record deleted')
   assert.equal(del.from_value, 'in_transit')
   assert.match(del.details, /no signed-in user/)
@@ -113,7 +113,7 @@ try {
   assert.ok(t2.events.some(e => e.category === 'facility'))
   await actor(5)
   const t5 = await timeline()
-  assert.equal(t5.scope, 'All sitios')
+  assert.equal(t5.scope, 'All barangays')
   assert.ok(t5.events.length > t1.events.length)
 
   await actor(1)

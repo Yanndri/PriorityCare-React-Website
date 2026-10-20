@@ -17,7 +17,7 @@ export function DisasterEventsPage() {
   const [notice, setNotice] = useState('')
   const [name, setName] = useState('')
   const [hazard, setHazard] = useState<HazardType>('flood')
-  const [sitio, setSitio] = useState('')
+  const [barangay, setBarangay] = useState('')
   const [location, setLocation] = useState('')
   const [onset, setOnset] = useState(manilaNow)
   const [notes, setNotes] = useState('')
@@ -56,7 +56,7 @@ export function DisasterEventsPage() {
     }
     setBusy(true)
     try {
-      await declareEvent({ sitio: Number(sitio || register?.sitios[0]?.sitio_id), name, hazard, location,
+      await declareEvent({ barangay: Number(barangay || register?.barangays[0]?.barangay_id), name, hazard, location,
         startedAt: startedAt.toISOString(), notes, latitude: lat, longitude: lng })
       setName(''); setLocation(''); setNotes(''); setLatitude(''); setLongitude(''); setOnset(manilaNow())
       setNotice('Disaster event declared.'); setFilter('active'); await load()
@@ -77,7 +77,7 @@ export function DisasterEventsPage() {
   return <div className="disaster-events-page">
     <section className="panel disaster-intro">
       <h3>Disaster event register</h3>
-      <p>Declare operational incidents for your assigned sitio. All times are Philippine time (UTC+8).</p>
+      <p>Declare operational incidents for your assigned barangay. All times are Philippine time (UTC+8).</p>
       <p>Declarations do not send responder notifications or associate existing SOS alerts. A map point identifies a reference location, not a danger-zone boundary.</p>
       <strong>{register ? `${events.filter(e => e.status === 'active').length} active events in your scope` : 'Register unavailable'}</strong>
       <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => { void load() }}>Refresh register</button>
@@ -88,10 +88,10 @@ export function DisasterEventsPage() {
     <section className="panel">
       <h3>Declare an active event</h3>
       <form onSubmit={submit}>
-        <fieldset disabled={!register || busy || loading || !register.sitios.length} className="disaster-form">
+        <fieldset disabled={!register || busy || loading || !register.barangays.length} className="disaster-form">
           <label>Event name<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Riverside flood — October 14" /></label>
           <label>Hazard<select value={hazard} onChange={e => setHazard(e.target.value as HazardType)}>{Object.entries(hazardLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-          <label>Sitio<select required value={sitio || register?.sitios[0]?.sitio_id || ''} onChange={e => setSitio(e.target.value)}>{register?.sitios.map(s => <option key={s.sitio_id} value={s.sitio_id}>{s.sitio_name}</option>)}</select></label>
+          <label>Barangay<select required value={barangay || register?.barangays[0]?.barangay_id || ''} onChange={e => setBarangay(e.target.value)}>{register?.barangays.map(s => <option key={s.barangay_id} value={s.barangay_id}>{s.barangay_name}</option>)}</select></label>
           <label>Incident onset (Philippine time)<input required type="datetime-local" value={onset} onChange={e => setOnset(e.target.value)} /></label>
           <label className="disaster-wide">Affected location / landmark<input required maxLength={500} value={location} onChange={e => setLocation(e.target.value)} /></label>
           <label>Reference latitude (optional)<input type="number" step="any" min={-90} max={90} value={latitude} onChange={e => setLatitude(e.target.value)} /></label>
@@ -106,7 +106,7 @@ export function DisasterEventsPage() {
       {register && !events.some(e => filter === 'all' || e.status === filter) && <p>No {filter === 'all' ? '' : filter} events in your scope.</p>}
       {events.filter(e => filter === 'all' || e.status === filter).map(event => <article key={event.event_id} className="disaster-event-card">
         <div className="disaster-list-header"><h4>{event.name}</h4><span className={`disaster-status ${event.status}`}>{hazardLabels[event.hazard_type]} · {event.status}</span></div>
-        <p>{register?.sitios.find(s => s.sitio_id === event.sitio_id)?.sitio_name} · {event.location_description}</p>
+        <p>{register?.barangays.find(s => s.barangay_id === event.barangay_id)?.barangay_name} · {event.location_description}</p>
         <p>Onset: {formatTime(event.started_at)} · Declared: {formatTime(event.declared_at)}</p>
         {event.latitude !== null && <p>Reference point: {event.latitude}, {event.longitude}</p>}
         {event.notes && <p className="disaster-notes">{event.notes}</p>}

@@ -50,7 +50,7 @@ export function VpiPanel({ residents }: { residents: Resident[] }) {
     {error && <p role="alert">{error}</p>}
     {scored.length === 0 && <p className="empty-state">No resident profiles available.</p>}
     <div className="vpi-list">{scored.map(({ resident, vpi }) => <details className="vpi-resident" key={resident.id}>
-      <summary><span><strong>{resident.name}</strong><small>{resident.sitio}</small></span><span className={`vpi-badge vpi-${vpi.level.toLowerCase()}`}>{vpi.level === 'Incomplete' ? `Incomplete · subtotal ${vpi.score}` : `Demo ${vpi.level} · ${vpi.score}/${vpi.maxScore}`}</span></summary>
+      <summary><span><strong>{resident.name}</strong><small>{resident.barangay}</small></span><span className={`vpi-badge vpi-${vpi.level.toLowerCase()}`}>{vpi.level === 'Incomplete' ? `Incomplete · subtotal ${vpi.score}` : `Demo ${vpi.level} · ${vpi.score}/${vpi.maxScore}`}</span></summary>
       {vpi.factors.length > 0 ? <ul>{vpi.factors.map((factor) => <li key={factor.label}>{factor.label}: +{factor.points}</li>)}</ul> : <p>No scored factors recorded.</p>}
       {vpi.age !== null && <p>Age: {vpi.age} years</p>}
       {vpi.missing.length > 0 && <p className="vpi-missing">Needs assessment: {vpi.missing.join(', ')}. A missing value is not treated as a confirmed absence.</p>}

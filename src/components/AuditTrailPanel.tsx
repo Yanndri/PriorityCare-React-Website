@@ -37,16 +37,16 @@ export function AuditTrailPanel() {
   const [toDate, setToDate] = useState(() => phtDate(0))
   const [data, setData] = useState<TimelineData | null>(null)
   const [categories, setCategories] = useState<TimelineCategory[]>(ALL_CATEGORIES)
-  const [sitio, setSitio] = useState('all')
+  const [barangay, setBarangay] = useState('all')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
-  const sitioName = (id: number) => data?.sitios.find(s => s.sitio_id === id)?.sitio_name ?? `Sitio ${id}`
+  const barangayName = (id: number) => data?.barangays.find(s => s.barangay_id === id)?.barangay_name ?? `Barangay ${id}`
   const filtered = useMemo(() => data ? filterTimeline(data.events, {
-    categories, search, sitioId: sitio === 'all' ? null : Number(sitio),
-  }) : [], [data, categories, search, sitio])
+    categories, search, barangayId: barangay === 'all' ? null : Number(barangay),
+  }) : [], [data, categories, search, barangay])
 
   async function load() {
     if (busy) return
@@ -65,7 +65,7 @@ export function AuditTrailPanel() {
 
   function filterSummary() {
     const cats = categories.length === ALL_CATEGORIES.length ? 'All categories' : categories.map(c => CATEGORY_LABELS[c]).join(', ')
-    const where = sitio === 'all' ? 'All sitios in scope' : sitio === '0' ? 'Facility-wide only' : sitioName(Number(sitio))
+    const where = barangay === 'all' ? 'All barangays in scope' : barangay === '0' ? 'Facility-wide only' : barangayName(Number(barangay))
     return [cats, where, search.trim() ? `Search: "${search.trim()}"` : ''].filter(Boolean).join(' · ')
   }
 
@@ -76,15 +76,15 @@ export function AuditTrailPanel() {
     try {
       const name = timelineFileName(data.from, data.to, format)
       if (format === 'csv') {
-        download(timelineCsv(filtered, sitioName, meta), 'text/csv;charset=utf-8', name)
+        download(timelineCsv(filtered, barangayName, meta), 'text/csv;charset=utf-8', name)
       } else {
         const { createTimelineWorkbook, createTimelinePdf } = await import('../utils/auditTrailFiles')
         if (format === 'xlsx') {
-          const book = await createTimelineWorkbook(filtered, sitioName, meta)
+          const book = await createTimelineWorkbook(filtered, barangayName, meta)
           download(new Uint8Array(await book.xlsx.writeBuffer()) as Uint8Array<ArrayBuffer>,
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', name)
         } else {
-          const pdf = await createTimelinePdf(filtered, sitioName, meta, await loadFontBase64())
+          const pdf = await createTimelinePdf(filtered, barangayName, meta, await loadFontBase64())
           download(new Uint8Array(pdf.output('arraybuffer')) as Uint8Array<ArrayBuffer>, 'application/pdf', name)
         }
       }
@@ -95,7 +95,7 @@ export function AuditTrailPanel() {
 
   const toggle = (c: TimelineCategory) =>
     setCategories(cur => cur.includes(c) ? cur.filter(x => x !== c) : ALL_CATEGORIES.filter(x => x === c || cur.includes(x)))
-  const rows = timelineTableRows(filtered.slice(0, PREVIEW_LIMIT), sitioName)
+  const rows = timelineTableRows(filtered.slice(0, PREVIEW_LIMIT), barangayName)
 
   return <section className="panel rdana-panel audit-panel">
     <div className="section-header"><div><span className="panel-kicker">AUDIT TRAIL</span><h3>Evacuation Audit Trail & Operational Timestamp Log</h3></div><span>PDF · Excel · CSV</span></div>
@@ -120,9 +120,9 @@ export function AuditTrailPanel() {
           </label>)}
         </div>
         <div className="audit-range">
-          <label><span>Sitio</span><select value={sitio} onChange={e => setSitio(e.target.value)}>
+          <label><span>Barangay</span><select value={barangay} onChange={e => setBarangay(e.target.value)}>
             <option value="all">All in scope</option>
-            {data.sitios.map(s => <option key={s.sitio_id} value={s.sitio_id}>{s.sitio_name}</option>)}
+            {data.barangays.map(s => <option key={s.barangay_id} value={s.barangay_id}>{s.barangay_name}</option>)}
             <option value="0">Facility-wide only (centers)</option>
           </select></label>
           <label className="audit-search"><span>Search</span><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, action, staff, details…" /></label>

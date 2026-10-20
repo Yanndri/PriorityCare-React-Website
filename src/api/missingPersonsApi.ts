@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import type { ReconciliationData } from '../utils/rescueReconciliation'
 
 export type NewMissingPersonReport = {
-  sitioId: number
+  barangayId: number
   eventId: string | null
   residentUid: string | null
   fullName: string
@@ -29,7 +29,7 @@ export async function getRescueReconciliation(): Promise<ReconciliationData> {
 
 export async function fileMissingPersonReport(input: NewMissingPersonReport) {
   const { data, error } = await supabase.rpc('file_missing_person_report', {
-    p_sitio: input.sitioId,
+    p_barangay: input.barangayId,
     p_event_id: input.eventId,
     p_resident_uid: input.residentUid,
     p_full_name: input.fullName.trim(),

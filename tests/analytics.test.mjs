@@ -8,15 +8,15 @@ import { buildDromicReport } from '../src/utils/dromicReport.ts'
 
 const asOf = '2026-10-16T00:00:00Z'
 const resident = (uid, f, l, extra = {}) => ({
-  uid, sitio_id: 3, f_name: f, m_name: null, l_name: l, sex: 'female', birthdate: '1990-05-01',
+  uid, barangay_id: 3, f_name: f, m_name: null, l_name: l, sex: 'female', birthdate: '1990-05-01',
   latest_status: null, latest_logged_at: null, evacuated_at: null, center_id: null, center_name: null, ...extra,
 })
 const report = (id, name, extra = {}) => ({
-  report_id: id, sitio_id: 3, event_id: null, resident_uid: null, full_name: name, sex: null, approx_age: null,
+  report_id: id, barangay_id: 3, event_id: null, resident_uid: null, full_name: name, sex: null, approx_age: null,
   last_seen_location: '', last_seen_at: null, notes: '', status: 'missing', matched_resident_uid: null,
   reconciled_at: null, reconciliation_note: null, reported_at: '2026-10-15T00:00:00Z', ...extra,
 })
-const recon = (reports, residents) => reconcile({ generated_at: asOf, sitios: [{ sitio_id: 3, sitio_name: 'Sitio 3' }], events: [], reports, residents }, asOf)
+const recon = (reports, residents) => reconcile({ generated_at: asOf, barangays: [{ barangay_id: 3, barangay_name: 'Barangay 3' }], events: [], reports, residents }, asOf)
 
 test('ID-linked rescued resident is ready to close and flagged as a discrepancy', () => {
   const r = recon([report('1', 'Ana Cruz', { resident_uid: 'a' })], [resident('a', 'Ana', 'Cruz', { latest_status: 'safely_evacuated', center_name: 'Gym' })])
@@ -69,7 +69,7 @@ test('closed reports, regressions, duplicates and withdrawals are reported', () 
   assert.match(r.rows[0].discrepancies.join(), /now "in_transit"/)
   assert.match(r.rows[3].discrepancies.join(), /duplicate/)
   assert.equal(r.counts.open, 2)
-  const [manifest, directory] = reconciliationTables({ generated_at: asOf, sitios: [{ sitio_id: 3, sitio_name: 'Sitio 3' }], events: [], reports: [], residents: [] }, r)
+  const [manifest, directory] = reconciliationTables({ generated_at: asOf, barangays: [{ barangay_id: 3, barangay_name: 'Barangay 3' }], events: [], reports: [], residents: [] }, r)
   assert.equal(manifest.rows.length, 5)
   assert.equal(manifest.headers.some((header) => /contact/i.test(header)), false)
   assert.equal(directory.rows.length, 0)
@@ -125,15 +125,15 @@ test('CSV export quotes, escapes, and neutralises formula-like text', () => {
 })
 
 test('timeline rows keep exact UTC and Manila times and unrecorded actors', () => {
-  const data = { generated_at: asOf, from: '', to: '', scope: 'Sitio 3', sitios: [{ sitio_id: 3, sitio_name: 'Sitio 3' }], events: [
-    { occurred_at: '2026-10-14T12:27:03.935451+00:00', category: 'evacuation', action: 'Evacuation status logged', subject: 'A', sitio_id: 3, from_value: null, to_value: 'safely_evacuated', actor_name: null, actor_role: null, details: null, ref_id: 'r1' },
-    { occurred_at: '2026-10-14T13:00:00Z', category: 'facility', action: 'Center status changed', subject: 'Gym', sitio_id: null, from_value: 'active', to_value: 'closed', actor_name: 'Admin', actor_role: 'admin', details: 'Reason: full', ref_id: '7' },
+  const data = { generated_at: asOf, from: '', to: '', scope: 'Barangay 3', barangays: [{ barangay_id: 3, barangay_name: 'Barangay 3' }], events: [
+    { occurred_at: '2026-10-14T12:27:03.935451+00:00', category: 'evacuation', action: 'Evacuation status logged', subject: 'A', barangay_id: 3, from_value: null, to_value: 'safely_evacuated', actor_name: null, actor_role: null, details: null, ref_id: 'r1' },
+    { occurred_at: '2026-10-14T13:00:00Z', category: 'facility', action: 'Center status changed', subject: 'Gym', barangay_id: null, from_value: 'active', to_value: 'closed', actor_name: 'Admin', actor_role: 'admin', details: 'Reason: full', ref_id: '7' },
   ] }
   const rows = timelineRows(data, data.events)
   assert.equal(rows[0][0], '2026-10-14T12:27:03.935Z')
   assert.equal(rows[0][1], '2026-10-14 20:27:03 PHT')
   assert.equal(rows[0][8], 'Not recorded')
-  assert.equal(rows[1][5], 'All sitios (facility-wide)')
+  assert.equal(rows[1][5], 'All barangays (facility-wide)')
   assert.equal(countByCategory(data.events).evacuation, 1)
   assert.equal(countByCategory([]).sos, 0)
 })
@@ -141,7 +141,7 @@ test('timeline rows keep exact UTC and Manila times and unrecorded actors', () =
 const window = makeReportWindow(24, '2026-10-15T04:00:00Z')
 const available = (data) => ({ available: true, data })
 const base = () => ({
-  window, scope: 'Sitio 3', fetchedAt: window.end, residents: [{ uid: 'a', birthdate: '1990-01-01', mobility_status: 'ambulatory' }],
+  window, scope: 'Barangay 3', fetchedAt: window.end, residents: [{ uid: 'a', birthdate: '1990-01-01', mobility_status: 'ambulatory' }],
   sos: available([]), loggedEvacuations: available([]), completedEvacuations: available([]), profiles: available([]),
   disabilityResidents: available([]), shelters: available([]),
 })
@@ -164,7 +164,7 @@ test('manifest and event helpers use window timestamps and deduplicate', () => {
 test('RDANA includes the manifest, declared events and data sources when retrieved', () => {
   const text = buildRdanaSummary({ ...base(), missingReports: available(manifestRows), declaredEvents: available(eventRows) })
   assert.match(text, /reports filed in period 1; marked found in period 1; withdrawn in period 0; open reports at retrieval 2/)
-  assert.match(text, /Declared disaster events active during the period \(register; sitio-scoped\): 1/)
+  assert.match(text, /Declared disaster events active during the period \(register; barangay-scoped\): 1/)
   assert.match(text, /Typhoon flooding — flood/)
   assert.doesNotMatch(text, /Old fire/)
   assert.match(text, /7\. DATA SOURCES/)
