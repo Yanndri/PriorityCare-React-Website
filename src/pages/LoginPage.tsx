@@ -66,7 +66,7 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-hero">
-        <div className="meta">§ 00 — Staff portal</div>
+        <div className="meta">Staff portal</div>
         <h1>
           Priority care
           <br />

@@ -122,6 +122,8 @@ export type EvacuationCenter = {
 export type MenuItem = {
   key: MenuKey
   label: string
+  // Sidebar heading the tab sits under; items without one sit at the top.
+  group?: string
 }
 
 export type StatCardData = {

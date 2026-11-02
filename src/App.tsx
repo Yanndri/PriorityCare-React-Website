@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
-import { adminMenuItems, superAdminMenuItems } from './data/dashboardData'
+import { adminMenuItems, pageDescriptions, superAdminMenuItems } from './data/dashboardData'
 
 import type {
   AccountAction,
@@ -561,8 +561,8 @@ function App({ profile }: AppProps) {
 
           <PageTitle
             title={activeTitle}
-            index={menuItems.findIndex((item) => item.key === activeMenu)}
-            onExportReport={() =>
+            description={pageDescriptions[activeMenu]}
+            onExportReport={activeMenu !== 'home' ? undefined : () =>
               exportReport({
                 stats,
                 residents: liveResidents,
@@ -586,6 +586,9 @@ function App({ profile }: AppProps) {
               onSearchChange={setSearchTerm}
               onStatusFilterChange={setStatusFilter}
               locationOptions={locationOptions}
+              scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
+              allResidents={liveResidents}
+              onOpen={setActiveMenu}
             />
           )}
 

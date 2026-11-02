@@ -4,7 +4,8 @@ import { ConstraintChart } from '../components/ConstraintChart'
 import { ResidentTable } from '../components/ResidentTable'
 import { StatsGrid } from '../components/StatsGrid'
 import { OperationsOverview } from '../components/OperationsOverview'
-import type { EvacuationCenter } from '../types/dashboard'
+import type { EvacuationCenter, MenuKey } from '../types/dashboard'
+import { TodayTasks } from '../components/TodayTasks'
 
 type HomePageProps = {
   stats: StatCardData[]
@@ -17,6 +18,9 @@ type HomePageProps = {
   onSearchChange: (value: string) => void
   onStatusFilterChange: (value: 'All' | Status) => void
   locationOptions?: string[]
+  scopeBarangayId: number | null
+  allResidents: Resident[]
+  onOpen: (menu: MenuKey) => void
 }
 
 export function HomePage({
@@ -30,10 +34,20 @@ export function HomePage({
   onSearchChange,
   onStatusFilterChange,
   locationOptions,
+  scopeBarangayId,
+  allResidents,
+  onOpen,
 }: HomePageProps) {
   // Home page combines the main dashboard widgets.
   return (
     <>
+      <TodayTasks
+        scopeBarangayId={scopeBarangayId}
+        residents={allResidents}
+        centers={evacuationCenters}
+        onOpen={onOpen}
+      />
+
       <StatsGrid stats={stats} />
 
       <OperationsOverview
