@@ -36,7 +36,7 @@ export function VpiPanel({ residents }: { residents: Resident[] }) {
     catch { setError('Settings apply for this session, but could not be saved on this browser.') }
   }
   return <section className="panel prototype-vpi">
-    <div className="section-header"><div><span className="panel-kicker">AUTOMATED VPI · PROTOTYPE</span><h3>Resident vulnerability scores</h3></div><span>{scored.length} profiles</span></div>
+    <div className="section-header"><div><h3>Resident vulnerability scores</h3></div><span>{scored.length} profiles</span></div>
     <p className="vpi-demo-notice">Demonstration weights only. These scores do not determine dispatch, rescue order, or medical triage.</p>
     <p>Calculated {asOf} (Asia/Manila) · {incomplete} incomplete assessment(s). Scores update after profile changes and birthdays.</p>
     <details className="vpi-settings">

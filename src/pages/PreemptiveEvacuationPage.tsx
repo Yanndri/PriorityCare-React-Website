@@ -188,7 +188,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
 
   return <section className="panel catchment-panel">
     <div className="section-header">
-      <div><span className="panel-kicker">PRE-EMPTIVE EVACUATION</span><h3>Resident Evacuation Status &amp; Destination</h3></div>
+      <div><h3>Resident Evacuation Status &amp; Destination</h3></div>
       <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => void load()}>Refresh</button>
     </div>
     <p className="catchment-muted">

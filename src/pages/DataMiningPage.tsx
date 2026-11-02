@@ -39,7 +39,6 @@ export function DataMiningPage({ residents }: DataMiningPageProps) {
     <section className="data-mining-page">
       <div className="panel mining-intro">
         <div>
-          <span className="panel-kicker">APPENDIX N · MODULE 3</span>
           <h3>Statutory Disaster Analytics & Report Generation</h3>
           <p>{current.title}</p>
         </div>

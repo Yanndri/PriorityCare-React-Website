@@ -21,7 +21,6 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
     <section className="operations-overview">
       <div className="operations-banner">
         <div>
-          <span className="operations-kicker">FIELD OPERATIONS</span>
           <h3>Keep response teams ahead of the next emergency.</h3>
           <p>
             Use this control room to review vulnerable residents, track shelter capacity, and
@@ -44,7 +43,6 @@ export function OperationsOverview({ residents, alerts, centers }: OperationsOve
         <section className="panel shelter-readiness">
           <div className="section-header">
             <div>
-              <span className="panel-kicker">SHELTER READINESS</span>
               <h3>Evacuation capacity</h3>
             </div>
             <span>{totalCapacity === 0 ? 0 : Math.round((occupiedCapacity / totalCapacity) * 100)}% occupied</span>

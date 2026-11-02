@@ -577,15 +577,7 @@ function App({ profile }: AppProps) {
           {activeMenu === 'home' && (
             <HomePage
               stats={stats}
-              residents={filteredResidents}
-              alerts={liveAlerts}
               evacuationCenters={liveEvacuationCenters}
-              constraintStats={constraintStats}
-              searchTerm={searchTerm}
-              statusFilter={statusFilter}
-              onSearchChange={setSearchTerm}
-              onStatusFilterChange={setStatusFilter}
-              locationOptions={locationOptions}
               scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
               allResidents={liveResidents}
               onOpen={setActiveMenu}
@@ -608,6 +600,7 @@ function App({ profile }: AppProps) {
               onChangeAccountState={handleResidentAccountState}
               accountFilter={accountFilter}
               onAccountFilterChange={setAccountFilter}
+              constraintStats={constraintStats}
               onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
             />
           )}

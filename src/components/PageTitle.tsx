@@ -13,8 +13,10 @@ export function PageTitle({ title, description, onExportReport }: PageTitleProps
   return (
     <section className="page-title">
       <div>
-        <h2>{title}</h2>
-        <p>{description}</p>
+        <h2>
+          {title}
+          <span className="page-help" tabIndex={0} role="note" aria-label={description} data-tip={description}>?</span>
+        </h2>
       </div>
 
       {onExportReport && (

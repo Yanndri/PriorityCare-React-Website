@@ -55,7 +55,7 @@ export function DromicExportPanel() {
     finally{setBusy('')}
   }
   return <section className="panel rdana-panel">
-    <div className="section-header"><div><span className="panel-kicker">POPULATION & RELIEF EXPORTS</span><h3>DROMIC-style PDF / Excel Reports</h3></div><span>Prototype draft</span></div>
+    <div className="section-header"><div><h3>DROMIC-style PDF / Excel Reports</h3></div><span>Prototype draft</span></div>
     <p>Export a population, shelter, and relief-planning report. An official DSWD-DROMIC template has not been supplied, so this layout is a prototype draft.</p>
     <fieldset className="resident-edit-fields" disabled={Boolean(busy)}><div className="edit-form-grid">
       <label><span>Activity reporting window</span><select value={hours} onChange={(e)=>{setHours(Number(e.target.value) as 24|48);reset()}}><option value={24}>Last 24 hours</option><option value={48}>Last 48 hours</option></select></label>

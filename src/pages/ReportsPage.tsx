@@ -38,7 +38,6 @@ export function ReportsPage({ stats, scopeLabel, generatedBy }: ReportsPageProps
     <section className="panel printable-report">
       <div className="section-header">
         <div>
-          <span className="panel-kicker">SUMMARY REPORT</span>
           <h3>Current dashboard figures</h3>
         </div>
         <button type="button" className="secondary-button no-print" onClick={printSummary}>

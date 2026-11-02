@@ -105,7 +105,6 @@ export function AuditTrailPanel() {
     <section className="panel analytics-panel">
       <div className="section-header">
         <div>
-          <span className="panel-kicker">AUDIT TRAILS & TIMESTAMP LOGS</span>
           <h3>Evacuation Audit Trail & Operational Log</h3>
         </div>
       </div>

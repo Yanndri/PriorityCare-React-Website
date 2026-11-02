@@ -16,7 +16,6 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
         </span>
         <div>
           <strong className="brand-name">PRIORITYCARE</strong>
-          <span className="header-eyebrow">Emergency response · Cebu City</span>
         </div>
       </div>
 

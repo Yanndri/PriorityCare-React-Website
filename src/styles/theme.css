@@ -1307,3 +1307,83 @@ textarea {
 .app .geo-map-page .leaflet-top.leaflet-left {
   top: 46px;
 }
+
+/* ---------- Calmer layout: fewer labels, more room, bigger text ---------- */
+.app .page-content,
+.app main {
+  font-size: 15px;
+}
+
+.app .panel {
+  padding: 28px;
+}
+
+.app .panel + .panel,
+.app .panel + section,
+.app section + .panel {
+  margin-top: 24px;
+}
+
+.page-title {
+  margin-bottom: 32px;
+}
+
+.page-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Small "?" next to the page title; hover or tab to it to read what the page is for. */
+.page-help {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  cursor: help;
+}
+
+.page-help::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+
+.page-help:hover::after,
+.page-help:focus-visible::after {
+  opacity: 1;
+}
+
+.residents-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.residents-insights > .panel + .panel {
+  margin-top: 0;
+}

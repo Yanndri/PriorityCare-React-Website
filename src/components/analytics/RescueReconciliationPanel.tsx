@@ -89,7 +89,6 @@ export function RescueReconciliationPanel() {
     <section className="panel analytics-panel">
       <div className="section-header">
         <div>
-          <span className="panel-kicker">MASTER RESCUED DIRECTORY × MISSING PERSONS MANIFEST</span>
           <h3>Rescue Reconciliation</h3>
         </div>
         <button type="button" className="secondary-button" onClick={refresh} disabled={state.status === 'loading'}>

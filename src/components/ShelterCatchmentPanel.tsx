@@ -63,7 +63,7 @@ export function ShelterCatchmentPanel() {
   const activeCenters = (data?.centers ?? []).filter(c => c.status !== 'closed')
 
   return <section className="panel catchment-panel">
-    <div className="section-header"><div><span className="panel-kicker">CATCHMENT PLAN</span><h3>Barangay → Designated Shelters</h3></div>
+    <div className="section-header"><div><h3>Barangay → Designated Shelters</h3></div>
       <button type="button" className="secondary-button" disabled={loading || saving !== null} onClick={() => void load()}>Refresh</button></div>
     <p className="catchment-muted">{data && !data.can_edit_all
       ? 'Choose your barangay\'s primary evacuation shelter and up to 3 alternates (used when the primary is full or unreachable). You can pick your barangay\'s centres or municipal ones; only the municipal admin can assign another barangay\'s centre.'

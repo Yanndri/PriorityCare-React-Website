@@ -1,8 +1,8 @@
 /* "Things to do" list on the Today page. Colours come from theme.css. */
 .today-panel {
   display: grid;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .today-head {
@@ -52,7 +52,7 @@
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--tone, var(--accent));
   background: var(--panel);
@@ -82,19 +82,9 @@
 }
 
 .today-text {
-  display: grid;
-  gap: 3px;
   min-width: 0;
-}
-
-.today-text strong {
-  font-size: 15.5px;
+  font-size: 16px;
   font-weight: 600;
-}
-
-.today-text span {
-  color: var(--muted);
-  font-size: 13.5px;
 }
 
 .today-action {
@@ -109,10 +99,7 @@
 
 @media (max-width: 640px) {
   .today-card {
-    grid-template-columns: 24px 1fr;
-  }
-
-  .today-action {
-    grid-column: 2;
+    grid-template-columns: 24px 1fr auto;
+    gap: 10px;
   }
 }

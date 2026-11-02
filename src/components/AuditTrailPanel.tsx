@@ -98,7 +98,7 @@ export function AuditTrailPanel() {
   const rows = timelineTableRows(filtered.slice(0, PREVIEW_LIMIT), barangayName)
 
   return <section className="panel rdana-panel audit-panel">
-    <div className="section-header"><div><span className="panel-kicker">AUDIT TRAIL</span><h3>Evacuation Audit Trail & Operational Timestamp Log</h3></div><span>PDF · Excel · CSV</span></div>
+    <div className="section-header"><div><h3>Evacuation Audit Trail & Operational Timestamp Log</h3></div><span>PDF · Excel · CSV</span></div>
     <p>One time-ordered log of evacuation status changes, record edits/deletions, evacuation center status and capacity changes, disaster declarations, missing-person actions, verification reviews and SOS alerts. Times are Philippine time (UTC+8).</p>
     <fieldset className="resident-edit-fields" disabled={Boolean(busy)}>
       <div className="audit-range">

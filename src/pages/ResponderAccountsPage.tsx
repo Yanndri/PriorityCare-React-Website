@@ -117,7 +117,7 @@ export function ResponderAccountsPage() {
 
   return <section className="panel catchment-panel">
     <div className="section-header">
-      <div><span className="panel-kicker">ACCREDITED RESPONDERS</span><h3>Rescuer Accounts</h3></div>
+      <div><h3>Rescuer Accounts</h3></div>
       <div>
         <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => void load()}>Refresh</button>{' '}
         <button type="button" className="verify-button" disabled={busy} onClick={() => { setForm(emptyForm()); setNotice('') }}>Add Rescuer</button>

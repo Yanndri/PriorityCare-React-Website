@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
+import type { AccountAction, AccountFilter, ConstraintStat, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
+import { VpiPanel } from '../components/VpiPanel'
+import { ConstraintChart } from '../components/ConstraintChart'
 import { useEquipmentRules } from '../api/equipmentRulesApi'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
@@ -20,6 +22,7 @@ type VerificationPageProps = {
   accountFilter: AccountFilter
   onAccountFilterChange: (value: AccountFilter) => void
   onRegisterResident?: () => void
+  constraintStats?: ConstraintStat[]
 }
 
 export function VerificationPage({
@@ -38,6 +41,7 @@ export function VerificationPage({
   accountFilter,
   onAccountFilterChange,
   onRegisterResident,
+  constraintStats,
 }: VerificationPageProps) {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
 
@@ -71,6 +75,12 @@ export function VerificationPage({
         accountFilter={accountFilter}
         onAccountFilterChange={onAccountFilterChange}
       />
+
+      {/* Moved here from the Today page so that page stays short. */}
+      <section className="residents-insights">
+        <VpiPanel residents={residents} />
+        {constraintStats && <ConstraintChart stats={constraintStats} />}
+      </section>
 
       {selectedResidentFromLatestData && (
         <VerificationRequestModal

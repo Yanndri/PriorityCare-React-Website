@@ -26,7 +26,6 @@ type Task = {
   tone: Tone
   icon: string
   title: string
-  detail: string
   action: string
   menu: MenuKey
 }
@@ -96,64 +95,60 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
   if (live?.activeSos) {
     tasks.push({
       key: 'sos', tone: 'urgent', icon: 'sos', menu: 'dispatch',
-      title: `${plural(live.activeSos, 'person is', 'people are')} asking for help (SOS)`,
-      detail: 'Open a rescue request and send a team.',
-      action: 'Answer SOS',
+      title: `${plural(live.activeSos, 'SOS', 'SOS calls')} waiting`,
+      action: 'Answer',
     })
   }
   for (const event of live?.events ?? []) {
     tasks.push({
       key: `event-${event.name}`, tone: 'urgent', icon: 'siren-on', menu: 'preemptiveEvacuation',
-      title: `Disaster declared: ${event.name}`,
-      detail: live?.noEvacuationReport
-        ? `${plural(live.noEvacuationReport, 'household has', 'households have')} not said yet if they are evacuating.`
-        : 'Check which households are evacuating and where they are going.',
-      action: 'Check evacuations',
+      title: live?.noEvacuationReport
+        ? `${event.name}: ${plural(live.noEvacuationReport, 'household', 'households')} with no report yet`
+        : `${event.name} is active`,
+      action: 'Check',
     })
   }
   if (live?.missing) {
     tasks.push({
       key: 'missing', tone: 'warn', icon: 'search-location', menu: 'rescueReconciliation',
-      title: `${plural(live.missing, 'person is', 'people are')} reported missing`,
-      detail: 'Mark them found when they turn up, or send a team to look.',
-      action: 'See missing persons',
+      title: `${plural(live.missing, 'person', 'people')} missing`,
+      action: 'View',
     })
   }
   if (nearlyFull.length) {
     tasks.push({
       key: 'full', tone: 'warn', icon: 'building', menu: 'evacCenters',
-      title: `${plural(nearlyFull.length, 'evacuation center is', 'evacuation centers are')} almost full`,
-      detail: nearlyFull.map((c) => `${c.name} (${c.occupied} of ${c.capacity})`).join(', '),
-      action: 'See centers',
+      title: nearlyFull.length === 1
+        ? `${nearlyFull[0].name} almost full`
+        : `${nearlyFull.length} centers almost full`,
+      action: 'View',
     })
   }
   if (live?.teamsOut) {
     tasks.push({
       key: 'teams', tone: 'info', icon: 'ambulance', menu: 'dispatch',
-      title: `${plural(live.teamsOut, 'rescue request is', 'rescue requests are')} still open`,
-      detail: 'Follow up until each one is marked resolved.',
-      action: 'See rescue teams',
+      title: `${plural(live.teamsOut, 'rescue', 'rescues')} in progress`,
+      action: 'View',
     })
   }
   if (pending) {
     tasks.push({
       key: 'pending', tone: 'info', icon: 'user-check', menu: 'verification',
-      title: `${plural(pending, 'resident is', 'residents are')} waiting for verification`,
-      detail: 'Check their ID, then verify or reject them.',
-      action: 'Verify residents',
+      title: `${plural(pending, 'resident', 'residents')} to verify`,
+      action: 'Verify',
     })
   }
 
   return (
     <section className="panel today-panel" aria-labelledby="today-heading">
       <div className="today-head">
-        <h3 id="today-heading">Things to do</h3>
+        <h3 id="today-heading">To do</h3>
         {!live && <span className="today-loading" role="status">Checking…</span>}
       </div>
 
       {tasks.length === 0 && live ? (
         <p className="today-clear">
-          <Icon name="check" /> All clear. Nothing needs your attention right now.
+          <Icon name="check" /> All clear
         </p>
       ) : (
         <ul className="today-list">
@@ -161,10 +156,7 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
             <li key={task.key}>
               <button type="button" className={`today-card tone-${task.tone}`} onClick={() => onOpen(task.menu)}>
                 <Icon name={task.icon} className="today-icon" />
-                <span className="today-text">
-                  <strong>{task.title}</strong>
-                  <span>{task.detail}</span>
-                </span>
+                <strong className="today-text">{task.title}</strong>
                 <span className="today-action">{task.action} <Icon name="arrow-small-right" /></span>
               </button>
             </li>

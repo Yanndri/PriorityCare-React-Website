@@ -82,7 +82,7 @@ export function ReliefDemandPlanner({ centers }: { centers: EvacuationCenter[] }
     catch { setMessage('This browser could not save the draft for Reports. CSV export remains available.') }
   }
   return <section className="relief-planner">
-    <div className="section-header"><div><span className="panel-kicker">DAILY RELIEF PLANNING · PROTOTYPE</span><h3>Relief requisition demand</h3></div></div>
+    <div className="section-header"><div><h3>Relief requisition demand</h3></div></div>
     <p>Calculate Family Food Packs (FFPs), potable-water liters, and hygiene kits using your approved daily rates. A kit’s daily rate can be zero on days it is not distributed. This is a draft calculator; it does not submit orders or change inventory.</p>
     <div className="edit-form-grid">
       <label><span>Planning date</span><input required type="date" value={date} onChange={(e) => { setDate(e.target.value); setMessage('') }} /></label>
