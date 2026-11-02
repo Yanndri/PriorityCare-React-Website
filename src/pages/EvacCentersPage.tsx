@@ -6,6 +6,7 @@ import { facilityTypeLabel } from '../utils/facility'
 import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
 import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
+import { SubTabs } from '../components/SubTabs'
 
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
@@ -59,7 +60,7 @@ export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCent
     })
   }, [centers, searchTerm, showClosed])
 
-  return (
+  const centersList = (
     <section className="panel evac-centers-panel">
       <div className="section-header">
         <h3>Evacuation Centers</h3>
@@ -115,11 +116,12 @@ export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCent
                 </>}
                 {center.closedAt && <p>Closed: {new Date(center.closedAt).toLocaleString()} · {center.closureReason}</p>}
 
-                <section className="assigned-residents">
-                  <div className="assigned-residents-header">
-                    <h4>Assigned / Evacuated Residents</h4>
+                {/* Collapsed by default so each card stays short; opens when searching. */}
+                <details className="assigned-residents" open={Boolean(searchTerm)}>
+                  <summary className="assigned-residents-header">
+                    <h4>Residents here</h4>
                     <span>{center.residents?.length ?? 0} resident(s)</span>
-                  </div>
+                  </summary>
 
                   {center.residents && center.residents.length > 0 ? (
                     <div className="assigned-resident-list">
@@ -146,17 +148,29 @@ export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCent
                       No resident evacuation records are assigned to this center yet.
                     </p>
                   )}
-                </section>
+                </details>
               </article>
             )
           })
         )}
       </div>
-      <ShelterCatchmentPanel />
-      <ReliefDemandPlanner centers={centers} />
+    </section>
+  )
+
+  // One tab per job so the page is not one long scroll.
+  return (
+    <>
+      <SubTabs
+        label="Evacuation center tools"
+        parts={[
+          { key: 'centers', label: 'Centers', content: centersList },
+          { key: 'shelters', label: 'Shelter assignments', content: <ShelterCatchmentPanel /> },
+          { key: 'relief', label: 'Relief supplies', content: <ReliefDemandPlanner centers={centers} /> },
+        ]}
+      />
       {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} barangayOptions={barangayOptions} onClose={() => setForm(null)} onSaved={onReload} />}
       {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
-    </section>
+    </>
   )
 }
 
