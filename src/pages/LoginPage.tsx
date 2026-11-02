@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { Icon } from '../components/Icon'
+import logo from '../assets/prioritycare-logo.png'
 import {
   dashboardPathFor,
   fetchStaffProfile,
@@ -85,7 +86,7 @@ export function LoginPage() {
       <form className="login-card" onSubmit={handleLogin}>
         <div className="login-card-head">
           <span className="login-mark" aria-hidden="true">
-            <Icon name="life-ring" />
+            <img className="brand-logo" src={logo} alt="" />
           </span>
           <strong>PRIORITYCARE</strong>
         </div>

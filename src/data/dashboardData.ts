@@ -12,17 +12,16 @@ const BEFORE = 'Before a disaster'
 const DURING = 'During a disaster'
 const AFTER = 'After a disaster'
 
+// Each tab matches a sub-module in Appendix N (numbers in the comments).
 const operationalItems: MenuItem[] = [
-  { key: 'verification', label: 'Residents', group: BEFORE },
-  { key: 'evacCenters', label: 'Evacuation Centers', group: BEFORE },
-  { key: 'preemptiveEvacuation', label: 'Pre-emptive Evacuation', group: BEFORE },
-  { key: 'disasterEvents', label: 'Declare a Disaster', group: DURING },
-  { key: 'geoMap', label: 'Map', group: DURING },
-  { key: 'dispatch', label: 'SOS & Rescue Teams', group: DURING },
-  { key: 'rescueReconciliation', label: 'Missing Persons', group: DURING },
-  { key: 'familyReunification', label: 'Find a Family Member', group: DURING },
-  { key: 'reports', label: 'Situation & Relief Reports', group: AFTER },
-  { key: 'dataMining', label: 'Charts', group: AFTER },
+  { key: 'verification', label: 'Residents', group: BEFORE }, // 1.1, 1.2
+  { key: 'evacCenters', label: 'Evacuation Centers', group: BEFORE }, // 2.1, 2.3
+  { key: 'preemptiveEvacuation', label: 'Pre-emptive Evacuation', group: BEFORE }, // 1.3
+  { key: 'disasterEvents', label: 'Declare a Disaster', group: DURING }, // 3.1
+  { key: 'geoMap', label: 'Map', group: DURING }, // 3.2
+  { key: 'dispatch', label: 'SOS & Rescue', group: DURING }, // 1.3, 2.2
+  { key: 'rescueReconciliation', label: 'Missing & Family Search', group: DURING }, // 4.1
+  { key: 'reports', label: 'Reports', group: AFTER }, // 4.2
 ]
 
 export const adminMenuItems: MenuItem[] = [
@@ -32,9 +31,7 @@ export const adminMenuItems: MenuItem[] = [
 
 export const superAdminMenuItems: MenuItem[] = [
   { key: 'home', label: 'Today' },
-  { key: 'barangayOverview', label: 'Barangay Overview', group: 'Municipal admin' },
-  { key: 'adminAccounts', label: 'Admin Accounts', group: 'Municipal admin' },
-  { key: 'responderAccounts', label: 'Rescuer Accounts', group: 'Municipal admin' },
+  { key: 'adminAccounts', label: 'Accounts & Barangays', group: 'Municipal admin' }, // 4.3
   { key: 'activityLogs', label: 'Activity Logs', group: 'Municipal admin' },
   ...operationalItems,
 ]
@@ -46,14 +43,14 @@ export const pageDescriptions: Record<MenuKey, string> = {
   evacCenters: 'Your evacuation centers: how full they are, who is inside, and relief supplies needed.',
   preemptiveEvacuation: 'Before a disaster hits, record which households are staying home or leaving, and where they are going.',
   disasterEvents: 'Declare a flood, fire, earthquake or landslide when it happens, and close it when it is over.',
-  geoMap: 'See residents, evacuation centers and SOS calls on the map.',
+  geoMap: 'See residents by priority, evacuation centers and SOS calls on the map, plus the vulnerability heatmap.',
   dispatch: 'Answer SOS calls: open a rescue request and send a rescue team.',
-  rescueReconciliation: 'Record people reported missing and mark them found.',
+  rescueReconciliation: 'Record people reported missing, mark them found, and help families find where a relative is.',
   familyReunification: 'Help someone find out where a family member is: at a center, rescued, or still missing.',
-  reports: 'Make the situation report (RDANA) and the DSWD relief report (DROMIC) as PDF or Excel.',
+  reports: 'Make the situation report (RDANA), the DSWD relief report (DROMIC) and the evacuation audit trail as PDF or Excel.',
   dataMining: 'Charts about your residents, such as who needs the most help during evacuation.',
   barangayOverview: 'Every barangay at a glance. Click one to open its dashboard.',
-  adminAccounts: 'Create barangay admin accounts, suspend them, or move them to another barangay.',
+  adminAccounts: 'Every barangay at a glance, plus barangay admin and rescuer accounts.',
   responderAccounts: 'Create and manage accounts for accredited rescuers.',
   activityLogs: 'A record of who changed what, and when.',
 }

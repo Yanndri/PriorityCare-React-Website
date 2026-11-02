@@ -1263,8 +1263,14 @@ textarea {
 
   .nav-group {
     display: flex;
+    flex: 0 0 auto;
     padding-bottom: 0;
     border-bottom: 0;
+  }
+
+  /* Keep each tab name on one line; the row scrolls sideways instead. */
+  .nav-label {
+    white-space: nowrap;
   }
 
   .nav-button {
@@ -1386,4 +1392,17 @@ textarea {
 
 .residents-insights > .panel + .panel {
   margin-top: 0;
+}
+
+/* PriorityCare logo (black house + pin) in the header and on the sign-in card. */
+.brand-mark,
+.login-mark {
+  background: transparent !important;
+}
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }

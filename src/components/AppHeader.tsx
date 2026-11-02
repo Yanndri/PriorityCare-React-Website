@@ -1,4 +1,5 @@
 import { Icon } from './Icon'
+import logo from '../assets/prioritycare-logo.png'
 
 type AppHeaderProps = {
   name: string
@@ -12,7 +13,7 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
     <header className="app-header">
       <div className="header-brand">
         <span className="brand-mark" aria-hidden="true">
-          <Icon name="life-ring" />
+          <img className="brand-logo" src={logo} alt="" />
         </span>
         <div>
           <strong className="brand-name">PRIORITYCARE</strong>

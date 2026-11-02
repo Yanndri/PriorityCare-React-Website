@@ -24,7 +24,8 @@ import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
 import { FamilyReunificationPage } from './pages/FamilyReunificationPage'
 import { DispatchPage } from './pages/DispatchPage'
 import { ReportsPage } from './pages/ReportsPage'
-import { DataMiningPage } from './pages/DataMiningPage'
+import { VulnerabilityHeatmapPanel } from './components/analytics/VulnerabilityHeatmapPanel'
+import { SubTabs } from './components/SubTabs'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
 import { PreemptiveEvacuationPage } from './pages/PreemptiveEvacuationPage'
@@ -530,13 +531,16 @@ function App({ profile }: AppProps) {
 
           {isManagementTab ? (
             <>
-              {activeMenu === 'barangayOverview' && (
-                <SuperAdminSection view="barangays" onOpenBarangay={openBarangay} />
-              )}
               {activeMenu === 'adminAccounts' && (
-                <SuperAdminSection view="accounts" onOpenBarangay={openBarangay} />
+                <SubTabs
+                  label="Accounts and barangays"
+                  parts={[
+                    { key: 'barangays', label: 'Barangays', content: <SuperAdminSection view="barangays" onOpenBarangay={openBarangay} /> },
+                    { key: 'admins', label: 'Admin accounts', content: <SuperAdminSection view="accounts" onOpenBarangay={openBarangay} /> },
+                    { key: 'rescuers', label: 'Rescuer accounts', content: <ResponderAccountsPage /> },
+                  ]}
+                />
               )}
-              {activeMenu === 'responderAccounts' && <ResponderAccountsPage />}
               {activeMenu === 'activityLogs' && <AuditTrailPanel />}
             </>
           ) : isLoadingDatabase ? (
@@ -606,14 +610,23 @@ function App({ profile }: AppProps) {
           )}
 
           {activeMenu === 'geoMap' && (
-            <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters} />
+            <>
+              <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters} />
+              <VulnerabilityHeatmapPanel residents={liveResidents} active />
+            </>
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
 
-          {activeMenu === 'rescueReconciliation' && <RescueReconciliationPage />}
-
-          {activeMenu === 'familyReunification' && <FamilyReunificationPage />}
+          {activeMenu === 'rescueReconciliation' && (
+            <SubTabs
+              label="Missing persons and family search"
+              parts={[
+                { key: 'missing', label: 'Missing persons', content: <RescueReconciliationPage /> },
+                { key: 'family', label: 'Find a family member', content: <FamilyReunificationPage /> },
+              ]}
+            />
+          )}
 
           {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} />}
 
@@ -623,10 +636,6 @@ function App({ profile }: AppProps) {
               scopeLabel={scopeLabel}
               generatedBy={generatedBy}
             />
-          )}
-
-          {activeMenu === 'dataMining' && (
-            <DataMiningPage residents={liveResidents} />
           )}
 
           {activeMenu === 'preemptiveEvacuation' && (
