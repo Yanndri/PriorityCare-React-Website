@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useLiveSignal } from '../lib/useLiveSignal'
 import {
   destinationLabel,
   destinationTypeLabels,
@@ -14,6 +15,7 @@ import {
   type PreemptiveStatus,
 } from '../api/preemptiveEvacuationApi'
 import '../components/ShelterCatchmentPanel.css'
+import { listResponders, type Responder } from '../api/superAdminApi'
 
 // Module: Log Resident Pre-emptive Evacuation Status & Intended Destination.
 // Staff log (or residents report from the app) whether a household is staying,
@@ -35,6 +37,7 @@ type Draft = {
   destinationAddress: string
   headcount: string
   note: string
+  rescuerUid: string // '' = came on their own
 }
 
 const statusTone: Record<PreemptiveStatus, string> = {
@@ -69,6 +72,7 @@ function newDraft(resident: PreemptiveResident, board: PreemptiveBoard): Draft {
     destinationAddress: latest?.destination_address ?? '',
     headcount: String(latest?.headcount ?? resident.household_size),
     note: '',
+    rescuerUid: '',
   }
 }
 
@@ -82,6 +86,14 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [history, setHistory] = useState<{ uid: string; name: string; logs: PreemptiveLog[] } | null>(null)
+  const [rescuers, setRescuers] = useState<Responder[]>([])
+  // Going to / at an evacuation center: staff say whether a rescuer brought them (shown as "Rescued").
+  const askRescuer = Boolean(draft && draft.destinationType === 'evacuation_center'
+    && (draft.status === 'evacuating' || draft.status === 'arrived'))
+
+  useEffect(() => {
+    listResponders().then((list) => setRescuers(list.filter((r) => r.account_status === 'active'))).catch(() => setRescuers([]))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -99,6 +111,11 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch
     void load()
   }, [load])
+
+  // Residents reporting from the app ("on the way", "arrived") appear without a Refresh.
+  useLiveSignal(['preemptive', 'events', 'residents', 'evacuation'], () => {
+    getPreemptiveBoard(scopeBarangayId).then(setBoard).catch(() => { /* keep what is shown */ })
+  })
 
   const counts = useMemo(() => {
     const result: Record<StatusFilter, number> = {
@@ -146,6 +163,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
         destinationAddress: draft.destinationAddress,
         headcount: draft.headcount ? Number(draft.headcount) : null,
         note: draft.note,
+        rescuerUid: askRescuer ? draft.rescuerUid : '',
       })
       setNotice(`${draft.resident.name}: ${preemptiveStatusLabels[draft.status]} logged.`)
       setDraft(null)
@@ -188,7 +206,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
 
   return <section className="panel catchment-panel">
     <div className="section-header">
-      <div><h3>Resident Evacuation Status &amp; Destination</h3></div>
+      <div><h3>Evacuation log</h3></div>
       <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => void load()}>Refresh</button>
     </div>
     <p className="catchment-muted">
@@ -240,6 +258,11 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
                 placeholder={draft.destinationType === 'relative_friend' ? 'e.g. Tita Nena, Purok 2, Pilipog' : 'e.g. Church hall, Poblacion'}
                 onChange={(e) => setDraft({ ...draft, destinationAddress: e.target.value })} /></label>}
       </>}
+      {askRescuer && <label><span>How did they get there?</span>
+        <select value={draft.rescuerUid} onChange={(e) => setDraft({ ...draft, rescuerUid: e.target.value })}>
+          <option value="">On their own</option>
+          {rescuers.map((r) => <option key={r.uid} value={r.uid}>Brought by {r.name}</option>)}
+        </select></label>}
       <label><span>People in this group</span>
         <input type="number" min={1} max={50} value={draft.headcount} onChange={(e) => setDraft({ ...draft, headcount: e.target.value })} /></label>
       <label><span>Disaster event (optional)</span>

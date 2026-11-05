@@ -2,13 +2,13 @@ import { useMemo } from 'react'
 import L from 'leaflet'
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import type { EvacuationCenter } from '../types/dashboard'
+import { useBarangayView } from '../lib/barangayCenters'
+import { MapFocus } from './MapFocus'
 
 // Map picker for registering an evacuation facility: drag the pin (or click
 // the map) to set the GPS coordinates. Existing facilities are shown for
 // reference so a new one is not placed on top of another. The typed
 // latitude/longitude fields stay the source of truth.
-
-const DEFAULT_VIEW: [number, number] = [10.3157, 123.8854] // Cebu City
 
 const pinIcon = L.divIcon({
   className: 'facility-pin',
@@ -21,6 +21,8 @@ type Props = {
   latitude: string
   longitude: string
   centers: EvacuationCenter[]
+  // Barangay to open the map on; null = all of Cordova.
+  focusBarangayId?: number | null
   disabled?: boolean
   onChange: (latitude: string, longitude: string) => void
 }
@@ -44,7 +46,8 @@ function ClickToPlace({ disabled, onPlace }: { disabled?: boolean; onPlace: (lat
   return null
 }
 
-export function FacilityLocationPicker({ latitude, longitude, centers, disabled, onChange }: Props) {
+export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange }: Props) {
+  const view = useBarangayView(focusBarangayId)
   const point = toPoint(latitude, longitude)
   const place = (lat: number, lng: number) => onChange(format(lat), format(lng))
 
@@ -70,8 +73,9 @@ export function FacilityLocationPicker({ latitude, longitude, centers, disabled,
           : 'Click the map, or drag the pin, to set the facility location.'}
       </p>
       <div className="facility-picker-map">
-        <MapContainer center={point ?? DEFAULT_VIEW} zoom={15} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+        <MapContainer center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapFocus center={view.center} zoom={view.zoom} />
           <ClickToPlace disabled={disabled} onPlace={place} />
           {existing.map((center) => (
             <CircleMarker
@@ -84,7 +88,7 @@ export function FacilityLocationPicker({ latitude, longitude, centers, disabled,
             </CircleMarker>
           ))}
           <Marker
-            position={point ?? DEFAULT_VIEW}
+            position={point ?? view.center}
             icon={pinIcon}
             draggable={!disabled}
             eventHandlers={markerHandlers}

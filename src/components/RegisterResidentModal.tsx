@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { fetchDisabilityTypes, registerResident, type ResidentRegistrationInput } from '../api/residentProfileApi'
+import { useSitios } from '../api/sitiosApi'
 
 // Staff register a resident who cannot sign up in the app themselves
 // (no phone, elderly, PWD). The resident gets the same login as an app
@@ -37,6 +38,7 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const today = new Date().toLocaleDateString('en-CA')
+  const { sitios } = useSitios(form.barangay_id === '' ? null : Number(form.barangay_id))
 
   useEffect(() => {
     let cancelled = false
@@ -103,7 +105,10 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
                 {barangays.length !== 1 && <option value="">Select barangay…</option>}
                 {barangays.map((b) => <option key={b.barangay_id} value={b.barangay_id}>{b.barangay_name}</option>)}
               </select></label>
-              {textField('sitio', 'Sitio / purok (optional)', false)}
+              <label><span>Sitio (optional)</span><select value={form.sitio} onChange={(e) => setField('sitio', e.target.value)}>
+                <option value="">{sitios.length ? 'Select sitio…' : 'No sitios listed for this barangay'}</option>
+                {sitios.map((s) => <option key={s.sitio_id} value={s.sitio_name}>{s.sitio_name}</option>)}
+              </select></label>
               {textField('address', 'Address (optional)', false)}
               {textField('landmark', 'Landmark (optional)', false)}
               <label><span>GPS latitude (optional)</span><input type="number" step="any" min={-90} max={90} value={form.gps_lat} onChange={(e) => setField('gps_lat', e.target.value)} /></label>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   assignDispatchTicket, cancelOpenDispatchTicket, createDispatchTicket, getDispatchBoard, getDispatchTicketHistory,
@@ -15,6 +15,8 @@ import {
 import type { BoardColumn, DispatchBoard, DispatchTicket, RescueUnit, TicketPriority, TicketSource } from '../utils/dispatch'
 import './DispatchPage.css'
 import { Icon } from '../components/Icon'
+import { useLiveSignal } from '../lib/useLiveSignal'
+import { HazardReportsPanel } from '../components/HazardReportsPanel'
 
 type Draft = {
   barangay: string; event: string; resident: string; subject: string; source: TicketSource; sourceRef: string | null
@@ -28,6 +30,19 @@ const COLUMNS: { key: BoardColumn; title: string }[] = [
   { key: 'open', title: 'Unassigned' }, { key: 'assigned', title: 'Assigned' },
   { key: 'active', title: 'In progress' }, { key: 'closed', title: 'Closed (7 days)' },
 ]
+// A short two-tone chime for a new SOS. Browsers allow it only after the page was clicked once.
+function chime() {
+  try {
+    const ctx = new AudioContext()
+    ;[880, 660].forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain()
+      osc.frequency.value = freq; gain.gain.value = 0.15
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.start(ctx.currentTime + i * 0.25); osc.stop(ctx.currentTime + i * 0.25 + 0.2)
+    })
+    setTimeout(() => void ctx.close(), 1000)
+  } catch { /* no audio available */ }
+}
 const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }) : ''
 
 export function DispatchPage({ residents }: { residents: Resident[] }) {
@@ -49,6 +64,30 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
     catch (e) { setBoard(null); setError(e instanceof Error ? e.message : 'Unable to load the dispatch board.') }
     finally { setLoading(false) }
   }
+  // New SOS calls since the page opened, highlighted until handled.
+  const seenSos = useRef<Set<string> | null>(null)
+  const [newSos, setNewSos] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!board) return
+    const ids = board.intake_sos.map(a => a.alert_id)
+    if (seenSos.current) {
+      const seen = seenSos.current
+      const fresh = ids.filter(id => !seen.has(id))
+      if (fresh.length) {
+        setNewSos(prev => new Set([...prev, ...fresh]))
+        const first = board.intake_sos.find(a => a.alert_id === fresh[0])
+        setNotice(fresh.length === 1 ? `New SOS from ${first?.resident_name ?? 'a resident'}.` : `${fresh.length} new SOS calls.`)
+        chime()
+      }
+    }
+    seenSos.current = new Set(ids)
+  }, [board])
+
+  // Updates from the app (SOS raised or cancelled, rescuers moving tickets, units) without a Refresh.
+  useLiveSignal(['sos', 'tickets', 'units', 'missing', 'events'], () => {
+    getDispatchBoard().then(setBoard).catch(() => { /* keep the board shown; Refresh shows the error */ })
+  })
+
   useEffect(() => {
     let cancelled = false
     getDispatchBoard().then(b => { if (!cancelled) setBoard(b) })
@@ -257,8 +296,8 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
       {intakeCount > 0 && <section className="panel">
         <h3>Needs a ticket</h3>
         <div className="intake-list">
-          {board.intake_sos.map(a => <article key={a.alert_id} className="intake-item">
-            <div><span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>
+          {board.intake_sos.map(a => <article key={a.alert_id} className={`intake-item${newSos.has(a.alert_id) ? ' is-new' : ''}`}>
+            <div>{newSos.has(a.alert_id) && <span className="new-badge">New</span>}<span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>
               {a.home_barangay_id != null && a.home_barangay_id !== a.barangay_id && <> <span className="prio-badge prio-normal">Visiting from {a.home_barangay_name ?? `Barangay ${a.home_barangay_id}`}</span></>}
               <div className="dispatch-muted">{a.alert_type ?? 'alert'} · {a.barangay_name ?? barangayName(a.barangay_id)}{a.headcount ? ` · ${a.headcount} ${a.headcount === 1 ? 'person' : 'people'}` : ''} · {elapsed(a.created_at)} ago</div>
               {a.note && <div className="dispatch-muted">"{a.note}"</div>}</div>
@@ -298,6 +337,8 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
           </div>
         })}
       </section>
+
+      <HazardReportsPanel />
     </>}
 
     {tab === 'rules' && <EquipmentRulesPanel />}

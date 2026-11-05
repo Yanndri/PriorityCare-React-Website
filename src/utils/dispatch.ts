@@ -1,6 +1,7 @@
 // Module 5.5 — digital rescue dispatch tickets. Pure helpers (no Supabase) for unit tests.
 import type { Resident } from '../types/dashboard'
-import { calculateVpi, DEFAULT_VPI_RULES, vpiToday } from './vpi.ts'
+import { vpiToday } from './vpi.ts'
+import { residentVpi } from './householdVpi.ts'
 import { DEFAULT_EQUIPMENT_RULES, matchEquipment, type EquipmentRule } from './equipmentMatch.ts'
 
 export type TicketStatus = 'open' | 'assigned' | 'acknowledged' | 'en_route' | 'on_scene' | 'resolved' | 'cancelled'
@@ -100,8 +101,8 @@ export function columnOf(s: TicketStatus): BoardColumn {
 export const EQUIPMENT_OPTIONS = ['Stretcher / spineboard', 'Wheelchair', 'Oxygen', 'Boat', 'Life vests', 'First aid kit', 'Infant kit', 'Rope / harness']
 
 /**
- * Suggested priority and equipment for a resident. Priority: SOS level 3, or a High VPI → critical;
- * SOS level 2 or Moderate VPI → high; otherwise normal. Equipment comes from the editable equipment
+ * Suggested priority and equipment for a resident. Priority: SOS level 3, or a Critical household VPI → critical;
+ * SOS level 2 or Assisted VPI → high; otherwise normal. Equipment comes from the editable equipment
  * rules (Module 5.4). Suggestions only — the dispatcher decides.
  */
 export function suggestForResident(resident: Resident | undefined, sosLevel: number | null = null, asOf = vpiToday(),
@@ -110,10 +111,9 @@ export function suggestForResident(resident: Resident | undefined, sosLevel: num
   let priority: TicketPriority = 'normal'
   const needs = matchEquipment(resident, rules, asOf)
   if (resident) {
-    const v = calculateVpi(resident, DEFAULT_VPI_RULES, asOf)
-    if (v.score >= DEFAULT_VPI_RULES.highAt) { priority = 'critical'; reasons.push(`VPI ${v.score} (High)`) }
-    else if (v.score >= DEFAULT_VPI_RULES.moderateAt) { priority = 'high'; reasons.push(`VPI ${v.score} (Moderate)`) }
-    if (v.level === 'Incomplete') reasons.push('VPI incomplete')
+    const v = residentVpi(resident, asOf)
+    if (v.priority === 'CRITICAL') { priority = 'critical'; reasons.push(`VPI ${v.score}/100 (Critical)`) }
+    else if (v.priority === 'ASSISTED') { priority = 'high'; reasons.push(`VPI ${v.score}/100 (Assisted)`) }
   }
   if (sosLevel !== null && sosLevel >= 3) { priority = 'critical'; reasons.push(`SOS level ${sosLevel}`) }
   else if (sosLevel === 2 && priority === 'normal') { priority = 'high'; reasons.push('SOS level 2') }

@@ -28,3 +28,10 @@ export async function changeFacilityStatus(id: number | string, status: 'active'
   if (error) throw new Error(error.code === 'PGRST202'
     ? 'Center closure needs the 20261014_facility_lifecycle.sql database migration.' : error.message)
 }
+
+// "Went home": everyone at the center (recordId omitted) or one person. Returns how many were marked.
+export async function sendCenterHome(id: number | string, recordId?: string) {
+  const { data, error } = await supabase.rpc('send_center_home', { p_center_id: id, p_record_id: recordId ?? null })
+  if (error) throw new Error(error.code === 'PGRST202' ? 'This needs the STEP17 database update first.' : error.message)
+  return Number(data ?? 0)
+}

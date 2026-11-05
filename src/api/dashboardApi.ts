@@ -242,6 +242,20 @@ export async function fetchDashboardDataFromSupabase(
   const recordRows: AnyRow[] =
     recordsResult.data ?? []
 
+  // Family members and walk-ins have no resident_uid; staff can read the ones in their barangay.
+  const { data: otherRecordData, error: otherRecordError } = await supabase
+    .from('evacuation_records').select('*').is('resident_uid', null)
+  if (otherRecordError) throw otherRecordError
+  const otherRecordRows: AnyRow[] = otherRecordData ?? []
+  const memberIds = [...new Set(otherRecordRows.map((r) => r.member_id).filter(Boolean).map(String))]
+  const memberNames = new Map<string, string>()
+  if (memberIds.length > 0) {
+    const { data: memberData, error: memberError } = await supabase
+      .from('household_members').select('member_id, full_name').in('member_id', memberIds)
+    if (memberError) throw memberError
+    for (const m of memberData ?? []) memberNames.set(String(m.member_id), String(m.full_name ?? ''))
+  }
+
   // 3. Build lookup maps for efficient mapping.
   const usersByUid = toMap(
     usersRows,
@@ -312,7 +326,7 @@ export async function fetchDashboardDataFromSupabase(
     // Older deployments may not yet have the new table. Other errors must surface.
     if (error && !['PGRST205', '42P01'].includes(error.code)) throw error
     const householdQuery = supabase.from('households')
-      .select('household_id,household_name,head_uid,household_members(member_id,name:full_name,relationship,birthdate,sex,is_pregnant,needs,mobility,age_group)')
+      .select('household_id,household_name,head_uid,house_type,household_members(member_id,name:full_name,relationship,birthdate,sex,is_pregnant,needs,mobility,age_group)')
     const householdResult = allBarangays
       ? await householdQuery
       : await householdQuery.eq('barangay_id', selectedBarangayId)
@@ -335,6 +349,7 @@ export async function fetchDashboardDataFromSupabase(
         const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
         resident.householdId = household?.household_id
         resident.householdName = household?.household_name
+        resident.houseType = household?.house_type ?? null
         resident.householdMembers = household?.household_members
       }
     }
@@ -346,6 +361,7 @@ export async function fetchDashboardDataFromSupabase(
       if (!head.householdId) {
         head.householdId = household.household_id
         head.householdName = household.household_name
+        head.houseType = household.house_type ?? null
         head.householdMembers = household.household_members
       }
     }
@@ -358,7 +374,8 @@ export async function fetchDashboardDataFromSupabase(
     (centerRow, index) =>
       mapEvacuationCenter(
         centerRow,
-        recordRows,
+        [...recordRows, ...otherRecordRows],
+        memberNames,
         residentsRows,
         usersByUid,
         barangaysById,
@@ -685,6 +702,8 @@ function mapResident(
         'No address provided',
     ),
 
+    sitio: String(getField(residentRow, ['sitio']) ?? '').trim(),
+
     landmark: String(
       getField(residentRow, [
         'landmark',
@@ -849,6 +868,7 @@ function mapReviewStatus(
 function mapEvacuationCenter(
   centerRow: AnyRow,
   recordRows: AnyRow[],
+  memberNames: Map<string, string>,
   residentRows: AnyRow[],
   usersByUid: Map<string, AnyRow>,
   barangaysById: Map<string, AnyRow>,
@@ -859,111 +879,42 @@ function mapEvacuationCenter(
     ['center_id', 'id'],
   ))
 
-  const assignedRecords = recordRows.filter(
-    (record) => {
-      const recordCenterId = getField(
-        record,
-        ['evac_center_id', 'center_id'],
-      )
+  // People here = everyone whose latest record says they arrived at this center
+  // (same rule as the center's head count in the database).
+  const latestByPerson = new Map<string, AnyRow>()
+  const byNewest = [...recordRows].sort((a, b) =>
+    String(b.logged_at ?? '').localeCompare(String(a.logged_at ?? '')))
+  for (const record of byNewest) {
+    const key = String(record.resident_uid ?? record.member_id ?? record.record_id)
+    if (!latestByPerson.has(key)) latestByPerson.set(key, record)
+  }
+  const assignedRecords = [...latestByPerson.values()].filter((record) =>
+    String(record.evac_center_id) === String(centerId) &&
+    String(record.evac_status) === 'safely_evacuated')
 
-      return (
-        String(recordCenterId) ===
-        String(centerId)
-      )
-    },
-  )
+  const assignedResidents = assignedRecords.map((record, recordIndex) => {
+    const residentUid = toScalar(record.resident_uid)
+    const resident = residentRows.find((row) => String(getField(row, ['uid', 'id'])) === String(residentUid))
+    const user = usersByUid.get(String(residentUid))
+    const barangay = barangaysById.get(String(getField(resident, ['barangay_id']) ?? record.barangay_id))
+    const fullName = [getField(user, ['f_name']), getField(user, ['m_name']), getField(user, ['l_name'])]
+      .filter(Boolean).join(' ').trim()
+    const headcount = Number(record.headcount ?? 1) || 1
+    const name = record.walkin_name ? `${String(record.walkin_name)}${headcount > 1 ? ` (group of ${headcount})` : ''} · walk-in`
+      : record.member_id ? `${memberNames.get(String(record.member_id)) || 'Family member'} · family member`
+      : fullName || `Resident ${residentUid ?? recordIndex + 1}`
 
-  const assignedResidents = assignedRecords.map(
-    (record, recordIndex) => {
-      const residentUid = toScalar(getField(
-        record,
-        ['resident_uid', 'uid'],
-      ))
-
-      const resident = residentRows.find(
-        (row) =>
-          String(
-            getField(row, ['uid', 'id']),
-          ) === String(residentUid),
-      )
-
-      const user = usersByUid.get(
-        String(residentUid),
-      )
-
-      const barangay = barangaysById.get(
-        String(
-          getField(resident, [
-            'barangay_id',
-            'barangayId',
-          ]),
-        ),
-      )
-
-      const firstName = getField(
-        user,
-        ['f_name', 'first_name', 'firstname'],
-      )
-
-      const middleName = getField(
-        user,
-        ['m_name', 'middle_name', 'middlename'],
-      )
-
-      const lastName = getField(
-        user,
-        ['l_name', 'last_name', 'lastname'],
-      )
-
-      const fullName = [
-        firstName,
-        middleName,
-        lastName,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .trim()
-
-      return {
-        id:
-          residentUid ??
-          `center-resident-${index + 1}-${recordIndex + 1}`,
-
-        name:
-          fullName ||
-          `Resident ${residentUid ?? recordIndex + 1}`,
-
-        barangay: String(
-          getField(barangay, [
-            'barangay_name',
-            'name',
-          ]) ??
-            getField(resident, [
-              'barangay',
-              'barangay_name',
-            ]) ??
-            'Unknown Barangay',
-        ),
-
-        constraint: mapConstraint(
-          String(
-            getField(resident, [
-              'mobility_status',
-              'constraint',
-              'disability_type',
-            ]) ?? '',
-          ),
-        ),
-
-        evacuationStatus: String(
-          getField(record, [
-            'evac_status',
-            'status',
-          ]) ?? 'pending',
-        ),
-      }
-    },
-  )
+    return {
+      id: String(record.record_id ?? `center-resident-${index + 1}-${recordIndex + 1}`),
+      name,
+      barangay: String(getField(barangay, ['barangay_name', 'name']) ?? 'Unknown Barangay'),
+      constraint: mapConstraint(String(getField(resident, ['mobility_status']) ?? '')),
+      evacuationStatus: String(record.evac_status ?? 'pending'),
+      // A rescuer checked them in; no rescuer means they came on their own.
+      rescued: Boolean(record.rescuer_uid),
+      headcount,
+    }
+  })
 
   return {
     id: centerId ?? `center-${index + 1}`,

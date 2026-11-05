@@ -127,7 +127,7 @@ export const CATEGORY_LABELS: Record<TimelineCategory, string> = {
 export const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TimelineCategory[]
 
 const VALUE_LABELS: Record<string, string> = {
-  pending: 'Pending', in_transit: 'In transit', safely_evacuated: 'Safely evacuated', failed: 'Failed / not reached',
+  pending: 'Pending', in_transit: 'In transit', safely_evacuated: 'Safely evacuated', failed: 'Failed / not reached', returned_home: 'Went home',
   active: 'Active', closed: 'Closed', resolved: 'Resolved', missing: 'Missing', found: 'Found', withdrawn: 'Withdrawn',
   approved: 'Approved', rejected: 'Rejected',
 }

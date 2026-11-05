@@ -16,17 +16,21 @@ test('status flow and columns', () => {
 test('priority and equipment suggestions', () => {
   const asOf = '2026-10-17'
   assert.equal(suggestForResident({ ...base }, null, asOf).priority, 'normal')
-  const elder = suggestForResident({ ...base, birthdate: '1940-01-01', mobilityStatus: 'non_ambulatory' }, null, asOf)
-  assert.equal(elder.priority, 'critical')
+  // Household VPI: cannot walk 30 + senior 6 + light house 25 = 61 (Assisted)
+  const elder = suggestForResident({ ...base, birthdate: '1940-01-01', mobilityStatus: 'non_ambulatory', houseType: 'light' }, null, asOf)
+  assert.equal(elder.priority, 'high')
+  const bedriddenFamily = suggestForResident({ ...base, birthdate: '1940-01-01', mobilityStatus: 'non_ambulatory', houseType: 'light',
+    householdMembers: [{ name: 'B', relationship: '', birthdate: '2024-05-01', sex: 'female', is_pregnant: false, needs: '' },
+      { name: 'M', relationship: '', birthdate: '1998-01-01', sex: 'female', is_pregnant: true, needs: '' }] }, null, asOf)
+  assert.equal(bedriddenFamily.priority, 'critical') // 30 + (18 + 8 + 6) + 25 = 87
   assert.deepEqual(elder.equipment.sort(), ['Stretcher / spineboard', 'Wheelchair']) // non-ambulatory + age ≥ 80
   assert.equal(suggestForResident({ ...base, vulnerabilityNeeds: 'needs oxygen' }, null, asOf).equipment[0], 'Oxygen')
   assert.deepEqual(suggestForResident({ ...base, mobilityStatus: 'non_ambulatory' }, null, asOf, []).equipment, []) // no rules, no suggestions
-  assert.equal(suggestForResident({ ...base, isPregnant: true }, null, asOf).priority, 'high')
+  assert.equal(suggestForResident({ ...base, isPregnant: true, houseType: 'light' }, null, asOf).priority, 'high') // 18 + 25 = 43
   assert.equal(suggestForResident(undefined, 3, asOf).priority, 'critical')
   assert.equal(suggestForResident(undefined, 2, asOf).priority, 'high')
   const withBaby = suggestForResident({ ...base, householdMembers: [{ name: 'B', relationship: '', birthdate: '2024-05-01', sex: 'female', is_pregnant: false, needs: '' }] }, null, asOf)
   assert.deepEqual(withBaby.equipment, ['Infant kit'])
-  assert.ok(suggestForResident({ ...base, disabilityCount: undefined }, null, asOf).reasons.includes('VPI incomplete'))
 })
 
 test('unit ranking prefers capability coverage, then least busy; skips inactive', () => {

@@ -1,5 +1,7 @@
+import type React from 'react'
 import type { AccountAction, AccountFilter, Resident, Status } from '../types/dashboard'
-import Select from 'react-select'
+import { residentVpi } from '../utils/householdVpi'
+import { VPI_LABELS } from '../utils/vpi'
 
 type ResidentTableProps = {
   title: string
@@ -10,15 +12,16 @@ type ResidentTableProps = {
   onStatusFilterChange: (value: 'All' | Status) => void
   onViewResidentRequest?: (resident: Resident) => void
   onEditResident?: (resident: Resident) => void
-  onDeleteResident?: (resident: Resident) => void
-  onVerifyResident?: (residentId: number | string) => void
   onChangeAccountState?: (resident: Resident, action: AccountAction) => void
   accountFilter?: AccountFilter
   onAccountFilterChange?: (value: AccountFilter) => void
-  verifyingResidentId?: number | string | null
-  // Barangay names present in the loaded data (the location filter options).
-  locationOptions?: string[]
+  // Shown at the right of the header, e.g. "Register resident".
+  headerAction?: React.ReactNode
 }
+
+const STATUS_CHIPS: ['All' | Status, string][] = [
+  ['All', 'Everyone'], ['Pending', 'Needs review'], ['Verified', 'Verified'], ['Rejected', 'Rejected'],
+]
 
 export function ResidentTable({
   title,
@@ -29,67 +32,49 @@ export function ResidentTable({
   onStatusFilterChange,
   onViewResidentRequest,
   onEditResident,
-  onDeleteResident,
-  onVerifyResident,
   onChangeAccountState,
   accountFilter,
   onAccountFilterChange,
-  verifyingResidentId,
-  locationOptions = [],
+  headerAction,
 }: ResidentTableProps) {
   const hasActions = Boolean(
-    onViewResidentRequest || onEditResident || onDeleteResident || onVerifyResident || onChangeAccountState,
+    onViewResidentRequest || onEditResident || onChangeAccountState,
   )
 
   return (
     <section className="panel table-panel">
       <div className="section-header">
-        <h3>{title}</h3>
-        <span>{residents.length} shown</span>
+        <div>{title && <h3>{title}</h3>}<span>{residents.length} {residents.length === 1 ? 'resident' : 'residents'} shown</span></div>
+        {headerAction}
       </div>
 
-      {/* Search and filter controls update state stored in App.tsx. */}
+      <div className="table-actions resident-status-chips" role="group" aria-label="Filter by status">
+        {STATUS_CHIPS.map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={statusFilter === value}
+            className={statusFilter === value ? 'verify-button' : 'secondary-button'}
+            onClick={() => onStatusFilterChange(value)}>{label}</button>
+        ))}
+      </div>
+
       <div className="filters">
-        <Select
-          isClearable
-          value={
-            searchTerm
-              ? { value: searchTerm, label: searchTerm }
-              : { value: '', label: 'All Locations' }
-          }
-          // Real barangay names from the loaded records (previously a fixed
-          // list of sample locations that did not match the database).
-          options={[
-            { value: '', label: 'All Locations' },
-            ...locationOptions.map((name) => ({ value: name, label: name })),
-          ]}
-          placeholder="Search location..."
-          onChange={(selected) => {
-            onSearchChange(selected?.value || '')
-          }}
+        <input
+          type="search"
+          value={searchTerm}
+          placeholder="Search name, barangay or need…"
+          aria-label="Search residents"
+          onChange={(event) => onSearchChange(event.target.value)}
         />
-
-        <select
-          value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value as 'All' | Status)}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="Verified">Verified</option>
-          <option value="Rejected">Rejected</option>
-        </select>
-
         {accountFilter && onAccountFilterChange && (
           <select
             aria-label="Account"
             value={accountFilter}
             onChange={(event) => onAccountFilterChange(event.target.value as AccountFilter)}
           >
-            <option value="Current">Current Accounts</option>
+            <option value="Current">Current accounts</option>
             <option value="Active">Active</option>
             <option value="Deactivated">Deactivated</option>
             <option value="Archived">Archived</option>
-            <option value="All">All Accounts</option>
+            <option value="All">All accounts</option>
           </select>
         )}
       </div>
@@ -100,28 +85,36 @@ export function ResidentTable({
             <tr>
               <th>Name</th>
               <th>Barangay</th>
-              <th>Constraint</th>
+              <th>Needs</th>
+              <th title="One score out of 100 for the whole household: mobility, pregnancy, children, seniors and house type. Critical 70+, Assisted 40+.">Household VPI</th>
               <th>Status</th>
-              {hasActions && <th>Action</th>}
+              {hasActions && <th>Actions</th>}
             </tr>
           </thead>
 
           <tbody>
             {residents.length === 0 ? (
               <tr>
-                <td colSpan={hasActions ? 5 : 4}>No residents found.</td>
+                <td colSpan={hasActions ? 6 : 5}>No residents match.</td>
               </tr>
             ) : (
               residents.map((resident) => {
-                const isVerifying = verifyingResidentId === resident.id
+                const vpi = residentVpi(resident)
+                const accountState = resident.accountState ?? 'Active'
 
                 return (
                   <tr key={resident.id}>
-                    <td>{resident.name}</td>
+                    <td><strong>{resident.name}</strong>
+                      {resident.householdName && <div className="resident-sub">{resident.householdName}</div>}</td>
                     <td>{resident.barangay}</td>
                     <td>
                       <span className={`badge ${getConstraintClassName(resident.constraint)}`}>
                         {resident.constraint}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`vpi-badge vpi-${vpi.priority === 'CRITICAL' ? 'high' : vpi.priority === 'ASSISTED' ? 'moderate' : 'low'}`}>
+                        {VPI_LABELS[vpi.priority]} · {vpi.score}
                       </span>
                     </td>
                     <td>
@@ -141,68 +134,25 @@ export function ResidentTable({
                     {hasActions && (
                       <td>
                         <div className="table-actions">
-                          {onViewResidentRequest && (
-                            <button
-                              className="view-request-button"
-                              onClick={() => onViewResidentRequest(resident)}
-                            >
-                              View Request
-                            </button>
-                          )}
-
-                          {getPrimaryDocumentUrl(resident) && (
-                            <button
-                              className="view-id-button"
-                              onClick={() => openSubmittedId(resident)}
-                            >
-                              View ID
-                            </button>
-                          )}
-
-                          {onVerifyResident && resident.status === 'Pending' && (
-                            <button
-                              className="verify-button"
-                              disabled={isVerifying}
-                              onClick={() => onVerifyResident(resident.id)}
-                            >
-                              {isVerifying ? 'Verifying...' : 'Verify'}
-                            </button>
-                          )}
-
+                          {onViewResidentRequest && (resident.status === 'Pending' ? (
+                            <button className="review-button" onClick={() => onViewResidentRequest(resident)}>Review ID</button>
+                          ) : (
+                            <button className="view-request-button" onClick={() => onViewResidentRequest(resident)}>Details</button>
+                          ))}
                           {onEditResident && (
-                            <button className="edit-button" onClick={() => onEditResident(resident)}>
-                              Edit
-                            </button>
+                            <button className="edit-button" onClick={() => onEditResident(resident)}>Edit</button>
                           )}
-
-                          {onChangeAccountState && resident.accountState === 'Archived' && (
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'restore')}>
-                              Restore
-                            </button>
+                          {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore.
+                              Residents are never deleted; their records stay for the audit trail. */}
+                          {onChangeAccountState && accountState === 'Active' && (
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'deactivate')}>Deactivate</button>
                           )}
-
-                          {onChangeAccountState && resident.accountState === 'Deactivated' && (
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'reactivate')}>
-                              Reactivate
-                            </button>
-                          )}
-
-                          {onChangeAccountState && (resident.accountState ?? 'Active') === 'Active' && (
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'deactivate')}>
-                              Deactivate
-                            </button>
-                          )}
-
-                          {onChangeAccountState && resident.accountState !== 'Archived' && (
-                            <button className="account-button archive" onClick={() => onChangeAccountState(resident, 'archive')}>
-                              Archive
-                            </button>
-                          )}
-
-                          {onDeleteResident && (
-                            <button className="delete-button" onClick={() => onDeleteResident(resident)}>
-                              Delete
-                            </button>
+                          {onChangeAccountState && accountState === 'Deactivated' && <>
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'reactivate')}>Reactivate</button>
+                            <button className="account-button archive" onClick={() => onChangeAccountState(resident, 'archive')}>Archive</button>
+                          </>}
+                          {onChangeAccountState && accountState === 'Archived' && (
+                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'restore')}>Restore</button>
                           )}
                         </div>
                       </td>
@@ -218,19 +168,7 @@ export function ResidentTable({
   )
 }
 
-// Gets the first submitted verification document URL for the resident.
-function getPrimaryDocumentUrl(resident: Resident) {
-  return resident.documents?.find((document) => document.fileUrl)?.fileUrl
-}
 
-// Opens the submitted ID/document in a new browser tab.
-function openSubmittedId(resident: Resident) {
-  const fileUrl = getPrimaryDocumentUrl(resident)
-
-  if (fileUrl) {
-    window.open(fileUrl, '_blank', 'noopener,noreferrer')
-  }
-}
 
 // Hover text for a Deactivated / Archived tag: why and when.
 function describeAccountState(resident: Resident) {

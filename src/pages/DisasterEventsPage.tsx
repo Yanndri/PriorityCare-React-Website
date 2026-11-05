@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useLiveSignal } from '../lib/useLiveSignal'
 import type { FormEvent } from 'react'
 import { declareEvent, getEventRegister, hazardLabels, resolveEvent } from '../api/disasterEventsApi'
-import type { EventRegister, HazardType } from '../api/disasterEventsApi'
+import type { DisasterEvent, EventRegister, HazardType } from '../api/disasterEventsApi'
+import { DisasterAreaPicker } from '../components/DisasterAreaPicker'
 import './DisasterEventsPage.css'
 
 function manilaNow() {
@@ -21,11 +23,10 @@ export function DisasterEventsPage() {
   const [location, setLocation] = useState('')
   const [onset, setOnset] = useState(manilaNow)
   const [notes, setNotes] = useState('')
-  const [latitude, setLatitude] = useState('')
-  const [longitude, setLongitude] = useState('')
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null)
   const [resolving, setResolving] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [filter, setFilter] = useState<'active' | 'resolved' | 'all'>('active')
+  const [showForm, setShowForm] = useState(false)
   async function load() {
     setLoading(true); setError('')
     try { setRegister(await getEventRegister()) }
@@ -39,27 +40,22 @@ export function DisasterEventsPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+  // Declarations made by another admin show up here too.
+  useLiveSignal(['events'], () => {
+    getEventRegister().then(setRegister).catch(() => { /* keep what is shown */ })
+  })
   async function submit(event: FormEvent) {
     event.preventDefault(); setError(''); setNotice('')
     const startedAt = new Date(`${onset}:00+08:00`)
     if (!Number.isFinite(startedAt.getTime()) || startedAt.getTime() > Date.now()) {
       setError('Enter an onset time that is not in the future (Philippine time).'); return
     }
-    if (Boolean(latitude.trim()) !== Boolean(longitude.trim())) {
-      setError('Provide both coordinates, or leave both blank.'); return
-    }
-    const lat = latitude.trim() ? Number(latitude) : null
-    const lng = longitude.trim() ? Number(longitude) : null
-    if ((lat !== null && (!Number.isFinite(lat) || Math.abs(lat) > 90)) ||
-        (lng !== null && (!Number.isFinite(lng) || Math.abs(lng) > 180))) {
-      setError('Enter valid GPS coordinates.'); return
-    }
     setBusy(true)
     try {
       await declareEvent({ barangay: Number(barangay || register?.barangays[0]?.barangay_id), name, hazard, location,
-        startedAt: startedAt.toISOString(), notes, latitude: lat, longitude: lng })
-      setName(''); setLocation(''); setNotes(''); setLatitude(''); setLongitude(''); setOnset(manilaNow())
-      setNotice('Disaster event declared.'); setFilter('active'); await load()
+        startedAt: startedAt.toISOString(), notes, latitude: pin?.lat ?? null, longitude: pin?.lng ?? null })
+      setName(''); setLocation(''); setNotes(''); setPin(null); setOnset(manilaNow())
+      setNotice('Disaster declared.'); setShowForm(false); await load()
     } catch (e) { setError(e instanceof Error ? e.message : 'Declaration failed.') }
     finally { setBusy(false) }
   }
@@ -74,19 +70,33 @@ export function DisasterEventsPage() {
     finally { setBusy(false) }
   }
   const events = register?.events ?? []
+  const active = events.filter(e => e.status === 'active')
+  const past = events.filter(e => e.status !== 'active')
+  const eventCard = (event: DisasterEvent) => <article key={event.event_id} className="disaster-event-card">
+        <div className="disaster-list-header"><h4>{event.name}</h4><span className={`disaster-status ${event.status}`}>{hazardLabels[event.hazard_type]} · {event.status}</span></div>
+        <p>{register?.barangays.find(s => s.barangay_id === event.barangay_id)?.barangay_name} · {event.location_description}</p>
+        <p>Onset: {formatTime(event.started_at)} · Declared: {formatTime(event.declared_at)}</p>
+        {event.latitude !== null && <p>Pin: {Number(event.latitude).toFixed(5)}, {Number(event.longitude).toFixed(5)}</p>}
+        {event.notes && <p className="disaster-notes">{event.notes}</p>}
+        {event.status === 'resolved' && <p>Resolved: {formatTime(event.resolved_at!)} · {event.resolution_reason}</p>}
+        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason('') }}>Resolve event</button>}
+        {resolving === event.event_id && <form onSubmit={finish} className="disaster-resolution"><label>Resolution reason<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label><p>This ends the active declaration and keeps its history.</p><button className="primary-button" disabled={busy || loading || !reason.trim()}>Confirm resolution</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Cancel</button></form>}
+      </article>
   return <div className="disaster-events-page">
-    <section className="panel disaster-intro">
-      <h3>Disaster event register</h3>
-      <p>Declare operational incidents for your assigned barangay. All times are Philippine time (UTC+8).</p>
-      <p>Declarations do not send responder notifications or associate existing SOS alerts. A map point identifies a reference location, not a danger-zone boundary.</p>
-      <strong>{register ? `${events.filter(e => e.status === 'active').length} active events in your scope` : 'Register unavailable'}</strong>
-      <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => { void load() }}>Refresh register</button>
-    </section>
     {error && <p role="alert" className="disaster-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {loading && <p role="status">Loading event register…</p>}
     <section className="panel">
-      <h3>Declare an active event</h3>
+      <div className="disaster-list-header">
+        <h3>Active disasters ({active.length})</h3>
+        {!showForm && <button type="button" className="primary-button" disabled={!register?.barangays.length || loading} onClick={() => { setShowForm(true); setNotice('') }}>Declare a new disaster</button>}
+      </div>
+      {register && !active.length && <p>No active disaster in your scope.</p>}
+      {active.map(eventCard)}
+    </section>
+    {showForm && <section className="panel">
+      <h3>Declare a new disaster</h3>
+      <p className="disaster-hint">Residents of the barangay see it in the app. All times are Philippine time.</p>
       <form onSubmit={submit}>
         <fieldset disabled={!register || busy || loading || !register.barangays.length} className="disaster-form">
           <label>Event name<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Riverside flood — October 14" /></label>
@@ -94,26 +104,20 @@ export function DisasterEventsPage() {
           <label>Barangay<select required value={barangay || register?.barangays[0]?.barangay_id || ''} onChange={e => setBarangay(e.target.value)}>{register?.barangays.map(s => <option key={s.barangay_id} value={s.barangay_id}>{s.barangay_name}</option>)}</select></label>
           <label>Incident onset (Philippine time)<input required type="datetime-local" value={onset} onChange={e => setOnset(e.target.value)} /></label>
           <label className="disaster-wide">Affected location / landmark<input required maxLength={500} value={location} onChange={e => setLocation(e.target.value)} /></label>
-          <label>Reference latitude (optional)<input type="number" step="any" min={-90} max={90} value={latitude} onChange={e => setLatitude(e.target.value)} /></label>
-          <label>Reference longitude (optional)<input type="number" step="any" min={-180} max={180} value={longitude} onChange={e => setLongitude(e.target.value)} /></label>
+          <div className="disaster-wide">
+            <p className="disaster-map-label">Location on the map (optional)</p>
+            <DisasterAreaPicker barangayId={Number(barangay || register?.barangays[0]?.barangay_id) || null} latitude={pin?.lat ?? null} longitude={pin?.lng ?? null} disabled={!register || busy || loading}
+              onChange={(lat, lng) => setPin(lat !== null && lng !== null ? { lat, lng } : null)} />
+          </div>
           <label className="disaster-wide">Situation notes / source (optional)<textarea maxLength={2000} rows={3} value={notes} onChange={e => setNotes(e.target.value)} /></label>
-          <button className="primary-button" type="submit">{busy ? 'Saving…' : 'Declare active event'}</button>
+          <div className="disaster-wide disaster-form-actions"><button className="primary-button" type="submit">{busy ? 'Saving…' : 'Declare disaster'}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setShowForm(false)}>Cancel</button></div>
         </fieldset>
       </form>
-    </section>
+    </section>}
     <section className="panel">
-      <div className="disaster-list-header"><h3>Event history</h3><label>Show <select value={filter} onChange={e => setFilter(e.target.value as typeof filter)}><option value="active">Active</option><option value="resolved">Resolved</option><option value="all">All</option></select></label></div>
-      {register && !events.some(e => filter === 'all' || e.status === filter) && <p>No {filter === 'all' ? '' : filter} events in your scope.</p>}
-      {events.filter(e => filter === 'all' || e.status === filter).map(event => <article key={event.event_id} className="disaster-event-card">
-        <div className="disaster-list-header"><h4>{event.name}</h4><span className={`disaster-status ${event.status}`}>{hazardLabels[event.hazard_type]} · {event.status}</span></div>
-        <p>{register?.barangays.find(s => s.barangay_id === event.barangay_id)?.barangay_name} · {event.location_description}</p>
-        <p>Onset: {formatTime(event.started_at)} · Declared: {formatTime(event.declared_at)}</p>
-        {event.latitude !== null && <p>Reference point: {event.latitude}, {event.longitude}</p>}
-        {event.notes && <p className="disaster-notes">{event.notes}</p>}
-        {event.status === 'resolved' && <p>Resolved: {formatTime(event.resolved_at!)} · {event.resolution_reason}</p>}
-        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason('') }}>Resolve event</button>}
-        {resolving === event.event_id && <form onSubmit={finish} className="disaster-resolution"><label>Resolution reason<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label><p>This ends the active declaration and keeps its history.</p><button className="primary-button" disabled={busy || loading || !reason.trim()}>Confirm resolution</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Cancel</button></form>}
-      </article>)}
+      <h3>Past disasters ({past.length})</h3>
+      {register && !past.length && <p>No resolved disasters yet.</p>}
+      {past.map(eventCard)}
     </section>
   </div>
 }

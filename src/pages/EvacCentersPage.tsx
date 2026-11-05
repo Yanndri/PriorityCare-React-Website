@@ -1,165 +1,142 @@
-import { useMemo, useState } from 'react'
-import Select from 'react-select'
+import { useState } from 'react'
 import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
 import { facilityTypeLabel } from '../utils/facility'
 import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
 import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
+import { SubTabs } from '../components/SubTabs'
+import { sendCenterHome } from '../api/facilityApi'
 
 type EvacCentersPageProps = {
   centers: EvacuationCenter[]
   onReload: () => Promise<void>
   // Set for super admins only: they choose the barangay a new facility belongs to.
   barangayOptions?: { barangay_id: number; barangay_name: string }[]
+  // Barangay in scope, so the location map opens there; null = all of Cordova.
+  scopeBarangayId?: number | null
 }
 
-export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCentersPageProps) {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [form, setForm] = useState<{ center: EvacuationCenter | null } | null>(null)
-  const [statusCenter, setStatusCenter] = useState<EvacuationCenter | null>(null)
-  const [showClosed, setShowClosed] = useState(false)
-
-  const searchOptions = useMemo(() => {
-    const centerOptions = centers.map((center) => ({
-      value: center.name,
-      label: center.name,
-    }))
-
-    const residentOptions = centers.flatMap((center) =>
-      (center.residents ?? []).map((resident) => ({
-        value: resident.name,
-        label: `${resident.name} — ${center.name}`,
-      })),
-    )
-
-    return [{ value: '', label: 'All Evacuation Centers' }, ...centerOptions, ...residentOptions]
-  }, [centers])
-
-  const filteredCenters = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-
-    if (!normalizedSearch) {
-      return centers.filter((center) => showClosed || center.status.toLowerCase() !== 'closed')
-    }
-
-    return centers.filter((center) => {
-      const matchesCenter = center.name.toLowerCase().includes(normalizedSearch)
-      const matchesStatus = center.status.toLowerCase().includes(normalizedSearch)
-      const matchesResident = (center.residents ?? []).some((resident) => {
-        return (
-          resident.name.toLowerCase().includes(normalizedSearch) ||
-          resident.barangay.toLowerCase().includes(normalizedSearch) ||
-          resident.constraint.toLowerCase().includes(normalizedSearch) ||
-          resident.evacuationStatus.toLowerCase().includes(normalizedSearch)
-        )
-      })
-
-      return (showClosed || center.status.toLowerCase() !== 'closed') && (matchesCenter || matchesStatus || matchesResident)
-    })
-  }, [centers, searchTerm, showClosed])
-
+// Three tabs: the centers themselves, which shelter each barangay uses,
+// and the relief supplies the centers need.
+export function EvacCentersPage(props: EvacCentersPageProps) {
   return (
-    <section className="panel evac-centers-panel">
-      <div className="section-header">
-        <h3>Evacuation Centers</h3>
-        <span>{filteredCenters.length} shown</span>
-        <button type="button" className="verify-button" onClick={() => setForm({ center: null })}>Register Facility</button>
-      </div>
-
-      <div className="evac-center-search">
-        <Select
-          isClearable
-          value={
-            searchTerm
-              ? { value: searchTerm, label: searchTerm }
-              : { value: '', label: 'All Evacuation Centers' }
-          }
-          options={searchOptions}
-          placeholder="Search evacuation center or resident..."
-          onChange={(selected) => {
-            setSearchTerm(selected?.value || '')
-          }}
-        />
-      </div>
-
-      <div className="evac-center-list">
-        <label className="resident-check"><input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /><span>Include closed centers ({centers.filter((center) => center.status.toLowerCase() === 'closed').length})</span></label>
-        <p>Occupancy uses each resident’s latest record marked safely evacuated. Resident names below are limited to your barangay.</p>
-        {filteredCenters.length === 0 ? (
-          <p className="empty-documents">No evacuation centers or assigned residents found.</p>
-        ) : (
-          filteredCenters.map((center) => {
-            const occupancyPercent =
-              center.capacity === 0 ? 0 : Math.min(100, Math.round((center.occupied / center.capacity) * 100))
-
-            return (
-              <article className="evac-center-card" key={center.id ?? center.name}>
-                <div className="evac-center-header">
-                  <strong>{center.name}</strong>
-                  <span>{center.status}</span>
-                </div>
-
-                {center.capacityConfirmed && center.occupancyKnown && <div className="progress-track">
-                  <div className="progress-fill" style={{ width: `${occupancyPercent}%` }} />
-                </div>}
-
-                <p>{center.capacityConfirmed ? `Maximum safe capacity: ${center.capacity} people` : 'Capacity not set'}</p>
-                <p>{center.status.toLowerCase() === 'closed' ? 'Closed — unavailable for new admissions' : center.occupancyKnown ? `${center.occupied} recorded evacuees · ${center.capacityConfirmed ? `${Math.max(0, center.capacity - center.occupied)} slots remaining` : 'available slots unknown'}` : 'Facility-wide occupancy not available'}</p>
-                {center.capacityConfirmed && center.occupancyKnown && center.occupied >= center.capacity && <p role="status">{center.occupied > center.capacity ? 'Over recorded capacity' : 'At capacity'}</p>}
-                {center.facilityType && <p>Type: {facilityTypeLabel(center.facilityType)} · GPS: {center.gpsLat}, {center.gpsLong}</p>}
-                {center.barangayId !== undefined && <p>Barangay: {center.barangayName ?? 'Municipal (all barangays)'}</p>}
-                {center.editable === false ? <p role="note">In your shelter plan · managed by {center.barangayName ? `Barangay ${center.barangayName}` : 'the municipal admin'}</p> : <>
-                <button type="button" className="secondary-button" onClick={() => setForm({ center })}>Set Safe Capacity</button>
-                <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{center.status.toLowerCase() === 'closed' ? 'Reopen Center' : 'Close Center'}</button>
-                </>}
-                {center.closedAt && <p>Closed: {new Date(center.closedAt).toLocaleString()} · {center.closureReason}</p>}
-
-                <section className="assigned-residents">
-                  <div className="assigned-residents-header">
-                    <h4>Assigned / Evacuated Residents</h4>
-                    <span>{center.residents?.length ?? 0} resident(s)</span>
-                  </div>
-
-                  {center.residents && center.residents.length > 0 ? (
-                    <div className="assigned-resident-list">
-                      {center.residents.map((resident) => (
-                        <div className="assigned-resident-card" key={`${center.id ?? center.name}-${resident.id}`}>
-                          <div>
-                            <strong>{resident.name}</strong>
-                            <span>{resident.barangay}</span>
-                          </div>
-
-                          <div className="assigned-resident-tags">
-                            <span className={`badge ${resident.constraint.toLowerCase().replace(' ', '-')}`}>
-                              {resident.constraint}
-                            </span>
-                            <span className="status pending">
-                              {formatEvacuationStatus(resident.evacuationStatus)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="no-assigned-residents">
-                      No resident evacuation records are assigned to this center yet.
-                    </p>
-                  )}
-                </section>
-              </article>
-            )
-          })
-        )}
-      </div>
-      <ShelterCatchmentPanel />
-      <ReliefDemandPlanner centers={centers} />
-      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} barangayOptions={barangayOptions} onClose={() => setForm(null)} onSaved={onReload} />}
-      {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
-    </section>
+    <SubTabs
+      label="Evacuation centers"
+      parts={[
+        { key: 'centers', label: 'Centers', content: <CentersList {...props} /> },
+        { key: 'plan', label: 'Shelter plan', content: <ShelterCatchmentPanel /> },
+        { key: 'relief', label: 'Relief supplies', content: <ReliefDemandPlanner centers={props.centers} /> },
+      ]}
+    />
   )
 }
 
-function formatEvacuationStatus(status: string) {
-  return status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+const isClosed = (c: EvacuationCenter) => c.status.toLowerCase() === 'closed'
+
+function CentersList({ centers, onReload, barangayOptions, scopeBarangayId = null }: EvacCentersPageProps) {
+  const [search, setSearch] = useState('')
+  const [showClosed, setShowClosed] = useState(false)
+  const [form, setForm] = useState<{ center: EvacuationCenter | null } | null>(null)
+  const [statusCenter, setStatusCenter] = useState<EvacuationCenter | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // "Went home" keeps the records (audit trail); people just stop counting at the center.
+  async function wentHome(center: EvacuationCenter, person?: { id: number | string; name: string }) {
+    const question = person
+      ? `Mark ${person.name} as went home?`
+      : `Mark everyone at ${center.name} as went home? Use this when the disaster is over. The center can then be closed.`
+    if (center.id === undefined || !window.confirm(question)) return
+    setBusy(true); setError('')
+    try { await sendCenterHome(center.id, person ? String(person.id) : undefined); await onReload() }
+    catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') }
+    finally { setBusy(false) }
+  }
+
+  // Search matches a center's name or anyone staying in it.
+  const q = search.trim().toLowerCase()
+  const closedCount = centers.filter(isClosed).length
+  const shown = centers
+    .filter(c => showClosed || !isClosed(c))
+    .filter(c => !q || c.name.toLowerCase().includes(q) || (c.residents ?? []).some(r => r.name.toLowerCase().includes(q)))
+
+  return (
+    <section>
+      <div className="evac-toolbar">
+        <input type="search" placeholder="Search a center or a person's name" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search" />
+        <label className="resident-check">
+          <input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} />
+          <span>Show closed ({closedCount})</span>
+        </label>
+        <button type="button" className="verify-button" onClick={() => setForm({ center: null })}>Add a center</button>
+      </div>
+
+      {error && <p role="alert" className="dashboard-error">{error}</p>}
+      {shown.length === 0 && <p className="empty-documents">No evacuation centers found.</p>}
+
+      <div className="evac-grid">
+        {shown.map(center => {
+          const known = Boolean(center.capacityConfirmed && center.occupancyKnown)
+          const percent = known && center.capacity > 0 ? Math.min(100, Math.round((center.occupied / center.capacity) * 100)) : 0
+          const full = known && center.occupied >= center.capacity
+          const label = isClosed(center) ? 'Closed' : full ? 'Full' : 'Open'
+          const people = center.residents ?? []
+          return (
+            <article className="evac-card" key={center.id ?? center.name}>
+              <div className="evac-card-head">
+                <strong>{center.name}</strong>
+                <span className={`evac-badge evac-${label.toLowerCase()}`}>{label}</span>
+              </div>
+              <p className="evac-sub">
+                {center.facilityType ? facilityTypeLabel(center.facilityType) : 'Evacuation center'}
+                {center.barangayId !== undefined && ` · ${center.barangayName ?? 'Municipal (all barangays)'}`}
+              </p>
+
+              {isClosed(center) ? (
+                <p className="evac-sub">Closed{center.closedAt ? ` ${new Date(center.closedAt).toLocaleDateString()}` : ''}{center.closureReason ? `: ${center.closureReason}` : ''}</p>
+              ) : known ? (
+                <>
+                  <div className="progress-track"><div className="progress-fill" style={{ width: `${percent}%` }} /></div>
+                  <p className="evac-count"><strong>{center.occupied}</strong> of {center.capacity} people{full ? '' : ` · ${center.capacity - center.occupied} spaces left`}</p>
+                </>
+              ) : (
+                <p className="evac-sub">{center.capacityConfirmed ? `Room for ${center.capacity} people` : 'Capacity not set yet'}</p>
+              )}
+
+              <details className="evac-people">
+                <summary>People here ({people.reduce((n, r) => n + (r.headcount ?? 1), 0)})</summary>
+                {people.length === 0 ? <p className="evac-sub">No one has checked in yet.</p> : (
+                  <ul>{people.map(r => (
+                    <li key={`${center.id ?? center.name}-${r.id}`}>
+                      <span>{r.name}</span>
+                      <small>
+                        {r.barangay} · <span className={r.rescued ? 'evac-rescued' : 'evac-self'}>{r.rescued ? 'Rescued' : 'Came on their own'}</span>
+                        {center.editable !== false && <button type="button" className="link-button" disabled={busy} onClick={() => void wentHome(center, r)}>Went home</button>}
+                      </small>
+                    </li>
+                  ))}</ul>
+                )}
+              </details>
+
+              {center.editable === false ? (
+                <p className="evac-sub">View only: managed by {center.barangayName ? `Barangay ${center.barangayName}` : 'the municipal admin'}.</p>
+              ) : (
+                <div className="evac-actions">
+                  <button type="button" className="secondary-button" onClick={() => setForm({ center })}>Edit</button>
+                  {!isClosed(center) && center.occupied > 0 && (
+                    <button type="button" className="secondary-button" disabled={busy} onClick={() => void wentHome(center)}>Everyone went home</button>
+                  )}
+                  <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{isClosed(center) ? 'Reopen' : 'Close'}</button>
+                </div>
+              )}
+            </article>
+          )
+        })}
+      </div>
+
+      {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} barangayOptions={barangayOptions} scopeBarangayId={scopeBarangayId} onClose={() => setForm(null)} onSaved={onReload} />}
+      {statusCenter && <FacilityLifecycleForm key={statusCenter.id ?? statusCenter.name} center={statusCenter} onClose={() => setStatusCenter(null)} onSaved={onReload} />}
+    </section>
+  )
 }

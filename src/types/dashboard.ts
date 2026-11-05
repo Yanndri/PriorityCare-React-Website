@@ -4,6 +4,7 @@
 export type MenuKey =
   | 'home'
   | 'verification'
+  | 'population'
   | 'geoMap'
   | 'disasterEvents'
   | 'rescueReconciliation'
@@ -58,6 +59,8 @@ export type Resident = {
   /** Names from disability_types; undefined when the disability assessment was never loaded. */
   disabilityTypes?: string[]
   householdName?: string
+  /** households.house_type: light / mixed / concrete. */
+  houseType?: string | null
   isHouseholdHead?: boolean
   vulnerabilityNeeds?: string
   householdMembers?: {
@@ -72,6 +75,8 @@ export type Resident = {
     age_group?: string
   }[]
   address?: string
+  /** residents.sitio: the sitio picked from the barangay's list (may be blank). */
+  sitio?: string
   landmark?: string
   emergencyContactName?: string
   emergencyContactNo?: string
@@ -96,6 +101,8 @@ export type EvacuationCenterResident = {
   barangay: string
   constraint: Constraint
   evacuationStatus: string
+  rescued?: boolean // true = a rescuer brought them; false = came on their own
+  headcount?: number
 }
 
 export type EvacuationCenter = {

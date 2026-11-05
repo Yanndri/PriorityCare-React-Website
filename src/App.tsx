@@ -24,7 +24,7 @@ import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
 import { FamilyReunificationPage } from './pages/FamilyReunificationPage'
 import { DispatchPage } from './pages/DispatchPage'
 import { ReportsPage } from './pages/ReportsPage'
-import { VulnerabilityHeatmapPanel } from './components/analytics/VulnerabilityHeatmapPanel'
+import { PopulationPage } from './pages/PopulationPage'
 import { SubTabs } from './components/SubTabs'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
@@ -38,7 +38,6 @@ import { exportReport } from './utils/exportReport'
 
 import {
   ALL_BARANGAYS,
-  deleteResidentProfile,
   fetchDashboardDataFromSupabase,
   rejectResidentUser,
   setResidentAccountState,
@@ -56,6 +55,7 @@ import {
   signOutStaff,
   type StaffProfile,
 } from './lib/staffProfile'
+import { useLiveSignal } from './lib/useLiveSignal'
 
 type AppProps = {
   // Verified by RequireStaffRole from public.users before App renders.
@@ -225,6 +225,12 @@ function App({ profile }: AppProps) {
     }
   }, [isSuperAdmin, profile.assignedBarangayId, scope])
 
+  // Residents, centres and check-ins changed elsewhere (the app, a rescuer, another admin):
+  // reload the same scope quietly so lists, occupancy and the verification queue stay current.
+  useLiveSignal(['residents', 'accounts', 'centers', 'evacuation', 'shelter_plans'], () => {
+    if (assignedBarangayId) void reloadDashboardData().catch(() => { /* keep what is shown */ })
+  }, !isLoadingDatabase)
+
   function changeScope(next: string) {
     if (!isSuperAdmin || next === scope) return
     setIsLoadingDatabase(true)
@@ -329,27 +335,6 @@ function App({ profile }: AppProps) {
     await reloadDashboardData()
   }
 
-  async function handleDeleteResident(resident: Resident) {
-    if (
-      !window.confirm(
-        `Delete ${resident.name} permanently? This action cannot be undone. To keep their records, use Archive instead.`,
-      )
-    ) {
-      return
-    }
-
-    try {
-      await deleteResidentProfile(resident.id)
-      await reloadDashboardData()
-    } catch (error) {
-      console.error('Failed to delete resident:', error)
-
-      window.alert(
-        error instanceof Error ? error.message : 'Unable to delete this resident.',
-      )
-    }
-  }
-
   // Archived residents only appear in the Verification list when its account
   // filter asks for them; every other view works with current residents.
   const allResidents = dashboardData.residents
@@ -407,11 +392,6 @@ function App({ profile }: AppProps) {
     })
   }, [allResidents, searchTerm, statusFilter, accountFilter])
 
-  // Location filter options: the barangays actually present in the data.
-  const locationOptions = useMemo(
-    () => [...new Set(liveResidents.map((resident) => resident.barangay).filter(Boolean))].sort(),
-    [liveResidents],
-  )
 
   const stats = useMemo(() => {
     const pending = liveResidents.filter(
@@ -595,25 +575,26 @@ function App({ profile }: AppProps) {
               statusFilter={statusFilter}
               onSearchChange={setSearchTerm}
               onStatusFilterChange={setStatusFilter}
-              locationOptions={locationOptions}
               verifyingResidentId={verifyingResidentId}
               onVerifyResident={handleVerifyResident}
               onRejectResident={handleRejectResident}
               onEditResident={setEditingResident}
-              onDeleteResident={handleDeleteResident}
               onChangeAccountState={handleResidentAccountState}
               accountFilter={accountFilter}
               onAccountFilterChange={setAccountFilter}
-              constraintStats={constraintStats}
               onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
             />
           )}
 
+          {activeMenu === 'population' && (
+            <PopulationPage key={assignedBarangayId ?? 'all'} residents={liveResidents} constraintStats={constraintStats}
+              barangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
+              barangayName={assignedBarangayName} />
+          )}
+
           {activeMenu === 'geoMap' && (
-            <>
-              <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters} />
-              <VulnerabilityHeatmapPanel residents={liveResidents} active />
-            </>
+            <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters}
+              focusBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null} />
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
@@ -631,11 +612,7 @@ function App({ profile }: AppProps) {
           {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} />}
 
           {activeMenu === 'reports' && (
-            <ReportsPage
-              stats={stats}
-              scopeLabel={scopeLabel}
-              generatedBy={generatedBy}
-            />
+            <ReportsPage />
           )}
 
           {activeMenu === 'preemptiveEvacuation' && (
@@ -651,6 +628,7 @@ function App({ profile }: AppProps) {
               onReload={reloadDashboardData}
               centers={liveEvacuationCenters}
               barangayOptions={isSuperAdmin ? barangayOptions : undefined}
+              scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
             />
           )}
           </>

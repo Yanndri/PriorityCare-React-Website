@@ -67,6 +67,7 @@ export type PreemptiveLogInput = {
   destinationAddress: string
   headcount: number | null
   note: string
+  rescuerUid?: string // staff only: the rescuer who brought them ('' = on their own)
 }
 
 function preemptiveError(error: { code?: string; message: string }) {
@@ -99,6 +100,7 @@ export async function logPreemptiveEvacuation(input: PreemptiveLogInput) {
     p_destination_address: withDestination && input.destinationType !== 'evacuation_center' ? input.destinationAddress.trim() : '',
     p_headcount: input.headcount,
     p_note: input.note.trim(),
+    ...(input.rescuerUid ? { p_rescuer_uid: input.rescuerUid } : {}),
   })
   if (error) throw preemptiveError(error)
 }

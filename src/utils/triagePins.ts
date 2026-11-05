@@ -1,24 +1,22 @@
 // Module 4.3 — Household triage pins color-coded by VPI urgency (Red / Yellow / Green).
 // Pure functions so they can be unit-tested; rendering lives in components/TriagePinsLayer.tsx.
 import type { Resident } from '../types/dashboard'
-import { calculateVpi, DEFAULT_VPI_RULES, vpiToday, type VpiRules } from './vpi.ts'
+import { ageOn, countVulnerable, vpiBreakdown, vpiToday, type VpiPerson } from './vpi.ts'
 
 export type TriageLevel = 'red' | 'yellow' | 'green'
 
 export const TRIAGE_LEVELS: Record<TriageLevel, { label: string; short: string; color: string; ring: string; meaning: string }> = {
-  red: { label: 'Red — High priority', short: 'H', color: '#dc2626', ring: '#7f1d1d', meaning: 'Highest household VPI is in the High band' },
-  yellow: { label: 'Yellow — Moderate', short: 'M', color: '#eab308', ring: '#713f12', meaning: 'Highest household VPI is in the Moderate band' },
-  green: { label: 'Green — Low', short: 'L', color: '#16a34a', ring: '#14532d', meaning: 'All assessed members are in the Low band' },
+  red: { label: 'Red — Critical', short: 'C', color: '#dc2626', ring: '#7f1d1d', meaning: 'Household VPI 70 or more' },
+  yellow: { label: 'Yellow — Assisted', short: 'A', color: '#eab308', ring: '#713f12', meaning: 'Household VPI 40 to 69' },
+  green: { label: 'Green — Low', short: 'L', color: '#16a34a', ring: '#14532d', meaning: 'Household VPI below 40' },
 }
 export const TRIAGE_ORDER: TriageLevel[] = ['red', 'yellow', 'green']
 
 export type TriageMember = {
   id: string
   name: string
-  score: number
-  level: 'High' | 'Moderate' | 'Low' | 'Incomplete'
-  factors: string[]
-  missing: string[]
+  /** Why this person matters for the household score, e.g. "Cannot walk", "Senior". */
+  tags: string[]
   hasAccount: boolean
 }
 
@@ -28,11 +26,9 @@ export type TriagePin = {
   householdName: string | null
   barangay: string
   triage: TriageLevel
-  /** Highest member VPI score in the household. */
+  /** Household VPI, 0–100 (same rules as the app). */
   score: number
-  maxScore: number
-  /** Some member's profile is missing assessments: the colour is a lower bound ("at least"). */
-  incomplete: boolean
+  factors: { label: string; points: number }[]
   members: TriageMember[]
   /** Account holders without a valid GPS position (still scored). */
   unmappedMembers: number
@@ -48,69 +44,56 @@ function position(r: Resident): [number, number] | null {
   return [lat, lng]
 }
 
-function ageOn(birthdate: string, asOf: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > asOf) return null
-  return Number(asOf.slice(0, 4)) - Number(birthdate.slice(0, 4)) - (asOf.slice(5) < birthdate.slice(5) ? 1 : 0)
+const MOBILITY_TAGS: Record<string, string> = {
+  non_ambulatory: 'Cannot walk', bedridden: 'Bedridden', wheelchair: 'Wheelchair',
+  semi_ambulatory: 'Needs help walking', assisted: 'Needs help walking',
 }
+
+export function personTags(p: VpiPerson, asOf = vpiToday()) {
+  const tags: string[] = []
+  if (p.mobility && MOBILITY_TAGS[p.mobility]) tags.push(MOBILITY_TAGS[p.mobility])
+  const age = ageOn(p.birthdate, asOf)
+  if (p.age_group === 'infant' || p.age_group === 'child' || (!p.age_group && age !== null && age < 12)) tags.push('Child')
+  if (p.age_group === 'senior' || (age !== null && age >= 60)) tags.push('Senior')
+  if (p.is_pregnant) tags.push('Pregnant')
+  return tags
+}
+
+const bandColour = { CRITICAL: 'red', ASSISTED: 'yellow', LOW: 'green' } as const
 
 /**
- * Dependents listed in households.household_members have no account, mobility or disability
- * assessment. Only the factors that can be known (age band, pregnancy) are scored, and the
- * member is always marked incomplete for the missing assessments.
+ * One pin per household (or per resident with no household), coloured by the household VPI:
+ * Red = Critical (70+), Yellow = Assisted (40–69), Green = Low.
  */
-export function scoreDependent(d: { name?: string; birthdate?: string; is_pregnant?: boolean }, rules: VpiRules, asOf: string) {
-  const factors: { label: string; points: number }[] = []
-  const missing = ['mobility assessment', 'disability assessment']
-  const age = d.birthdate ? ageOn(d.birthdate, asOf) : null
-  if (age === null) missing.unshift('valid birthdate')
-  else if (age < 5 || age >= 60) factors.push({ label: age < 5 ? 'Under 5 years' : '60 years or older', points: rules.age })
-  if (d.is_pregnant) factors.push({ label: 'Pregnancy recorded', points: rules.pregnancy })
-  return { score: factors.reduce((t, f) => t + f.points, 0), factors, missing }
-}
-
-function levelFor(score: number, rules: VpiRules) {
-  return score >= rules.highAt ? 'High' : score >= rules.moderateAt ? 'Moderate' : 'Low'
-}
-
-/**
- * One pin per household (or per resident with no household). The household's colour is its most
- * urgent member's VPI band: Red = High, Yellow = Moderate, Green = Low. Members with incomplete
- * profiles are scored on their known factors only, so the pin is flagged `incomplete` and its colour
- * means "at least this urgent" — an assessment could only raise it.
- */
-export function buildTriagePins(residents: Resident[], rules: VpiRules = DEFAULT_VPI_RULES, asOf = vpiToday()) {
+export function buildTriagePins(residents: Resident[], asOf = vpiToday()) {
   const groups = new Map<string, Resident[]>()
   for (const r of residents) {
     const key = r.householdId ? `hh:${r.householdId}` : `r:${r.id}`
     const list = groups.get(key)
     if (list) list.push(r); else groups.set(key, [r])
   }
-  const maxScore = calculateVpi({ id: 'x', name: '', barangay: '', constraint: 'Walk Assist', status: 'Verified', floodZone: false, lastUpdated: '' } as Resident, rules, asOf).maxScore
   const pins: TriagePin[] = []
   let unmappedHouseholds = 0
   for (const [key, people] of groups) {
     const head = people.find(p => p.isHouseholdHead && position(p))
     const located = head ?? people.find(p => position(p))
     if (!located) { unmappedHouseholds++; continue }
-    const members: TriageMember[] = people.map(p => {
-      const v = calculateVpi(p, rules, asOf)
-      return { id: String(p.id), name: p.name, score: v.score, level: v.level as TriageMember['level'],
-        factors: v.factors.map(f => `${f.label} (+${f.points})`), missing: v.missing, hasAccount: true }
-    })
+    // Everyone counted once: each account holder, then the listed household members.
     const dependents = people.find(p => p.householdMembers?.length)?.householdMembers ?? []
-    dependents.forEach((d, i) => {
-      const s = scoreDependent(d, rules, asOf)
-      members.push({ id: `${key}:dep:${i}`, name: d.name || 'Unnamed dependent', score: s.score, level: 'Incomplete',
-        factors: s.factors.map(f => `${f.label} (+${f.points})`), missing: s.missing, hasAccount: false })
-    })
-    const score = Math.max(0, ...members.map(m => m.score))
-    const band = levelFor(score, rules)
-    const incomplete = members.some(m => m.level === 'Incomplete')
-    const triage: TriageLevel = band === 'High' ? 'red' : band === 'Moderate' ? 'yellow' : 'green'
-    members.sort((a, b) => b.score - a.score || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name))
+    const everyone: VpiPerson[] = [
+      ...people.map(p => ({ mobility: p.mobilityStatus, birthdate: p.birthdate, is_pregnant: p.isPregnant })),
+      ...dependents.map(d => ({ mobility: d.mobility, age_group: d.age_group, birthdate: d.birthdate, is_pregnant: d.is_pregnant })),
+    ]
+    const houseType = people.find(p => p.houseType)?.houseType ?? null
+    const vpi = vpiBreakdown(countVulnerable(everyone, asOf), houseType)
+    const members: TriageMember[] = [
+      ...people.map((p, i) => ({ id: String(p.id), name: p.name, tags: personTags(everyone[i], asOf), hasAccount: true })),
+      ...dependents.map((d, i) => ({ id: `${key}:dep:${i}`, name: d.name || 'Unnamed member', tags: personTags(everyone[people.length + i], asOf), hasAccount: false })),
+    ]
+    members.sort((a, b) => b.tags.length - a.tags.length || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name))
     pins.push({
       key, position: position(located)!, householdName: located.householdName ?? null, barangay: located.barangay,
-      triage, score, maxScore, incomplete, members,
+      triage: bandColour[vpi.priority], score: vpi.score, factors: vpi.factors, members,
       unmappedMembers: people.filter(p => !position(p)).length,
       floodZone: people.some(p => p.floodZone),
       contact: located.emergencyContactName
@@ -122,5 +105,5 @@ export function buildTriagePins(residents: Resident[], rules: VpiRules = DEFAULT
   const drawOrder: Record<TriageLevel, number> = { green: 0, yellow: 1, red: 2 }
   pins.sort((a, b) => drawOrder[a.triage] - drawOrder[b.triage] || a.score - b.score)
   const counts = Object.fromEntries(TRIAGE_ORDER.map(l => [l, pins.filter(p => p.triage === l).length])) as Record<TriageLevel, number>
-  return { pins, counts, unmappedHouseholds, incomplete: pins.filter(p => p.incomplete).length }
+  return { pins, counts, unmappedHouseholds }
 }

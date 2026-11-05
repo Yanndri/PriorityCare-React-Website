@@ -10,6 +10,7 @@ const STATUS: Record<EvacStatus, { label: string; tone: string }> = {
   in_transit: { label: 'In transit', tone: 'warn' },
   pending: { label: 'Rescue pending', tone: 'warn' },
   failed: { label: 'Not reached', tone: 'bad' },
+  returned_home: { label: 'Went home', tone: 'good' },
 }
 
 const formatTime = (iso: string | null) => iso

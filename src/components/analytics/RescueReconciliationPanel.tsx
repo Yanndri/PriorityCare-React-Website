@@ -78,7 +78,7 @@ export function RescueReconciliationPanel() {
 
   const statusBreakdown = useMemo(() => {
     if (!data) return []
-    const labels: [string, string][] = [['safely_evacuated', 'Safely evacuated'], ['in_transit', 'In transit'], ['pending', 'Pending'], ['failed', 'Failed']]
+    const labels: [string, string][] = [['safely_evacuated', 'Safely evacuated'], ['in_transit', 'In transit'], ['pending', 'Pending'], ['failed', 'Failed'], ['returned_home', 'Went home']]
     return [
       ...labels.map(([key, label]) => ({ label, value: data.residents.filter((resident) => resident.latest_status === key).length })),
       { label: 'No evacuation record', value: data.residents.filter((resident) => !resident.latest_status).length },

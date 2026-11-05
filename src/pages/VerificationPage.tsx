@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import type { AccountAction, AccountFilter, ConstraintStat, Resident, Status, VerificationDocument } from '../types/dashboard'
+import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
-import { VpiPanel } from '../components/VpiPanel'
-import { ConstraintChart } from '../components/ConstraintChart'
 import { useEquipmentRules } from '../api/equipmentRulesApi'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
@@ -13,16 +11,13 @@ type VerificationPageProps = {
   verifyingResidentId: number | string | null
   onSearchChange: (value: string) => void
   onStatusFilterChange: (value: 'All' | Status) => void
-  locationOptions?: string[]
   onVerifyResident: (residentId: number | string) => void
   onRejectResident: (residentId: number | string, reason: string) => void
   onEditResident: (resident: Resident) => void
-  onDeleteResident: (resident: Resident) => void
   onChangeAccountState: (resident: Resident, action: AccountAction) => void
   accountFilter: AccountFilter
   onAccountFilterChange: (value: AccountFilter) => void
   onRegisterResident?: () => void
-  constraintStats?: ConstraintStat[]
 }
 
 export function VerificationPage({
@@ -32,16 +27,13 @@ export function VerificationPage({
   verifyingResidentId,
   onSearchChange,
   onStatusFilterChange,
-  locationOptions,
   onVerifyResident,
   onRejectResident,
   onEditResident,
-  onDeleteResident,
   onChangeAccountState,
   accountFilter,
   onAccountFilterChange,
   onRegisterResident,
-  constraintStats,
 }: VerificationPageProps) {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
 
@@ -50,37 +42,22 @@ export function VerificationPage({
 
   return (
     <>
-      {onRegisterResident && (
-        <div className="page-actions">
-          <button type="button" className="secondary-button" onClick={onRegisterResident}>
-            Register Resident
-          </button>
-        </div>
-      )}
-
       <ResidentTable
-        title="Verification Queue"
+        title=""
+        headerAction={onRegisterResident && (
+          <button type="button" className="verify-button" onClick={onRegisterResident}>Register resident</button>
+        )}
         residents={residents}
         searchTerm={searchTerm}
         statusFilter={statusFilter}
-        verifyingResidentId={verifyingResidentId}
         onSearchChange={onSearchChange}
         onStatusFilterChange={onStatusFilterChange}
-        locationOptions={locationOptions}
         onViewResidentRequest={setSelectedResident}
-        onVerifyResident={onVerifyResident}
         onEditResident={onEditResident}
-        onDeleteResident={onDeleteResident}
         onChangeAccountState={onChangeAccountState}
         accountFilter={accountFilter}
         onAccountFilterChange={onAccountFilterChange}
       />
-
-      {/* Moved here from the Today page so that page stays short. */}
-      <section className="residents-insights">
-        <VpiPanel residents={residents} />
-        {constraintStats && <ConstraintChart stats={constraintStats} />}
-      </section>
 
       {selectedResidentFromLatestData && (
         <VerificationRequestModal

@@ -10,10 +10,11 @@ type Props = {
   existingCenters?: EvacuationCenter[]
   onClose: () => void
   onSaved: () => Promise<void>
+  scopeBarangayId?: number | null
   // Super admins only; admins always register in their own barangay.
   barangayOptions?: { barangay_id: number; barangay_name: string }[]
 }
-export function FacilityForm({ center, existingCenters = [], barangayOptions, onClose, onSaved }: Props) {
+export function FacilityForm({ center, existingCenters = [], barangayOptions, scopeBarangayId = null, onClose, onSaved }: Props) {
   const [name, setName] = useState('')
   const [type, setType] = useState<typeof FACILITY_TYPES[number]>('school')
   const [barangay, setBarangay] = useState('')
@@ -56,6 +57,7 @@ export function FacilityForm({ center, existingCenters = [], barangayOptions, on
             latitude={latitude}
             longitude={longitude}
             centers={existingCenters}
+            focusBarangayId={barangay ? Number(barangay) : scopeBarangayId}
             disabled={saving || saved}
             onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng) }}
           />
