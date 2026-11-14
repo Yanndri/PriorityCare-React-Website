@@ -1202,6 +1202,14 @@ td {
 .relief-table { width: 100%; margin-top: 14px; border-collapse: collapse; text-align: left; }
 .relief-table th, .relief-table td { border-bottom: 1px solid #d8d4cc; padding: 10px; }
 .relief-total { padding: 14px; background: #edf4fc; border-radius: 10px; }
+.relief-step { margin-top: 24px; }
+.relief-step h4 { margin: 0 0 6px; font-size: 16px; }
+.relief-hint { color: #5b6472; font-size: 13px; margin: 0 0 12px; }
+.relief-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.relief-actions .relief-hint { margin: 0; }
+.relief-fieldset { border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+.relief-fieldset legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+.relief-total-row th, .relief-total-row td { font-weight: 800; background: #edf4fc; }
 
 .resident-edit-fields { margin: 18px 0; padding: 16px; border: 1px solid #d8d4cc; border-radius: 12px; }
 .resident-edit-fields legend { font-weight: 700; padding: 0 6px; }

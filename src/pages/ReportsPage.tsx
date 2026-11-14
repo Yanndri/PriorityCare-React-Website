@@ -11,9 +11,11 @@ type ReportsPageProps = {
   scopeLabel: string
   // Who is printing, e.g. "Ana Alpha (Admin)".
   generatedBy: string
+  // Relief planning is Municipal/System Admin only (Appendix N 2.3).
+  canAttachRelief?: boolean
 }
 
-export function ReportsPage({ stats, scopeLabel, generatedBy }: ReportsPageProps) {
+export function ReportsPage({ stats, scopeLabel, generatedBy, canAttachRelief = false }: ReportsPageProps) {
   const [printedAt, setPrintedAt] = useState<{ manila: string; utc: string } | null>(null)
   const [printRequest, setPrintRequest] = useState(0)
 
@@ -31,7 +33,7 @@ export function ReportsPage({ stats, scopeLabel, generatedBy }: ReportsPageProps
   return (
     <>
     <div className="no-print">
-      <DromicExportPanel />
+      <DromicExportPanel canAttachRelief={canAttachRelief} />
       <RdanaSummaryPanel />
       <AuditTrailPanel />
     </div>

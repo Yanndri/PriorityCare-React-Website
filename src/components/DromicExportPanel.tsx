@@ -3,10 +3,13 @@ import { fetchRdanaData } from '../api/rdanaApi'
 import { buildDromicReport, type DromicReport } from '../utils/dromicReport'
 import { parseReliefReportDraft, RELIEF_REPORT_KEY } from '../utils/reliefReportDraft'
 
-export function DromicExportPanel() {
+// canAttachRelief: relief planning (Appendix N 2.3) is Municipal/System Admin only,
+// so Barangay Admins export without the relief attachment option.
+export function DromicExportPanel({ canAttachRelief = true }: { canAttachRelief?: boolean } = {}) {
   const [hours,setHours]=useState<24|48>(24)
   const [context,setContext]=useState('')
-  const [attach,setAttach]=useState(true)
+  const [attachChoice,setAttach]=useState(true)
+  const attach=canAttachRelief&&attachChoice
   const [report,setReport]=useState<DromicReport|null>(null)
   const [reviewed,setReviewed]=useState(false)
   const [busy,setBusy]=useState('')
@@ -20,7 +23,7 @@ export function DromicExportPanel() {
       let relief=null
       if(attach) {
         try {relief=parseReliefReportDraft(sessionStorage.getItem(RELIEF_REPORT_KEY))}
-        catch {throw new Error('The saved relief draft could not be read. Save it again in Evacuation Centers, or uncheck the relief attachment.')}
+        catch {throw new Error('The saved relief draft could not be read. Save it again in Evacuation Centers → Relief supplies, or untick the relief option.')}
       }
       const data=await fetchRdanaData(hours)
       setReport(buildDromicReport(data,context,relief))
@@ -60,8 +63,8 @@ export function DromicExportPanel() {
     <fieldset className="resident-edit-fields" disabled={Boolean(busy)}><div className="edit-form-grid">
       <label><span>Activity reporting window</span><select value={hours} onChange={(e)=>{setHours(Number(e.target.value) as 24|48);reset()}}><option value={24}>Last 24 hours</option><option value={48}>Last 48 hours</option></select></label>
     </div><label className="resident-notes">Incident / assessment notes (optional)<textarea maxLength={2000} value={context} onChange={(e)=>{setContext(e.target.value);reset()}} placeholder="Use aggregate assessment notes. Do not enter personal identifiers."/></label>
-      <label className="resident-check"><input type="checkbox" checked={attach} onChange={(e)=>{setAttach(e.target.checked);reset()}}/><span>Attach the latest relief draft saved for Reports in this browser tab</span></label>
-      <p>Save a complete draft using Evacuation Centers → Relief requisition demand → Save Draft for Reports. Its planning date and facility scope are shown separately from this report’s population scope.</p>
+      {canAttachRelief&&<><label className="resident-check"><input type="checkbox" checked={attach} onChange={(e)=>{setAttach(e.target.checked);reset()}}/><span>Include relief supplies saved from Evacuation Centers (this browser tab only)</span></label>
+      <p>First go to Evacuation Centers → Relief supplies and click "Use in DROMIC report". Its planning date and facility scope are shown separately from this report’s population scope.</p></>}
       <button type="button" className="verify-button" onClick={()=>void generate()}>Prepare Export Preview</button>
     </fieldset>
     {busy&&<p role="status">{busy}</p>}{error&&<p role="alert" className="dashboard-error">{error}</p>}{notice&&<p role="status">{notice}</p>}

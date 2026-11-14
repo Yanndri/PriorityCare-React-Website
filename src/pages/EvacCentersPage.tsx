@@ -13,9 +13,12 @@ type EvacCentersPageProps = {
   onReload: () => Promise<void>
   // Set for super admins only: they choose the barangay a new facility belongs to.
   barangayOptions?: { barangay_id: number; barangay_name: string }[]
+  // Relief requisition (Appendix N 2.3) is for Municipal and System Admin only,
+  // so the Relief supplies tab is shown to super admins only.
+  canPlanRelief?: boolean
 }
 
-export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCentersPageProps) {
+export function EvacCentersPage({ centers, onReload, barangayOptions, canPlanRelief = false }: EvacCentersPageProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [form, setForm] = useState<{ center: EvacuationCenter | null } | null>(null)
   const [statusCenter, setStatusCenter] = useState<EvacuationCenter | null>(null)
@@ -165,7 +168,9 @@ export function EvacCentersPage({ centers, onReload, barangayOptions }: EvacCent
         parts={[
           { key: 'centers', label: 'Centers', content: centersList },
           { key: 'shelters', label: 'Shelter assignments', content: <ShelterCatchmentPanel /> },
-          { key: 'relief', label: 'Relief supplies', content: <ReliefDemandPlanner centers={centers} /> },
+          ...(canPlanRelief
+            ? [{ key: 'relief', label: 'Relief supplies', content: <ReliefDemandPlanner centers={centers} /> }]
+            : []),
         ]}
       />
       {form && <FacilityForm key={String(form.center?.id ?? 'new')} center={form.center} existingCenters={centers} barangayOptions={barangayOptions} onClose={() => setForm(null)} onSaved={onReload} />}

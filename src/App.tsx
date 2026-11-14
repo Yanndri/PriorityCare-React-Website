@@ -635,6 +635,7 @@ function App({ profile }: AppProps) {
               stats={stats}
               scopeLabel={scopeLabel}
               generatedBy={generatedBy}
+              canAttachRelief={isSuperAdmin}
             />
           )}
 
@@ -651,6 +652,7 @@ function App({ profile }: AppProps) {
               onReload={reloadDashboardData}
               centers={liveEvacuationCenters}
               barangayOptions={isSuperAdmin ? barangayOptions : undefined}
+              canPlanRelief={isSuperAdmin}
             />
           )}
           </>
