@@ -13,21 +13,19 @@ test('positions reject missing, invalid and 0,0 coordinates', () => {
   }
 })
 
-test('vulnerability weights by VPI and filters by level', () => {
+test('vulnerability weights by household VPI and filters by level', () => {
   const residents = [
     r('low', 10.3, 123.9),
-    r('bedridden-elder', 10.3, 123.9, { birthdate: '1940-01-01', mobilityStatus: 'non_ambulatory' }),
-    r('pregnant', 10.3, 123.9, { isPregnant: true }),
+    r('bedridden-elder', 10.3, 123.9, { birthdate: '1940-01-01', mobilityStatus: 'non_ambulatory', houseType: 'light' }), // 61
+    r('critical', 10.3, 123.9, { mobilityStatus: 'non_ambulatory', isPregnant: true, houseType: 'light' }), // 73
     r('nogps', null, null, { mobilityStatus: 'non_ambulatory' }),
-    r('incomplete', 10.3, 123.9, { disabilityCount: undefined, mobilityStatus: 'non_ambulatory' }),
   ]
   const all = vulnerabilityPoints(residents, 'all', '2026-10-14')
   assert.equal(all.unmapped, 1)
-  assert.equal(all.incomplete, 1)
-  assert.equal(all.points.length, 3) // zero-score resident adds nothing
-  assert.equal(all.points[0].weight, 6 / 9)
+  assert.equal(all.points.length, 2) // zero-score resident adds nothing
+  assert.equal(all.points[0].weight, 0.61)
   assert.equal(vulnerabilityPoints(residents, 'high', '2026-10-14').points.length, 1)
-  assert.equal(vulnerabilityPoints(residents, 'moderate-high', '2026-10-14').points.length, 3)
+  assert.equal(vulnerabilityPoints(residents, 'moderate-high', '2026-10-14').points.length, 2)
 })
 
 test('incidents respect the time window but keep current-state items', () => {

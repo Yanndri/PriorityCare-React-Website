@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLiveSignal } from '../lib/useLiveSignal'
 import { supabase } from '../lib/supabaseClient'
 import { getRescueReconciliation } from '../api/missingPersonsApi'
 import { getPreemptiveBoard } from '../api/preemptiveEvacuationApi'
@@ -52,6 +53,9 @@ async function countRows(table: 'sos_alerts' | 'dispatch_tickets', statuses: str
 
 export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Props) {
   const [live, setLive] = useState<Live | null>(null)
+  // Re-count when the app or another admin changes something.
+  const [tick, setTick] = useState(0)
+  useLiveSignal(['sos', 'tickets', 'events', 'missing', 'preemptive'], () => setTick((n) => n + 1))
 
   useEffect(() => {
     let cancelled = false
@@ -85,7 +89,7 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
       })
     })()
     return () => { cancelled = true }
-  }, [scopeBarangayId])
+  }, [scopeBarangayId, tick])
 
   const pending = residents.filter((r) => r.status === 'Pending').length
   const nearlyFull = centers.filter((c) =>

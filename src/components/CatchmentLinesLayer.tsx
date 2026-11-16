@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLiveSignal } from '../lib/useLiveSignal'
 import { CircleMarker, Polyline, Tooltip } from 'react-leaflet'
 import { getShelterAssignments } from '../api/shelterPlanApi'
 import { catchmentLines, barangayPopulation } from '../utils/shelterCatchments'
@@ -16,6 +17,7 @@ export function CatchmentLinesLayer() {
     getShelterAssignments().then(d => { if (!cancelled) setData(d) }).catch(() => undefined)
     return () => { cancelled = true }
   }, [])
+  useLiveSignal(['shelter_plans', 'centers'], () => { getShelterAssignments().then(setData).catch(() => undefined) })
   // Barangay admins see only their own barangay's catchment; the municipal admin sees all.
   const { lines } = useMemo(() => {
     if (!data) return { lines: [] }

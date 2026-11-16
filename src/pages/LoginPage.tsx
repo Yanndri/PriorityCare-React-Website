@@ -68,18 +68,12 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-hero">
         <div className="meta">Staff portal</div>
-        <h1>
-          Priority care
-          <br />
-          for every
-          <br />
-          resident
-        </h1>
-        <p className="login-hero-sub">Disaster response, Cebu City</p>
+        <h1>Priority care for every resident</h1>
+        <p className="login-hero-sub">Disaster response for Cordova, Cebu</p>
         <ul className="login-facts" aria-label="What the portal covers">
-          <li><span>01</span>Resident Management</li>
-          <li><span>02</span>Evacuation &amp; shelters</li>
-          <li><span>03</span>Rescue dispatch</li>
+          <li><Icon name="users" />Resident records</li>
+          <li><Icon name="building" />Evacuation centers and shelters</li>
+          <li><Icon name="siren-on" />Rescue dispatch</li>
         </ul>
       </section>
 
@@ -88,10 +82,9 @@ export function LoginPage() {
           <span className="login-mark" aria-hidden="true">
             <img className="brand-logo" src={logo} alt="" />
           </span>
-          <strong>PRIORITYCARE</strong>
+          <strong>PriorityCare</strong>
         </div>
 
-        <div className="meta">Sign in</div>
         <h2>Staff login</h2>
         <p className="login-note">
           Admin and Super Admin accounts sign in here. You will be taken to the dashboard for your role.

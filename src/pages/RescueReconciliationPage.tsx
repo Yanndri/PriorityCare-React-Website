@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLiveSignal } from '../lib/useLiveSignal'
 import type { FormEvent } from 'react'
 import {
   fileMissingPersonReport, getRescueReconciliation, markMissingPersonFound, withdrawMissingPersonReport,
@@ -44,6 +45,11 @@ export function RescueReconciliationPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  // Missing reports, check-ins and rescues from the app show up without a Refresh.
+  useLiveSignal(['missing', 'evacuation', 'events', 'sos', 'tickets'], () => {
+    getRescueReconciliation().then(setData).catch(() => { /* keep what is shown */ })
+  })
 
   const result = useMemo(() => data ? reconcile(data) : null, [data])
   const barangayName = (id: number) => data?.barangays.find(s => s.barangay_id === id)?.barangay_name ?? `Barangay ${id}`

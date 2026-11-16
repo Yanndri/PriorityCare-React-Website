@@ -1,60 +1,30 @@
-import { useEffect, useState } from 'react'
 import type { Resident } from '../types/dashboard'
-import { calculateVpi, DEFAULT_VPI_RULES, validateVpiRules, vpiToday, type VpiRules } from '../utils/vpi'
+import { scoreHouseholds } from '../utils/householdVpi'
+import { VPI_LABELS } from '../utils/vpi'
 
-const RULES_KEY = 'prioritycare.prototype-vpi.v1'
-function initialRules(): VpiRules {
-  try {
-    const stored = JSON.parse(localStorage.getItem(RULES_KEY) ?? 'null') as Partial<VpiRules> | null
-    const rules = { ...DEFAULT_VPI_RULES, ...stored }
-    return validateVpiRules(rules) ? DEFAULT_VPI_RULES : rules
-  } catch { return DEFAULT_VPI_RULES }
-}
-const ruleLabels: Record<keyof VpiRules, string> = {
-  age: 'Under 5 or age 60+ points', semiAmbulatory: 'Semi-ambulatory points',
-  nonAmbulatory: 'Non-ambulatory points', disability: 'Any recorded disability points',
-  pregnancy: 'Pregnancy points', moderateAt: 'Moderate starts at', highAt: 'High starts at',
-}
+// Household VPI (0–100), the same score rescuers see in the app.
+const houseLabels: Record<string, string> = { light: 'light materials', mixed: 'mixed materials', concrete: 'concrete' }
 
 export function VpiPanel({ residents }: { residents: Resident[] }) {
-  const [rules, setRules] = useState(initialRules)
-  const [draft, setDraft] = useState(rules)
-  const [asOf, setAsOf] = useState(vpiToday)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const timer = window.setInterval(() => setAsOf(vpiToday()), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
-  const scored = residents.map((resident) => ({ resident, vpi: calculateVpi(resident, rules, asOf) }))
-    .sort((a, b) => Number(a.vpi.level === 'Incomplete') - Number(b.vpi.level === 'Incomplete')
-      || b.vpi.score - a.vpi.score || a.resident.name.localeCompare(b.resident.name))
-  const incomplete = scored.filter((item) => item.vpi.level === 'Incomplete').length
-  const ruleError = validateVpiRules(draft)
-  function apply(next: VpiRules) {
-    setRules(next); setDraft(next); setError('')
-    try { localStorage.setItem(RULES_KEY, JSON.stringify(next)) }
-    catch { setError('Settings apply for this session, but could not be saved on this browser.') }
-  }
+  const households = scoreHouseholds(residents)
   return <section className="panel prototype-vpi">
-    <div className="section-header"><div><h3>Resident vulnerability scores</h3></div><span>{scored.length} profiles</span></div>
-    <p className="vpi-demo-notice">Demonstration weights only. These scores do not determine dispatch, rescue order, or medical triage.</p>
-    <p>Calculated {asOf} (Asia/Manila) · {incomplete} incomplete assessment(s). Scores update after profile changes and birthdays.</p>
+    <div className="section-header"><div><h3>Household vulnerability (VPI)</h3></div><span>{households.length} households</span></div>
+    <p>Each household gets one score out of 100, the same score rescuers see in the app. Critical is 70 or more, Assisted is 40 to 69, Low is below 40.</p>
     <details className="vpi-settings">
-      <summary>Demo scoring rules & settings</summary>
-      <p>Age points + maximum of mobility/disability points + pregnancy points. Verification, GPS presence, free-text medical notes, and household size add no points. Each resident account is scored individually.</p>
-      <div className="edit-form-grid">{(Object.keys(ruleLabels) as (keyof VpiRules)[]).map((field) => <label key={field}><span>{ruleLabels[field]}</span><input type="number" min={0} max={30} step={1} value={Number.isNaN(draft[field]) ? '' : draft[field]} onChange={(e) => setDraft({ ...draft, [field]: e.target.value === '' ? NaN : Number(e.target.value) })} /></label>)}</div>
-      {ruleError && <p role="alert">{ruleError}</p>}
-      <div className="request-modal-actions"><button type="button" className="secondary-button" onClick={() => apply(DEFAULT_VPI_RULES)}>Reset defaults</button><button type="button" className="verify-button" disabled={Boolean(ruleError)} onClick={() => apply(draft)}>Apply demo rules</button></div>
-      <p>These settings are stored on this browser only. Default points: age 2; assisted mobility 2; non-ambulatory 4; disability 2; pregnancy 3. Default bands: low 0–2, moderate 3–5, high 6+.</p>
+      <summary>How the score is counted</summary>
+      <ul>
+        <li>Mobility: someone who cannot walk (bedridden, wheelchair) 30, +5 for each extra person, up to 40. Otherwise someone who needs help walking 18, +4 each, up to 26.</li>
+        <li>Dependents, up to 35: pregnant 18; children under 12, 8 each (up to 16); seniors 60+, 6 each (up to 12).</li>
+        <li>House: light materials 25, mixed 12, concrete 0.</li>
+      </ul>
+      <p>Team-chosen prototype weights. They support, not replace, responder judgement.</p>
     </details>
-    {error && <p role="alert">{error}</p>}
-    {scored.length === 0 && <p className="empty-state">No resident profiles available.</p>}
-    <div className="vpi-list">{scored.map(({ resident, vpi }) => <details className="vpi-resident" key={resident.id}>
-      <summary><span><strong>{resident.name}</strong><small>{resident.barangay}</small></span><span className={`vpi-badge vpi-${vpi.level.toLowerCase()}`}>{vpi.level === 'Incomplete' ? `Incomplete · subtotal ${vpi.score}` : `Demo ${vpi.level} · ${vpi.score}/${vpi.maxScore}`}</span></summary>
-      {vpi.factors.length > 0 ? <ul>{vpi.factors.map((factor) => <li key={factor.label}>{factor.label}: +{factor.points}</li>)}</ul> : <p>No scored factors recorded.</p>}
-      {vpi.age !== null && <p>Age: {vpi.age} years</p>}
-      {vpi.missing.length > 0 && <p className="vpi-missing">Needs assessment: {vpi.missing.join(', ')}. A missing value is not treated as a confirmed absence.</p>}
-      <small>Formula: {vpi.version} · Open Verification → Edit Resident to update the underlying profile.</small>
+    {households.length === 0 && <p className="empty-state">No resident profiles available.</p>}
+    <div className="vpi-list">{households.map((h) => <details className="vpi-resident" key={h.key}>
+      <summary><span><strong>{h.name}</strong><small>{h.barangay} · {h.size} {h.size === 1 ? 'person' : 'people'}</small></span>
+        <span className={`vpi-badge vpi-${h.priority === 'CRITICAL' ? 'high' : h.priority === 'ASSISTED' ? 'moderate' : 'low'}`}>{VPI_LABELS[h.priority]} · {h.score}/100</span></summary>
+      {h.factors.length > 0 ? <ul>{h.factors.map((f) => <li key={f.label}>{f.label}: +{f.points}</li>)}</ul> : <p>No scored factors recorded.</p>}
+      {!h.houseType ? <p className="vpi-missing">House type not recorded (counted as 0).</p> : <p>House: {houseLabels[h.houseType] ?? h.houseType}</p>}
     </details>)}</div>
   </section>
 }

@@ -1,7 +1,8 @@
 // Spatial demographic-vulnerability and incident heatmaps.
 // Pure functions only so they can be unit-tested; rendering lives in components/SpatialHeatmapLayer.tsx.
 import type { Resident } from '../types/dashboard'
-import { calculateVpi, DEFAULT_VPI_RULES, vpiToday } from './vpi.ts'
+import { VPI_ASSISTED_AT, VPI_CRITICAL_AT, vpiToday } from './vpi.ts'
+import { residentVpi } from './householdVpi.ts'
 
 export type HeatLayerKind = 'vulnerability' | 'incidents'
 export type HeatPoint = {
@@ -53,20 +54,19 @@ export function residentPosition(r: Resident): [number, number] | null {
 
 export type VulnerabilityFilter = 'all' | 'moderate-high' | 'high'
 
-/** Each mapped resident weighted by VPI score ÷ maximum score. Zero-score residents add nothing. */
+/** Each mapped resident weighted by their household VPI ÷ 100. Zero-score households add nothing. */
 export function vulnerabilityPoints(residents: Resident[], filter: VulnerabilityFilter = 'all', asOf = vpiToday()) {
   const points: HeatPoint[] = []
   let unmapped = 0
-  let incomplete = 0
+  const incomplete = 0 // kept for callers; the household VPI has no 'incomplete' state
   for (const r of residents) {
     const pos = residentPosition(r)
     if (!pos) { unmapped++; continue }
-    const vpi = calculateVpi(r, DEFAULT_VPI_RULES, asOf)
-    if (vpi.level === 'Incomplete') incomplete++
-    if (filter === 'high' && vpi.score < DEFAULT_VPI_RULES.highAt) continue
-    if (filter === 'moderate-high' && vpi.score < DEFAULT_VPI_RULES.moderateAt) continue
+    const vpi = residentVpi(r, asOf)
+    if (filter === 'high' && vpi.score < VPI_CRITICAL_AT) continue
+    if (filter === 'moderate-high' && vpi.score < VPI_ASSISTED_AT) continue
     if (vpi.score <= 0) continue
-    points.push({ lat: pos[0], lng: pos[1], weight: Math.min(1, vpi.score / vpi.maxScore), kind: 'vulnerability' })
+    points.push({ lat: pos[0], lng: pos[1], weight: Math.min(1, vpi.score / 100), kind: 'vulnerability' })
   }
   return { points, unmapped, incomplete }
 }

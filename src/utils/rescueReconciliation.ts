@@ -1,7 +1,7 @@
 // Reconciles the Missing Persons Manifest against the Master Rescued Directory.
 // Pure functions only (no Supabase access) so they can be unit-tested.
 
-export type EvacStatus = 'pending' | 'in_transit' | 'safely_evacuated' | 'failed'
+export type EvacStatus = 'pending' | 'in_transit' | 'safely_evacuated' | 'failed' | 'returned_home'
 export type ReportStatus = 'missing' | 'found' | 'withdrawn'
 
 export type RegistryResident = {
@@ -244,7 +244,7 @@ export const matchLabels: Record<MatchClass, string> = {
 }
 
 export const statusLabels: Record<EvacStatus, string> = {
-  pending: 'Pending', in_transit: 'In transit', safely_evacuated: 'Safely evacuated', failed: 'Failed / not reached',
+  pending: 'Pending', in_transit: 'In transit', safely_evacuated: 'Safely evacuated', failed: 'Failed / not reached', returned_home: 'Went home',
 }
 
 function csvCell(value: unknown) {

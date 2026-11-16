@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 
-export type EvacStatus = 'pending' | 'in_transit' | 'safely_evacuated' | 'failed'
+export type EvacStatus = 'pending' | 'in_transit' | 'safely_evacuated' | 'failed' | 'returned_home'
 
 export type EvacueePerson = {
   uid: string

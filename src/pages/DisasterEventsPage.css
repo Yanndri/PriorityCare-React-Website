@@ -17,3 +17,6 @@
 .disaster-resolution { max-width: 650px; margin-top: 16px; }
 .disaster-resolution button { margin: 8px 10px 0 0; }
 @media (max-width: 650px) { .disaster-form { grid-template-columns: 1fr; } .disaster-intro button { margin: 12px 0 0; display: block; } }
+.disaster-map-label { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.disaster-form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.disaster-hint { color: #526174; margin: 0 0 16px; }

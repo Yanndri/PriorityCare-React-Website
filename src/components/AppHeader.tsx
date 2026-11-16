@@ -16,7 +16,7 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
           <img className="brand-logo" src={logo} alt="" />
         </span>
         <div>
-          <strong className="brand-name">PRIORITYCARE</strong>
+          <strong className="brand-name">PriorityCare</strong>
         </div>
       </div>
 

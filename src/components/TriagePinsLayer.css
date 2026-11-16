@@ -15,17 +15,7 @@
   position: absolute; bottom: -7px; left: -7px; transform: rotate(45deg); width: 14px; height: 14px; border-radius: 50%;
   background: #fff; color: #183153; border: 1px solid #183153; font: 800 10px/12px system-ui, sans-serif; text-align: center;
 }
-.triage-control.leaflet-control { margin: 0 10px 24px 0; }
-.triage-legend {
-  width: 240px; max-width: calc(100vw - 60px); padding: 10px 12px; border-radius: 10px; background: #fff; color: #183153;
-  box-shadow: 0 4px 16px rgba(24, 49, 83, 0.18); font: 12px/1.4 system-ui, sans-serif;
-}
-.triage-legend-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.triage-legend-head button { border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #183153; padding: 2px 9px; font: inherit; cursor: pointer; }
-.triage-legend-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer; }
-.triage-legend-row input { margin: 0; }
 .triage-swatch { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 10px; flex: none; }
-.triage-note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
 .triage-popup { font: 13px/1.45 system-ui, sans-serif; color: #183153; min-width: 220px; }
 .triage-popup-head { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
 .triage-popup-head .triage-swatch { width: 24px; height: 24px; font-size: 12px; }
