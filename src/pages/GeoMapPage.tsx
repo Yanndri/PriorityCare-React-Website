@@ -11,7 +11,8 @@ import { SpatialHeatmapLayer } from '../components/SpatialHeatmapLayer'
 import { TriagePinsLayer } from '../components/TriagePinsLayer'
 import { Icon } from '../components/Icon'
 import { MapFocus } from '../components/MapFocus'
-import { useBarangayView } from '../lib/barangayCenters'
+import { BARANGAY_ZOOM, useBarangayView } from '../lib/barangayCenters'
+import { BarangayBordersLayer } from '../components/BarangayBordersLayer'
 import { buildTriagePins, TRIAGE_LEVELS, TRIAGE_ORDER } from '../utils/triagePins'
 import type { TriageLevel } from '../utils/triagePins'
 import { HEAT_RAMPS } from '../utils/spatialHeatmap'
@@ -111,7 +112,7 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
 
   // What is switched on. Everything starts on except the heatmap.
   const [levels, setLevels] = useState<Record<TriageLevel, boolean>>({ red: true, yellow: true, green: true })
-  const [show, setShow] = useState({ sos: true, centers: true, hazards: true, disasters: true })
+  const [show, setShow] = useState({ borders: true, sos: true, centers: true, hazards: true, disasters: true })
   const [heat, setHeat] = useState<'off' | 'vulnerability' | 'incidents'>('off')
   const toggle = (key: keyof typeof show) => setShow(s => ({ ...s, [key]: !s[key] }))
 
@@ -161,6 +162,7 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
             <MapContainer center={view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
               <MapFocus center={view.center} zoom={view.zoom} />
               <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {show.borders && <BarangayBordersLayer highlightAt={view.zoom === BARANGAY_ZOOM ? view.center : null} />}
 
               {heat !== 'off' && <SpatialHeatmapLayer residents={residents} kind={heat} />}
               {show.disasters && <DisasterEventMarkers />}
@@ -216,6 +218,10 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
             {triage.unmappedHouseholds > 0 && <p className="map-side-note">{triage.unmappedHouseholds} household(s) have no home pin yet.</p>}
 
             <h2>Also show</h2>
+            <label className="map-toggle">
+              <input type="checkbox" checked={show.borders} onChange={() => toggle('borders')} />
+              <span className="map-key map-key-borders" /><span>Barangay borders</span>
+            </label>
             <label className="map-toggle">
               <input type="checkbox" checked={show.sos} onChange={() => toggle('sos')} />
               <span className="map-key map-key-sos" /><span>SOS calls</span><strong>{sosOnMap.length}</strong>

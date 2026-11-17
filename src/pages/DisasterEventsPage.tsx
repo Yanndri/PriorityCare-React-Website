@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveSignal } from '../lib/useLiveSignal'
 import type { FormEvent } from 'react'
 import { declareEvent, getEventRegister, hazardLabels, resolveEvent } from '../api/disasterEventsApi'
@@ -27,6 +27,14 @@ export function DisasterEventsPage() {
   const [resolving, setResolving] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const formRef = useRef<HTMLElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  // Brings the new form into view and puts the cursor in the first field.
+  useEffect(() => {
+    if (!showForm) return
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    nameRef.current?.focus({ preventScroll: true })
+  }, [showForm])
   async function load() {
     setLoading(true); setError('')
     try { setRegister(await getEventRegister()) }
@@ -86,20 +94,13 @@ export function DisasterEventsPage() {
     {error && <p role="alert" className="disaster-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {loading && <p role="status">Loading event register…</p>}
-    <section className="panel">
-      <div className="disaster-list-header">
-        <h3>Active disasters ({active.length})</h3>
-        {!showForm && <button type="button" className="primary-button" disabled={!register?.barangays.length || loading} onClick={() => { setShowForm(true); setNotice('') }}>Declare a new disaster</button>}
-      </div>
-      {register && !active.length && <p>No active disaster in your scope.</p>}
-      {active.map(eventCard)}
-    </section>
-    {showForm && <section className="panel">
+    {/* The form opens at the top so it is seen right away. */}
+    {showForm && <section className="panel" ref={formRef}>
       <h3>Declare a new disaster</h3>
       <p className="disaster-hint">Residents of the barangay see it in the app. All times are Philippine time.</p>
       <form onSubmit={submit}>
         <fieldset disabled={!register || busy || loading || !register.barangays.length} className="disaster-form">
-          <label>Event name<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Riverside flood — October 14" /></label>
+          <label>Event name<input ref={nameRef} required maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Riverside flood — October 14" /></label>
           <label>Hazard<select value={hazard} onChange={e => setHazard(e.target.value as HazardType)}>{Object.entries(hazardLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
           <label>Barangay<select required value={barangay || register?.barangays[0]?.barangay_id || ''} onChange={e => setBarangay(e.target.value)}>{register?.barangays.map(s => <option key={s.barangay_id} value={s.barangay_id}>{s.barangay_name}</option>)}</select></label>
           <label>Incident onset (Philippine time)<input required type="datetime-local" value={onset} onChange={e => setOnset(e.target.value)} /></label>
@@ -114,6 +115,14 @@ export function DisasterEventsPage() {
         </fieldset>
       </form>
     </section>}
+    <section className="panel">
+      <div className="disaster-list-header">
+        <h3>Active disasters ({active.length})</h3>
+        {!showForm && <button type="button" className="primary-button" disabled={!register?.barangays.length || loading} onClick={() => { setShowForm(true); setNotice('') }}>Declare a new disaster</button>}
+      </div>
+      {register && !active.length && <p>No active disaster in your scope.</p>}
+      {active.map(eventCard)}
+    </section>
     <section className="panel">
       <h3>Past disasters ({past.length})</h3>
       {register && !past.length && <p>No resolved disasters yet.</p>}

@@ -1000,6 +1000,8 @@ textarea {
 .map-key-center { background: #15803d; border-radius: 4px; }
 .map-key-hazard { background: #fde68a; box-shadow: 0 0 0 2px #d97706; }
 .map-key-disaster { background: #2563eb; }
+.map-key-borders { border-radius: 3px; border: 2px dashed #475569; box-shadow: none; background: rgba(100, 116, 139, 0.08); }
+.barangay-tooltip { font-weight: 700; font-size: 13px; }
 .map-select { width: 100%; min-height: 40px; border: 1px solid #c5cfdb; border-radius: 8px; padding: 6px 10px; font: inherit; background: #fff; }
 .map-ramp { margin-top: 10px; }
 .map-ramp > span { display: block; height: 10px; border-radius: 5px; }
@@ -1406,8 +1408,20 @@ textarea {
   }
 
   .page-title {
+    position: relative;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* Anchor the help tip to the full title width so it never runs past the
+     right edge of a phone screen (that made the whole page scroll sideways). */
+  .page-help { position: static; }
+  .page-help::after {
+    left: 0;
+    right: 0;
+    top: 100%;
+    width: auto;
+    max-width: none;
   }
 
   .admin-barangay-banner {

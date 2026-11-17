@@ -1,8 +1,12 @@
 
 import { supabase } from '../lib/supabaseClient'
 
+// Account management runs in the `super-admin` Supabase Edge Function, so the
+// published site needs no separate server. VITE_API_BASE_URL can still point
+// at the old Node backend (prioritycare-api) for local development.
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+  import.meta.env.VITE_API_BASE_URL ||
+  `${import.meta.env.VITE_SUPABASE_URL ?? ''}/functions/v1/super-admin`
 ).replace(/\/+$/, '')
 
 export type AdminAccount = {
@@ -95,7 +99,7 @@ async function apiRequest<T>(
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
-        `Cannot reach the PriorityCare API at ${API_BASE_URL}. Make sure the backend is running.`,
+        `Cannot reach the account service. Check your internet connection and try again.`,
         { cause: error },
       )
     }

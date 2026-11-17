@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import L from 'leaflet'
 import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
-import { useBarangayView } from '../lib/barangayCenters'
+import { BARANGAY_ZOOM, useBarangayView } from '../lib/barangayCenters'
 import { MapFocus } from './MapFocus'
+import { BarangayBordersLayer } from './BarangayBordersLayer'
 
 // Map pin for a declared disaster: click the map or drag the pin instead of
 // typing coordinates.
@@ -48,6 +49,7 @@ export function DisasterAreaPicker({ barangayId, latitude, longitude, disabled, 
       <div className="facility-picker-map">
         <MapContainer center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <BarangayBordersLayer highlightAt={view.zoom === BARANGAY_ZOOM ? view.center : null} />
           <MapFocus center={view.center} zoom={view.zoom} />
           <ClickToPlace disabled={disabled} onPlace={place} />
           {point && (
