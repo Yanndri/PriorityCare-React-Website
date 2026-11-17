@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import L from 'leaflet'
 import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
-import { useBarangayView } from '../lib/barangayCenters'
+import { useBarangayView, CORDOVA_MAP_LIMITS } from '../lib/barangayCenters'
 import { MapFocus } from './MapFocus'
+import { isInCordova, OUTSIDE_CORDOVA, useBarangayBorders } from '../utils/barangayBorders'
 
 // Map pin for a declared disaster: click the map or drag the pin instead of
 // typing coordinates.
@@ -32,21 +33,33 @@ function ClickToPlace({ disabled, onPlace }: { disabled?: boolean; onPlace: (lat
 export function DisasterAreaPicker({ barangayId, latitude, longitude, disabled, onChange }: Props) {
   const view = useBarangayView(barangayId)
   const point: [number, number] | null = latitude !== null && longitude !== null ? [latitude, longitude] : null
-  const place = (lat: number, lng: number) => onChange(round(lat), round(lng))
+  const borders = useBarangayBorders()
+  const [outside, setOutside] = useState(false)
+  // Only spots inside Cordova are accepted.
+  const place = (lat: number, lng: number) => {
+    const ok = isInCordova(lat, lng, borders)
+    setOutside(!ok)
+    if (ok) onChange(round(lat), round(lng))
+  }
   const handlers = useMemo(() => ({
     dragend(event: L.LeafletEvent) {
-      const position = (event.target as L.Marker).getLatLng()
-      onChange(round(position.lat), round(position.lng))
+      const marker = event.target as L.Marker
+      const position = marker.getLatLng()
+      const ok = isInCordova(position.lat, position.lng, borders)
+      setOutside(!ok)
+      if (ok) onChange(round(position.lat), round(position.lng))
+      else if (latitude !== null && longitude !== null) marker.setLatLng([latitude, longitude])
     },
-  }), [onChange])
+  }), [onChange, borders, latitude, longitude])
 
   return (
     <div className="facility-picker">
       <p className="facility-picker-hint">
         {point ? 'Drag the pin to adjust, or click the map to move it.' : 'Click the map where the disaster is happening.'}
       </p>
+      {outside && <p className="facility-picker-hint" role="alert">{OUTSIDE_CORDOVA}</p>}
       <div className="facility-picker-map">
-        <MapContainer center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+        <MapContainer {...CORDOVA_MAP_LIMITS} center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <MapFocus center={view.center} zoom={view.zoom} />
           <ClickToPlace disabled={disabled} onPlace={place} />

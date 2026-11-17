@@ -1,7 +1,6 @@
 // Operational timestamp log / evacuation audit trail: filtering, table and CSV shaping.
 // Pure functions (no Supabase, no export libraries) so they can be unit-tested.
-// Shapes match the get_operational_timeline() RPC. Used by Reports (components/AuditTrailPanel)
-// and Data Mining (components/analytics/AuditTrailPanel).
+// Shapes match the get_operational_timeline() RPC. Used by Activity Logs (components/AuditTrailPanel).
 
 export type TimelineEvent = {
   occurred_at: string

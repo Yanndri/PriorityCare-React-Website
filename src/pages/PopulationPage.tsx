@@ -17,12 +17,12 @@ type Row = { name: string; totals: Totals; sitioId?: number }
 
 type Props = {
   residents: Resident[]
-  constraintStats: ConstraintStat[]
+  constraintStats?: ConstraintStat[] // no longer used: the mobility chart is worked out here
   barangayId: number | null // the barangay in scope; null = super admin viewing all barangays
   barangayName: string
 }
 
-export function PopulationPage({ residents, constraintStats, barangayId, barangayName }: Props) {
+export function PopulationPage({ residents, barangayId, barangayName }: Props) {
   const [filter, setFilter] = useState('all')
   const { sitios, error: loadError, reload } = useSitios(barangayId)
   const [newName, setNewName] = useState('')
@@ -36,11 +36,12 @@ export function PopulationPage({ residents, constraintStats, barangayId, baranga
   // (even with nobody in it yet). With all barangays, the barangay is added to the
   // name, because two barangays can have a sitio with the same name.
   const rows = useMemo(() => {
-    const manyBarangays = barangayId === null && new Set(households.map(h => h.barangay)).size > 1
+    // All barangays: one row per barangay (sitios only make sense inside one barangay).
+    const byBarangay = barangayId === null
     const byKey = new Map<string, Row>()
-    for (const s of sitios) byKey.set(s.sitio_name.trim().toLowerCase(), { name: s.sitio_name, totals: empty(), sitioId: s.sitio_id })
+    if (!byBarangay) for (const s of sitios) byKey.set(s.sitio_name.trim().toLowerCase(), { name: s.sitio_name, totals: empty(), sitioId: s.sitio_id })
     for (const h of households) {
-      const name = (h.sitio || NO_SITIO) + (manyBarangays ? ` · ${h.barangay}` : '')
+      const name = byBarangay ? (h.barangay || 'Unknown barangay') : (h.sitio || NO_SITIO)
       const key = name.trim().toLowerCase()
       const row = byKey.get(key) ?? { name, totals: empty() }
       const t = row.totals
@@ -90,12 +91,28 @@ export function PopulationPage({ residents, constraintStats, barangayId, baranga
 
   const canManage = barangayId !== null
 
+  // Everyone in the households shown (account holders and their family members), by mobility.
+  const shownHouseholds = filter === 'all' ? households
+    : households.filter(h => (canManage ? (h.sitio || NO_SITIO) : (h.barangay || 'Unknown barangay')) === filter)
+  const mobilityStats: ConstraintStat[] = (() => {
+    const cannot = shownHouseholds.reduce((n, h) => n + h.counts.nonAmbulatoryCount, 0)
+    const help = shownHouseholds.reduce((n, h) => n + h.counts.semiCount, 0)
+    const all = shownHouseholds.reduce((n, h) => n + h.size, 0)
+    const can = Math.max(0, all - cannot - help)
+    const pct = (v: number) => (all ? Math.round((v / all) * 100) : 0)
+    return [
+      { label: 'Can walk', value: can, percent: pct(can) },
+      { label: 'Needs help walking', value: help, percent: pct(help) },
+      { label: 'Cannot walk', value: cannot, percent: pct(cannot) },
+    ] as ConstraintStat[]
+  })()
+
   return (
     <section className="population-page">
       <div className="population-filter">
         <label>Show
           <select value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all">All sitios</option>
+            <option value="all">{canManage ? 'All sitios' : 'All barangays'}</option>
             {rows.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
           </select>
         </label>
@@ -107,12 +124,14 @@ export function PopulationPage({ residents, constraintStats, barangayId, baranga
         ))}
       </div>
 
+      <ConstraintChart title="People by mobility" stats={mobilityStats} />
+
       <section className="panel">
-        <h3>Sitios{canManage ? ` in ${barangayName}` : ''}</h3>
+        <h3>{canManage ? `Sitios in ${barangayName}` : 'Barangays'}</h3>
         <p className="population-note">
           {canManage
             ? 'Residents pick their sitio from this list when they register in the app. Click a row to see only its numbers.'
-            : 'To add or rename sitios, choose one barangay in Scope at the top. Click a row to see only its numbers.'}
+            : 'To see a barangay\'s sitios (and add or rename them), choose that barangay in Scope at the top. Click a row to see only its numbers.'}
         </p>
 
         {canManage && (
@@ -126,7 +145,7 @@ export function PopulationPage({ residents, constraintStats, barangayId, baranga
         <div className="relief-table-wrap">
           <table className="relief-table">
             <thead>
-              <tr><th>Sitio</th><th>Households</th><th>People</th><th>Children</th><th>Seniors</th><th>Pregnant</th><th>Cannot walk alone</th><th>Critical households</th>{canManage && <th />}</tr>
+              <tr><th>{canManage ? 'Sitio' : 'Barangay'}</th><th>Households</th><th>People</th><th>Children</th><th>Seniors</th><th>Pregnant</th><th>Cannot walk alone</th><th>Critical households</th>{canManage && <th />}</tr>
             </thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={canManage ? 9 : 8}>No sitios or registered households yet.</td></tr>}
@@ -169,7 +188,6 @@ export function PopulationPage({ residents, constraintStats, barangayId, baranga
         {canManage && <p className="sitios-hint">Renaming a sitio also updates the residents who chose it.</p>}
       </section>
 
-      <ConstraintChart stats={constraintStats} />
     </section>
   )
 }

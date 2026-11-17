@@ -98,7 +98,7 @@ export function columnOf(s: TicketStatus): BoardColumn {
   return 'active'
 }
 
-export const EQUIPMENT_OPTIONS = ['Stretcher / spineboard', 'Wheelchair', 'Oxygen', 'Boat', 'Life vests', 'First aid kit', 'Infant kit', 'Rope / harness']
+export const EQUIPMENT_OPTIONS = ['Stretcher / spineboard', 'Wheelchair', 'Boat', 'Life vests', 'First aid kit', 'Infant kit', 'Rope / harness']
 
 /**
  * Suggested priority and equipment for a resident. Priority: SOS level 3, or a Critical household VPI → critical;

@@ -1172,21 +1172,11 @@ function getField(
 function mapConstraint(
   value: string,
 ): Resident['constraint'] {
+  // mobility_status: ambulatory | semi_ambulatory | non_ambulatory (older rows may say bedridden/wheelchair/assisted).
   const normalized = value.toLowerCase()
-
-  if (normalized.includes('bed')) {
-    return 'Bedridden'
-  }
-
-  if (normalized.includes('wheel')) {
-    return 'Wheelchair'
-  }
-
-  if (normalized.includes('visual')) {
-    return 'Visual'
-  }
-
-  return 'Walk Assist'
+  if (normalized.startsWith('non') || normalized.includes('bed')) return 'Cannot walk'
+  if (normalized.startsWith('semi') || normalized.includes('wheel') || normalized.includes('assist')) return 'Needs help walking'
+  return 'Can walk'
 }
 
 function mapEvacuationStatus(

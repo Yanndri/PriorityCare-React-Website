@@ -38,3 +38,14 @@ export function scoreHouseholds(residents: Resident[], asOf = vpiToday()) {
     }
   }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
 }
+
+// The resident as they are at the SOS: only the household members they ticked as with them
+// (null = not given, so everyone), and no house type when they are away from home.
+export function residentOnScene(r: Resident | undefined, withMembers: string[] | null | undefined, visiting = false): Resident | undefined {
+  if (!r) return r
+  return {
+    ...r,
+    householdMembers: withMembers ? (r.householdMembers ?? []).filter((m) => m.member_id && withMembers.includes(m.member_id)) : r.householdMembers,
+    houseType: visiting ? null : r.houseType,
+  }
+}

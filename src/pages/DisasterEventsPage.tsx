@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useScopeBarangay } from '../lib/scope'
 import { useLiveSignal } from '../lib/useLiveSignal'
 import type { FormEvent } from 'react'
 import { declareEvent, getEventRegister, hazardLabels, resolveEvent } from '../api/disasterEventsApi'
@@ -12,7 +13,14 @@ function manilaNow() {
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' })
 
 export function DisasterEventsPage() {
-  const [register, setRegister] = useState<EventRegister | null>(null)
+  const [rawRegister, setRegister] = useState<EventRegister | null>(null)
+  // Only the barangay chosen in the Scope selector (all of them for "All barangays").
+  const scope = useScopeBarangay()
+  const register = useMemo(() => (rawRegister && scope != null ? {
+    ...rawRegister,
+    barangays: rawRegister.barangays.filter((b) => b.barangay_id === scope),
+    events: rawRegister.events.filter((e) => e.barangay_id === scope),
+  } : rawRegister), [rawRegister, scope])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

@@ -2,13 +2,14 @@ import type { ConstraintStat } from '../types/dashboard'
 
 type ConstraintChartProps = {
   stats: ConstraintStat[]
+  title?: string
 }
 
-export function ConstraintChart({ stats }: ConstraintChartProps) {
+export function ConstraintChart({ stats, title = 'Residents by Constraint Type' }: ConstraintChartProps) {
   // Creates simple horizontal bars using percentages from App.tsx.
   return (
     <section className="panel">
-      <h3>Residents by Constraint Type</h3>
+      <h3>{title}</h3>
 
       <div className="bar-list">
         {stats.map((item) => (

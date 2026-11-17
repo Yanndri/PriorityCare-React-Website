@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useScopeBarangay } from '../lib/scope'
 import { getOperationalTimeline } from '../api/auditTrailApi'
 import {
   ALL_CATEGORIES, CATEGORY_LABELS, filterTimeline, formatPht, phtDayStart, timelineCsv, timelineFileName, timelineTableRows,
@@ -14,16 +15,6 @@ function phtDate(offsetDays: number) {
     .format(new Date(Date.now() + offsetDays * 86_400_000))
 }
 
-async function loadFontBase64() {
-  const { default: fontUrl } = await import('../assets/fonts/NotoSans-Regular.ttf?url')
-  const response = await fetch(fontUrl)
-  if (!response.ok) throw new Error('PDF font could not load. Try again, or download Excel/CSV.')
-  const font = new Uint8Array(await response.arrayBuffer())
-  let binary = ''
-  for (let i = 0; i < font.length; i += 8192) binary += String.fromCharCode(...font.subarray(i, i + 8192))
-  return btoa(binary)
-}
-
 function download(bytes: BlobPart, type: string, name: string) {
   const url = URL.createObjectURL(new Blob([bytes], { type }))
   const link = document.createElement('a')
@@ -37,7 +28,9 @@ export function AuditTrailPanel() {
   const [toDate, setToDate] = useState(() => phtDate(0))
   const [data, setData] = useState<TimelineData | null>(null)
   const [categories, setCategories] = useState<TimelineCategory[]>(ALL_CATEGORIES)
-  const [barangay, setBarangay] = useState('all')
+  // Starts on the barangay chosen in the Scope selector.
+  const scope = useScopeBarangay()
+  const [barangay, setBarangay] = useState(scope != null ? String(scope) : 'all')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -69,28 +62,15 @@ export function AuditTrailPanel() {
     return [cats, where, search.trim() ? `Search: "${search.trim()}"` : ''].filter(Boolean).join(' · ')
   }
 
-  async function exportAs(format: 'csv' | 'xlsx' | 'pdf') {
+  // One export format: CSV (opens in Excel or Google Sheets).
+  function exportCsv() {
     if (!data || busy) return
-    setBusy(`Creating ${format.toUpperCase()}…`); setError(''); setNotice('')
+    setError(''); setNotice('')
     const meta = { scope: data.scope, from: data.from, to: data.to, generatedAt: data.generated_at, filters: filterSummary() }
     try {
-      const name = timelineFileName(data.from, data.to, format)
-      if (format === 'csv') {
-        download(timelineCsv(filtered, barangayName, meta), 'text/csv;charset=utf-8', name)
-      } else {
-        const { createTimelineWorkbook, createTimelinePdf } = await import('../utils/auditTrailFiles')
-        if (format === 'xlsx') {
-          const book = await createTimelineWorkbook(filtered, barangayName, meta)
-          download(new Uint8Array(await book.xlsx.writeBuffer()) as Uint8Array<ArrayBuffer>,
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', name)
-        } else {
-          const pdf = await createTimelinePdf(filtered, barangayName, meta, await loadFontBase64())
-          download(new Uint8Array(pdf.output('arraybuffer')) as Uint8Array<ArrayBuffer>, 'application/pdf', name)
-        }
-      }
-      setNotice(`${format.toUpperCase()} downloaded with ${filtered.length} event${filtered.length === 1 ? '' : 's'}.`)
+      download(timelineCsv(filtered, barangayName, meta), 'text/csv;charset=utf-8', timelineFileName(data.from, data.to, 'csv'))
+      setNotice(`CSV downloaded with ${filtered.length} event${filtered.length === 1 ? '' : 's'}.`)
     } catch (e) { setError(e instanceof Error ? e.message : 'Export failed. Try again.') }
-    finally { setBusy('') }
   }
 
   const toggle = (c: TimelineCategory) =>
@@ -129,11 +109,9 @@ export function AuditTrailPanel() {
         </div>
       </div>
       <div className="request-modal-actions">
-        <button type="button" className="secondary-button" disabled={Boolean(busy) || !filtered.length} onClick={() => void exportAs('csv')}>Download CSV</button>
-        <button type="button" className="secondary-button" disabled={Boolean(busy)} onClick={() => void exportAs('pdf')}>Download PDF</button>
-        <button type="button" className="verify-button" disabled={Boolean(busy)} onClick={() => void exportAs('xlsx')}>Download Excel (.xlsx)</button>
+        <button type="button" className="verify-button" disabled={Boolean(busy) || !filtered.length} onClick={exportCsv}>Download CSV</button>
       </div>
-      <p className="audit-meta">{filtered.length} event{filtered.length === 1 ? '' : 's'} match the filters{filtered.length > PREVIEW_LIMIT ? ` — preview shows the first ${PREVIEW_LIMIT}; exports include all` : ''}.</p>
+      <p className="audit-meta">{filtered.length} event{filtered.length === 1 ? '' : 's'} match the filters{filtered.length > PREVIEW_LIMIT ? ` — preview shows the first ${PREVIEW_LIMIT}; the CSV includes all` : ''}.</p>
       {filtered.length > 0 && <div className="relief-table-wrap"><table className="relief-table audit-table">
         <thead><tr>{TIMELINE_HEADERS.slice(0, 10).map(h => <th key={h}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={`${filtered[i].ref_id}-${filtered[i].occurred_at}-${i}`}>{r.slice(0, 10).map((cell, j) => <td key={j}>{cell}</td>)}</tr>)}</tbody>

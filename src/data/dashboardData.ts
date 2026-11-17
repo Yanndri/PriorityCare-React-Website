@@ -21,8 +21,9 @@ const operationalItems: MenuItem[] = [
   { key: 'geoMap', label: 'Map', group: DURING }, // 3.2
   { key: 'dispatch', label: 'SOS & Rescue', group: DURING }, // 1.3, 2.2
   { key: 'preemptiveEvacuation', label: 'Evacuations', group: DURING }, // 1.3
-  { key: 'rescueReconciliation', label: 'Missing & Family Search', group: DURING }, // 4.1
+  { key: 'rescueReconciliation', label: 'Missing Persons', group: DURING }, // 4.1
   { key: 'reports', label: 'Reports', group: AFTER }, // 4.2
+  { key: 'activityLogs', label: 'Activity Logs', group: AFTER }, // 4.4
 ]
 
 export const adminMenuItems: MenuItem[] = [
@@ -33,7 +34,6 @@ export const adminMenuItems: MenuItem[] = [
 export const superAdminMenuItems: MenuItem[] = [
   { key: 'home', label: 'Today' },
   { key: 'adminAccounts', label: 'Accounts & Barangays', group: 'Municipal admin' }, // 4.3
-  { key: 'activityLogs', label: 'Activity Logs', group: 'Municipal admin' },
   ...operationalItems,
 ]
 
@@ -42,18 +42,17 @@ export const pageDescriptions: Record<MenuKey, string> = {
   home: 'What needs your attention right now. Click a card to go straight to it.',
   population: 'Your official sitio list, and how many people live in each sitio: children, seniors, pregnant, and those who cannot walk.',
   verification: 'Register residents, check their IDs, and keep household details up to date.',
-  evacCenters: 'Your evacuation centers: how full they are, who is inside, and relief supplies needed.',
+  evacCenters: 'Your evacuation centers: how full they are and who is inside.',
   preemptiveEvacuation: 'Which households are staying home, leaving, or safe, and where they went. Residents report from the app; staff can log for them.',
   disasterEvents: 'Declare a flood, fire, earthquake or landslide when it happens, and close it when it is over.',
   geoMap: 'See residents by priority, evacuation centers and SOS calls on the map, plus the vulnerability heatmap.',
   dispatch: 'Answer SOS calls: open a rescue request and send a rescue team.',
-  rescueReconciliation: 'Record people reported missing, mark them found, and help families find where a relative is.',
-  familyReunification: 'Help someone find out where a family member is: at a center, rescued, or still missing.',
-  reports: 'Make the situation report (RDANA), the DSWD relief report (DROMIC) and the evacuation audit trail as PDF or Excel.',
+  rescueReconciliation: 'Record people reported missing, mark them found, and search the rescued list to tell families where a relative is.',
+  reports: 'Make the 24/48-hour situation report (RDANA).',
   dataMining: 'Charts about your residents, such as who needs the most help during evacuation.',
   barangayOverview: 'Every barangay at a glance. Click one to open its dashboard.',
-  adminAccounts: 'Every barangay at a glance, plus barangay admin and rescuer accounts.',
-  responderAccounts: 'Create and manage accounts for accredited rescuers.',
+  adminAccounts: 'Every barangay at a glance, plus barangay admin and responder accounts.',
+  responderAccounts: 'Create and manage accounts for accredited responders.',
   activityLogs: 'A record of who changed what, and when.',
 }
 
@@ -67,7 +66,6 @@ export const menuIcons: Record<MenuKey, string> = {
   preemptiveEvacuation: 'home',
   disasterEvents: 'siren-on',
   rescueReconciliation: 'search-location',
-  familyReunification: 'family',
   dispatch: 'ambulance',
   reports: 'file-chart-line',
   dataMining: 'chart-histogram',

@@ -991,7 +991,11 @@ textarea {
 .map-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .map-side { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 16px; height: 100%; overflow-y: auto; box-sizing: border-box; }
 .map-side h2 { font-size: 16px; margin: 18px 0 8px; }
-.map-side h2:first-child { margin-top: 0; }
+.map-side h2:first-child, .map-side .map-side-close + h2 { margin-top: 0; }
+.map-layout.side-closed { grid-template-columns: minmax(0, 1fr) auto; }
+.map-side-close { margin: -4px -4px 8px auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.map-side-open { align-self: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; writing-mode: vertical-rl; }
+.map-side-open i, .map-side-close i { display: flex; }
 .map-side-note { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
 .map-toggle { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; min-height: 36px; font-size: 15px; cursor: pointer; }
 .map-toggle input { width: 18px; height: 18px; margin: 0; }

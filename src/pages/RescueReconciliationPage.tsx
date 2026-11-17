@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveSignal } from '../lib/useLiveSignal'
+import { useScopeBarangay } from '../lib/scope'
 import type { FormEvent } from 'react'
 import {
   fileMissingPersonReport, getRescueReconciliation, markMissingPersonFound, withdrawMissingPersonReport,
@@ -22,7 +23,16 @@ const emptyForm = {
 type Closing = { reportId: string; mode: 'elsewhere' | 'withdraw' } | null
 
 export function RescueReconciliationPage() {
-  const [data, setData] = useState<ReconciliationData | null>(null)
+  const [rawData, setData] = useState<ReconciliationData | null>(null)
+  // Only the barangay chosen in the Scope selector (all of them for "All barangays").
+  const scope = useScopeBarangay()
+  const data = useMemo(() => (rawData && scope != null ? {
+    ...rawData,
+    barangays: rawData.barangays.filter((b) => b.barangay_id === scope),
+    events: rawData.events.filter((e) => e.barangay_id === scope),
+    reports: rawData.reports.filter((r) => r.barangay_id === scope),
+    residents: rawData.residents.filter((r) => r.barangay_id === scope),
+  } : rawData), [rawData, scope])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -35,13 +45,13 @@ export function RescueReconciliationPage() {
   async function load() {
     setLoading(true); setError('')
     try { setData(await getRescueReconciliation()) }
-    catch (e) { setData(null); setError(e instanceof Error ? e.message : 'Unable to load the manifest.') }
+    catch (e) { setData(null); setError(e instanceof Error ? e.message : 'Could not load the missing persons list.') }
     finally { setLoading(false) }
   }
   useEffect(() => {
     let cancelled = false
     getRescueReconciliation().then(d => { if (!cancelled) setData(d) })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load the manifest.') })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load the missing persons list.') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -86,7 +96,7 @@ export function RescueReconciliationPage() {
         lastSeenLocation: form.where, lastSeenAt, reporterName: form.reporter, reporterContact: form.contact, notes: form.notes,
       })
       setForm({ ...emptyForm, barangay: form.barangay })
-      setNotice('Missing-person report added to the manifest.'); await load()
+      setNotice('Missing-person report added.'); await load()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to file the report.') }
     finally { setBusy(false) }
   }
@@ -132,8 +142,8 @@ export function RescueReconciliationPage() {
     <section className="panel reconcile-intro">
       <div className="reconcile-header">
         <div>
-          <h3>Rescued directory vs. missing persons manifest</h3>
-          <p>Each open missing-person report is compared with the Master Rescued Directory (residents whose latest evacuation record is <em>safely evacuated</em>). Matches are suggestions only — an administrator must confirm each one.</p>
+          <h3>Missing persons vs. rescued list</h3>
+          <p>Each open missing-person report is compared with the rescued list (residents whose latest evacuation record is <em>safely evacuated</em>). Matches are suggestions only — an administrator must confirm each one.</p>
           {data && <p className="reconcile-muted">Snapshot: {formatTime(data.generated_at)} (Philippine time)</p>}
         </div>
         <div className="reconcile-actions">
@@ -142,7 +152,7 @@ export function RescueReconciliationPage() {
         </div>
       </div>
       {s && <div className="reconcile-stats">
-        <article><span>Rescued directory</span><strong>{s.rescued}</strong></article>
+        <article><span>Rescued</span><strong>{s.rescued}</strong></article>
         <article><span>Open missing reports</span><strong>{s.openReports}</strong></article>
         <article className="tone-good"><span>Confirmed rescued — close</span><strong>{s.linkedRescued}</strong></article>
         <article className="tone-warn"><span>Probable / possible matches</span><strong>{s.probable + s.possible}</strong></article>
@@ -154,10 +164,10 @@ export function RescueReconciliationPage() {
 
     {error && <p role="alert" className="reconcile-error">{error}</p>}
     {notice && <p role="status" className="reconcile-notice">{notice}</p>}
-    {loading && <p role="status">Loading manifest and rescued directory…</p>}
+    {loading && <p role="status">Loading…</p>}
 
     <section className="panel">
-      <h3>Reconciliation — open manifest</h3>
+      <h3>Open missing-person reports</h3>
       {result && !result.open.length && <p>No open missing-person reports in your scope.</p>}
       {result?.open.map(o => <article key={o.report.report_id} className="reconcile-card">
         <div className="reconcile-card-head">
@@ -176,7 +186,7 @@ export function RescueReconciliationPage() {
           Linked registered resident — latest evacuation status: <strong>{o.linkedResident.latest_status ? statusLabels[o.linkedResident.latest_status] : 'no record'}</strong>
         </p>}
         {o.candidates.length > 0 && <table className="reconcile-table">
-          <thead><tr><th>Rescued directory match</th><th>Score</th><th>Evidence</th><th>Evacuation center</th><th /></tr></thead>
+          <thead><tr><th>Possible match in rescued list</th><th>Score</th><th>Evidence</th><th>Evacuation center</th><th /></tr></thead>
           <tbody>{o.candidates.map(c => <tr key={c.resident.uid}>
             <td>{fullName(c.resident)}</td>
             <td>{c.score}</td>
@@ -193,7 +203,7 @@ export function RescueReconciliationPage() {
             <button type="button" className="secondary-button" disabled={busy} onClick={() => setClosing(null)}>Cancel</button>
           </form>
           : <div className="reconcile-card-actions">
-            <button type="button" className="secondary-button" disabled={busy} onClick={() => { setClosing({ reportId: o.report.report_id, mode: 'elsewhere' }); setClosingText('') }}>Found outside directory…</button>
+            <button type="button" className="secondary-button" disabled={busy} onClick={() => { setClosing({ reportId: o.report.report_id, mode: 'elsewhere' }); setClosingText('') }}>Found elsewhere…</button>
             <button type="button" className="secondary-button" disabled={busy} onClick={() => { setClosing({ reportId: o.report.report_id, mode: 'withdraw' }); setClosingText('') }}>Withdraw…</button>
           </div>}
       </article>)}
@@ -220,14 +230,14 @@ export function RescueReconciliationPage() {
           <label>Reported by<input required maxLength={200} value={form.reporter} onChange={set('reporter')} /></label>
           <label>Reporter contact<input maxLength={50} value={form.contact} onChange={set('contact')} /></label>
           <label className="reconcile-wide">Description / notes<textarea rows={3} maxLength={2000} value={form.notes} onChange={set('notes')} /></label>
-          <button className="primary-button" type="submit">{busy ? 'Saving…' : 'Add to manifest'}</button>
+          <button className="primary-button" type="submit">{busy ? 'Saving…' : 'Add report'}</button>
         </fieldset>
       </form>
     </section>
 
     {result && result.unaccounted.length > 0 && <section className="panel">
       <h3>Unaccounted registered residents</h3>
-      <p className="reconcile-muted">Residents of barangays with an active disaster event who are not in the rescued directory and have no open report.</p>
+      <p className="reconcile-muted">Residents of barangays with an active disaster event who are not in the rescued list and have no open report.</p>
       <div className="reconcile-table-wrap"><table className="reconcile-table">
         <thead><tr><th>Name</th><th>Barangay</th><th>Latest evacuation status</th><th>Logged</th></tr></thead>
         <tbody>{result.unaccounted.map(r => <tr key={r.uid}>
@@ -239,8 +249,9 @@ export function RescueReconciliationPage() {
     </section>}
 
     <section className="panel">
-      <div className="reconcile-header"><h3>Master rescued directory</h3>
-        <input className="reconcile-search" type="search" placeholder="Search name or center" value={directorySearch} onChange={e => setDirectorySearch(e.target.value)} /></div>
+      <div className="reconcile-header"><div><h3>Rescued list</h3>
+        <p className="reconcile-muted">A relative asking where someone is? Search the name here first; if they are not listed, file a missing-person report above.</p></div>
+        <input className="reconcile-search" type="search" placeholder="Search name or center" aria-label="Search the rescued list" value={directorySearch} onChange={e => setDirectorySearch(e.target.value)} /></div>
       {result && !directory.length && <p>No safely evacuated residents{directorySearch ? ' match your search' : ' in your scope'}.</p>}
       {directory.length > 0 && <div className="reconcile-table-wrap"><table className="reconcile-table">
         <thead><tr><th>Name</th><th>Barangay</th><th>Sex</th><th>Age</th><th>Evacuation center</th><th>Evacuated</th></tr></thead>

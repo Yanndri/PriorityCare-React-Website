@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import {
+import { getUnverifiedResidents, getSosNotes, getSosWithMembers,
   assignDispatchTicket, cancelOpenDispatchTicket, createDispatchTicket, getDispatchBoard, getDispatchTicketHistory,
   saveRescueUnit, updateDispatchStatus,
+  getBackupRequests, closeBackupRequest, BACKUP_NEED_LABELS, type BackupRequest,
 } from '../api/dispatchApi'
 import type { Resident } from '../types/dashboard'
-import { useEquipmentRules } from '../api/equipmentRulesApi'
-import { EquipmentRulesPanel } from '../components/EquipmentRulesPanel'
 import { vpiToday } from '../utils/vpi'
+import { residentOnScene } from '../utils/householdVpi'
 import {
   columnOf, elapsed, EQUIPMENT_OPTIONS, nextStatus, PRIORITY_LABELS, rankUnits, SOURCE_LABELS, STATUS_LABELS,
   suggestForResident, ticketLabel,
@@ -17,11 +17,19 @@ import './DispatchPage.css'
 import { Icon } from '../components/Icon'
 import { useLiveSignal } from '../lib/useLiveSignal'
 import { HazardReportsPanel } from '../components/HazardReportsPanel'
+import { useScopeBarangay } from '../lib/scope'
+import { TicketLocationMap } from '../components/TicketLocationMap'
+import { SosResidentCard } from '../components/SosResidentCard'
 
 type Draft = {
   barangay: string; event: string; resident: string; subject: string; source: TicketSource; sourceRef: string | null
   sosLevel: number | null; priority: TicketPriority; lat: string; lng: string; locationNote: string
   instructions: string; equipment: string[]; unit: string
+  sosNote?: string
+  sosHeadcount?: number | null
+  visitingFrom?: string | null
+  sentFrom?: string | null
+  withMembers?: string[] | null
 }
 type Action = { ticketId: string; kind: 'cancel' | 'resolve' | 'reassign' | 'assign'; note: string; unit: string } | null
 type UnitDraft = { unitId: number | null; name: string; barangay: string; capabilities: string[]; extraCap: string; members: string[]; active: boolean }
@@ -45,18 +53,31 @@ function chime() {
 }
 const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }) : ''
 
-export function DispatchPage({ residents }: { residents: Resident[] }) {
-  const [board, setBoard] = useState<DispatchBoard | null>(null)
+export function DispatchPage({ residents, onOpenMissing }: { residents: Resident[]; onOpenMissing?: () => void }) {
+  const [rawBoard, setBoard] = useState<DispatchBoard | null>(null)
+  // Only the barangay chosen in the Scope selector (all of them for "All barangays").
+  // Units stay listed: a unit from another barangay can still be sent (mutual aid).
+  const scope = useScopeBarangay()
+  const board = useMemo(() => (rawBoard && scope != null ? {
+    ...rawBoard,
+    barangays: rawBoard.barangays.filter((b) => b.barangay_id === scope),
+    events: rawBoard.events.filter((e) => e.barangay_id === scope),
+    tickets: rawBoard.tickets.filter((t) => t.barangay_id === scope),
+    intake_sos: rawBoard.intake_sos.filter((a) => a.barangay_id === scope),
+    away_sos: (rawBoard.away_sos ?? []).filter((a) => a.barangay_id === scope),
+    intake_missing: rawBoard.intake_missing.filter((m) => m.barangay_id === scope),
+  } : rawBoard), [rawBoard, scope])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [tab, setTab] = useState<'board' | 'units' | 'rules'>('board')
-  const { rules: equipmentRules } = useEquipmentRules()
+  const [tab, setTab] = useState<'board' | 'units'>('board')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [action, setAction] = useState<Action>(null)
   const [history, setHistory] = useState<{ ticketId: string; rows: Awaited<ReturnType<typeof getDispatchTicketHistory>> } | null>(null)
   const [unitDraft, setUnitDraft] = useState<UnitDraft | null>(null)
+  const [backups, setBackups] = useState<BackupRequest[]>([])
+  const loadBackups = () => getBackupRequests().then(setBackups).catch(() => setBackups([]))
 
   async function load() {
     setLoading(true); setError('')
@@ -67,6 +88,25 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
   // New SOS calls since the page opened, highlighted until handled.
   const seenSos = useRef<Set<string> | null>(null)
   const [newSos, setNewSos] = useState<Set<string>>(new Set())
+  const [unverified, setUnverified] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!board) return
+    let cancelled = false
+    getUnverifiedResidents([...board.intake_sos, ...(board.away_sos ?? [])].map((a) => a.resident_uid ?? ''))
+      .then((set) => { if (!cancelled) setUnverified(set) })
+    return () => { cancelled = true }
+  }, [board])
+  // Resident SOS notes for tickets made from an SOS (the board itself only carries them for new SOS).
+  const [sosNotes, setSosNotes] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    if (!board) return
+    let cancelled = false
+    getSosNotes(board.tickets.filter((t) => t.source === 'sos' && t.source_ref).map((t) => t.source_ref ?? ''))
+      .then((m) => { if (!cancelled) setSosNotes(m) })
+    return () => { cancelled = true }
+  }, [board])
+  const notVerifiedTag = (uid?: string | null) => uid && unverified.has(uid)
+    ? <> <span className="prio-badge prio-normal" title="The resident's account has not been verified by the barangay yet. Household details are self-reported.">Account not verified</span></> : null
   useEffect(() => {
     if (!board) return
     const ids = board.intake_sos.map(a => a.alert_id)
@@ -86,6 +126,7 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
   // Updates from the app (SOS raised or cancelled, rescuers moving tickets, units) without a Refresh.
   useLiveSignal(['sos', 'tickets', 'units', 'missing', 'events'], () => {
     getDispatchBoard().then(setBoard).catch(() => { /* keep the board shown; Refresh shows the error */ })
+    void loadBackups()
   })
 
   useEffect(() => {
@@ -93,12 +134,13 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
     getDispatchBoard().then(b => { if (!cancelled) setBoard(b) })
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load the dispatch board.') })
       .finally(() => { if (!cancelled) setLoading(false) })
+    getBackupRequests().then(b => { if (!cancelled) setBackups(b) }).catch(() => { /* STEP20 not run yet */ })
     return () => { cancelled = true }
   }, [])
 
   async function run(work: () => Promise<unknown>, done: string) {
     setBusy(true); setError(''); setNotice('')
-    try { await work(); setNotice(done); setAction(null); await load() }
+    try { await work(); setNotice(done); setAction(null); await load(); await loadBackups() }
     catch (e) { setError(e instanceof Error ? e.message : 'Action failed.') }
     finally { setBusy(false) }
   }
@@ -111,7 +153,7 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
   function openDraft(seed: Partial<Draft> = {}) {
     const barangay = seed.barangay ?? String(board?.barangays[0]?.barangay_id ?? '')
     const resident = seed.resident ? residentById.get(seed.resident) : undefined
-    const s = suggestForResident(resident, seed.sosLevel ?? null, vpiToday(), equipmentRules)
+    const s = suggestForResident(residentOnScene(resident, seed.withMembers, !!seed.visitingFrom), seed.sosLevel ?? null, vpiToday())
     setDraft({
       barangay, event: '', resident: '', subject: '', source: 'manual', sourceRef: null, sosLevel: null,
       priority: s.priority, lat: resident?.gpsLat != null ? String(resident.gpsLat) : '', lng: resident?.gpsLong != null ? String(resident.gpsLong) : '',
@@ -121,10 +163,20 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
     setTab('board')
     window.scrollTo?.({ top: 0, behavior: 'smooth' })
   }
+  // Once the SOS's "who is with me" list loads, redo the priority and equipment for just those people.
+  async function loadWithMembers(alertId: string) {
+    const ids = await getSosWithMembers(alertId)
+    if (!ids) return
+    setDraft((d) => {
+      if (!d || d.sourceRef !== alertId) return d
+      const s = suggestForResident(residentOnScene(residentById.get(d.resident), ids, !!d.visitingFrom), d.sosLevel, vpiToday())
+      return { ...d, withMembers: ids, priority: s.priority, equipment: s.equipment }
+    })
+  }
   function pickResident(uid: string) {
     if (!draft) return
     const r = residentById.get(uid)
-    const s = suggestForResident(r, draft.sosLevel, vpiToday(), equipmentRules)
+    const s = suggestForResident(r, draft.sosLevel, vpiToday())
     setDraft({ ...draft, resident: uid, subject: draft.subject || (r ? `Assist ${r.name}` : ''), priority: s.priority,
       equipment: [...new Set([...draft.equipment, ...s.equipment])],
       lat: r?.gpsLat != null ? String(r.gpsLat) : draft.lat, lng: r?.gpsLong != null ? String(r.gpsLong) : draft.lng })
@@ -158,10 +210,13 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
 
   const tickets = board?.tickets ?? []
   const live = tickets.filter(t => columnOf(t.status) !== 'closed')
-  const intakeCount = (board?.intake_sos.length ?? 0) + (board?.intake_missing.length ?? 0)
-  const draftResidents = draft ? residents.filter(r => !draft.barangay || barangayName(Number(draft.barangay)) === r.barangay || board?.barangays.length === 1) : []
+  // Missing-person reports are handled on the Missing Persons page; only SOS calls wait here.
+  const intakeCount = board?.intake_sos.length ?? 0
+  const missingCount = board?.intake_missing.length ?? 0
+  // The SOS sender is always listed, even when visiting another barangay.
+  const draftResidents = draft ? residents.filter(r => String(r.id) === draft.resident || !draft.barangay || barangayName(Number(draft.barangay)) === r.barangay || board?.barangays.length === 1) : []
   const ranked = draft ? rankUnits(board?.units ?? [], draft.equipment) : []
-  const draftSuggestion = draft ? suggestForResident(residentById.get(draft.resident), draft.sosLevel, vpiToday(), equipmentRules) : null
+  const draftSuggestion = draft ? suggestForResident(residentOnScene(residentById.get(draft.resident), draft.withMembers, !!draft.visitingFrom), draft.sosLevel, vpiToday()) : null
 
   // A render helper, not a nested component, so typing in a ticket's note box keeps focus.
   function renderTicket(t: DispatchTicket) {
@@ -178,12 +233,20 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
         <span className={`status-badge st-${t.status}`}>{STATUS_LABELS[t.status]}</span>
       </div>
       <h4>{t.subject}</h4>
+      {t.source === 'sos' && t.source_ref && <p className="sos-note"><strong>Resident says:</strong>{' '}
+        {sosNotes.get(t.source_ref) ? `"${sosNotes.get(t.source_ref)}"` : <em className="dispatch-muted">No details given</em>}</p>}
       <p className="dispatch-muted">{SOURCE_LABELS[t.source]} · {barangayName(t.barangay_id)} · opened {elapsed(t.created_at)} ago{t.created_by_name ? ` by ${t.created_by_name}` : ''}</p>
       {resident && <p className="dispatch-muted">Resident: {resident.name}{resident.mobilityStatus ? ` · ${resident.mobilityStatus.replace('_', '-')}` : ''}</p>}
       {(t.latitude !== null || t.location_note) && <p className="dispatch-muted"><Icon name="marker" /> {t.location_note}{t.location_note && t.latitude !== null ? ' · ' : ''}
         {t.latitude !== null && <a href={`https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=18/${t.latitude}/${t.longitude}`} target="_blank" rel="noreferrer">{Number(t.latitude).toFixed(5)}, {Number(t.longitude).toFixed(5)}</a>}</p>}
       {t.equipment.length > 0 && <p className="ticket-equip">{t.equipment.map(e => <span key={e}>{e}</span>)}</p>}
       {t.instructions && <p className="ticket-instr">{t.instructions}</p>}
+      {backups.filter(b => b.ticket_id === t.ticket_id).map(b => <div key={b.request_id} className="ticket-backup" role="alert">
+        <span><strong>Backup needed: {BACKUP_NEED_LABELS[b.need] ?? b.need}</strong>
+          {' '}· asked {elapsed(b.requested_at)} ago{b.requested_by_name ? ` by ${b.requested_by_name}` : ''}{b.note ? ` — ${b.note}` : ''}</span>
+        <button type="button" className="verify-button" disabled={busy}
+          onClick={() => void run(() => closeBackupRequest(b.request_id, 'handled'), `Backup for ${ticketLabel(t)} marked as sent.`)}>Mark sent</button>
+      </div>)}
       {unit && <p className="dispatch-muted">Unit: <strong>{unit.unit_name}</strong>{unit.members.length ? ` — ${unit.members.map(m => m.name).join(', ')}` : ' — no members'}{t.assigned_at ? ` · assigned ${elapsed(t.assigned_at)} ago` : ''}</p>}
       {closed && t.outcome_note && <p className="ticket-outcome">{t.status === 'resolved' ? 'Outcome' : 'Cancelled'}: {t.outcome_note} · {fmt(t.closed_at)}</p>}
 
@@ -238,12 +301,13 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
         <div className="dispatch-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'board'} onClick={() => setTab('board')}>Board</button>
           <button type="button" role="tab" aria-selected={tab === 'units'} onClick={() => setTab('units')}>Units ({board?.units.filter(u => u.is_active).length ?? 0})</button>
-          <button type="button" role="tab" aria-selected={tab === 'rules'} onClick={() => setTab('rules')}>Equipment rules</button>
         </div>
       </div>
       {board && <div className="dispatch-stats">
         <article><span>Needs a ticket</span><strong className={intakeCount ? 'warn' : ''}>{intakeCount}</strong></article>
+        <article><span>Backup asked</span><strong className={backups.length ? 'bad' : ''}>{backups.length}</strong></article>
         <article><span>Unassigned</span><strong className={live.some(t => t.status === 'open') ? 'bad' : ''}>{live.filter(t => t.status === 'open').length}</strong></article>
+        <article><span>Assigned</span><strong>{live.filter(t => columnOf(t.status) === 'assigned').length}</strong></article>
         <article><span>Critical live</span><strong className={live.some(t => t.priority === 'critical') ? 'bad' : ''}>{live.filter(t => t.priority === 'critical').length}</strong></article>
         <article><span>In progress</span><strong>{live.filter(t => columnOf(t.status) === 'active').length}</strong></article>
         <article><span>Idle active units</span><strong>{board.units.filter(u => u.is_active && u.live_tickets === 0).length}</strong></article>
@@ -262,28 +326,33 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
         <h3>New dispatch ticket{draft.source !== 'manual' ? ` — from ${SOURCE_LABELS[draft.source]}` : ''}</h3>
         <form onSubmit={e => void submitDraft(e)}>
           <fieldset className="dispatch-form" disabled={busy}>
+            {draft.source === 'sos' && draft.resident && <SosResidentCard residentUid={draft.resident} resident={residentById.get(draft.resident)}
+              headcount={draft.sosHeadcount} note={draft.sosNote} visitingFrom={draft.visitingFrom} sentFrom={draft.sentFrom} withMembers={draft.withMembers} />}
             <label>Barangay<select value={draft.barangay} disabled={draft.source !== 'manual'} onChange={e => setDraft({ ...draft, barangay: e.target.value, resident: '', event: '' })}>
               {board.barangays.map(s => <option key={s.barangay_id} value={s.barangay_id}>{s.barangay_name}</option>)}</select></label>
             <label>Disaster event (optional)<select value={draft.event} onChange={e => setDraft({ ...draft, event: e.target.value })}>
               <option value="">None</option>{board.events.filter(ev => String(ev.barangay_id) === draft.barangay).map(ev => <option key={ev.event_id} value={ev.event_id}>{ev.name}</option>)}</select></label>
-            <label className="wide">Resident (optional)<select value={draft.resident} disabled={draft.source === 'sos'} onChange={e => pickResident(e.target.value)}>
-              <option value="">No specific resident</option>{draftResidents.map(r => <option key={r.id} value={r.id}>{r.name}{r.mobilityStatus ? ` · ${r.mobilityStatus.replace('_', '-')}` : ''}</option>)}</select></label>
-            <label className="wide">What is needed<input required maxLength={200} value={draft.subject} onChange={e => setDraft({ ...draft, subject: e.target.value })} placeholder="e.g. Evacuate bedridden elder, Purok 2" /></label>
+            {draft.source !== 'sos' && <label className="wide">Resident (optional)<select value={draft.resident} onChange={e => pickResident(e.target.value)}>
+              <option value="">No specific resident</option>{draftResidents.map(r => <option key={r.id} value={r.id}>{r.name}{r.mobilityStatus ? ` · ${r.mobilityStatus.replace('_', '-')}` : ''}</option>)}</select></label>}
+            {draft.source !== 'sos' && <label className="wide">What is needed<input required maxLength={200} value={draft.subject} onChange={e => setDraft({ ...draft, subject: e.target.value })} placeholder="e.g. Evacuate bedridden elder, Purok 2" /></label>}
             <label>Priority<select value={draft.priority} onChange={e => setDraft({ ...draft, priority: e.target.value as TicketPriority })}>
               {(['critical', 'high', 'normal'] as const).map(p => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}</select>
               {draftSuggestion && draftSuggestion.reasons.length > 0 && <small className="dispatch-muted">Suggested {PRIORITY_LABELS[draftSuggestion.priority]}: {draftSuggestion.reasons.join(', ')}</small>}</label>
             <label>Assign to unit (optional)<select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
               <option value="">Leave unassigned</option>
               {ranked.map(r => <option key={r.unit.unit_id} value={r.unit.unit_id}>{r.unit.unit_name} · {r.unit.live_tickets} live{draft.equipment.length ? ` · has ${r.covered}/${draft.equipment.length}` : ''}</option>)}</select></label>
-            <label>Latitude<input inputMode="decimal" value={draft.lat} onChange={e => setDraft({ ...draft, lat: e.target.value })} /></label>
-            <label>Longitude<input inputMode="decimal" value={draft.lng} onChange={e => setDraft({ ...draft, lng: e.target.value })} /></label>
+            <div className="wide"><span className="dispatch-label">Where to go</span>
+              <TicketLocationMap latitude={draft.lat} longitude={draft.lng} fixed={draft.source === 'sos'}
+                home={(() => { const r = residentById.get(draft.resident); const la = Number(r?.gpsLat), lo = Number(r?.gpsLong)
+                  return r && r.gpsLat != null && Number.isFinite(la) && Number.isFinite(lo) && la !== 0 ? { lat: la, lng: lo } : null })()}
+                onChange={(lat, lng) => setDraft((d) => (d ? { ...d, lat, lng } : d))} /></div>
             <label className="wide">Location / landmark<input maxLength={500} value={draft.locationNote} onChange={e => setDraft({ ...draft, locationNote: e.target.value })} /></label>
             <div className="wide"><span className="dispatch-label">Equipment to bring</span>
               <div className="dispatch-checks">{[...new Set([...EQUIPMENT_OPTIONS, ...draft.equipment])].map(eq => <label key={eq} className="dispatch-chip">
                 <input type="checkbox" checked={draft.equipment.includes(eq)} onChange={e => setDraft({ ...draft, equipment: e.target.checked ? [...draft.equipment, eq] : draft.equipment.filter(x => x !== eq) })} />{eq}</label>)}</div>
               {draftSuggestion && draftSuggestion.equipmentReasons.length > 0 && <ul className="equip-reasons">
                 {draftSuggestion.equipmentReasons.map(n => <li key={n.equipment}><strong>{n.equipment}</strong> — {n.reasons.join('; ')}</li>)}</ul>}
-              <small className="dispatch-muted">Pre-filled from the resident's profile using the equipment rules (mobility, disabilities, pregnancy, age, assistance needs, household dependents). Trained personnel confirm what is appropriate.</small></div>
+              <small className="dispatch-muted">Pre-filled from the resident's profile using the fixed equipment list (mobility, disabilities, pregnancy, age, assistance needs, household members). Responders confirm on site.</small></div>
             <label className="wide">Instructions for the unit<textarea rows={3} maxLength={2000} value={draft.instructions} onChange={e => setDraft({ ...draft, instructions: e.target.value })} /></label>
             <div className="wide ticket-actions">
               <button type="submit" className="primary-button">{busy ? 'Issuing…' : draft.unit ? 'Issue & assign' : 'Issue ticket'}</button>
@@ -297,30 +366,30 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
         <h3>Needs a ticket</h3>
         <div className="intake-list">
           {board.intake_sos.map(a => <article key={a.alert_id} className={`intake-item${newSos.has(a.alert_id) ? ' is-new' : ''}`}>
-            <div>{newSos.has(a.alert_id) && <span className="new-badge">New</span>}<span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>
+            <div>{newSos.has(a.alert_id) && <span className="new-badge">New</span>}<span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>{notVerifiedTag(a.resident_uid)}
               {a.home_barangay_id != null && a.home_barangay_id !== a.barangay_id && <> <span className="prio-badge prio-normal">Visiting from {a.home_barangay_name ?? `Barangay ${a.home_barangay_id}`}</span></>}
               <div className="dispatch-muted">{a.alert_type ?? 'alert'} · {a.barangay_name ?? barangayName(a.barangay_id)}{a.headcount ? ` · ${a.headcount} ${a.headcount === 1 ? 'person' : 'people'}` : ''} · {elapsed(a.created_at)} ago</div>
-              {a.note && <div className="dispatch-muted">"{a.note}"</div>}</div>
-            <button type="button" className="verify-button" disabled={busy} onClick={() => openDraft({ barangay: String(a.barangay_id), resident: a.resident_uid, source: 'sos', sourceRef: a.alert_id,
-              sosLevel: a.alert_level, subject: `SOS: ${a.alert_type ?? 'assistance'} — ${a.resident_name}`,
-              lat: a.latitude != null ? String(a.latitude) : '', lng: a.longitude != null ? String(a.longitude) : '' })}>Create ticket</button>
-          </article>)}
-          {board.intake_missing.map(m => <article key={m.report_id} className="intake-item">
-            <div><span className="prio-badge prio-high">Missing</span> <strong>{m.full_name}</strong>
-              <div className="dispatch-muted">{m.last_seen_location || 'last seen unknown'} · {barangayName(m.barangay_id)} · reported {elapsed(m.reported_at)} ago</div></div>
-            <button type="button" className="verify-button" disabled={busy} onClick={() => openDraft({ barangay: String(m.barangay_id), resident: m.resident_uid ?? '', source: 'missing_report', sourceRef: m.report_id,
-              subject: `Search: ${m.full_name}`, priority: 'high', locationNote: m.last_seen_location,
-              lat: m.latitude != null ? String(m.latitude) : '', lng: m.longitude != null ? String(m.longitude) : '' })}>Create ticket</button>
+              <div className="sos-note"><strong>Resident says:</strong> {a.note ? `"${a.note}"` : <em className="dispatch-muted">No details given</em>}</div></div>
+            <button type="button" className="verify-button" disabled={busy} onClick={() => { void loadWithMembers(a.alert_id); openDraft({ barangay: String(a.barangay_id), resident: a.resident_uid, source: 'sos', sourceRef: a.alert_id,
+              sosLevel: a.alert_level, sosNote: a.note ?? '', sosHeadcount: a.headcount,
+              visitingFrom: a.home_barangay_id != null && a.home_barangay_id !== a.barangay_id ? (a.home_barangay_name ?? `Barangay ${a.home_barangay_id}`) : null,
+              sentFrom: a.barangay_name ?? barangayName(a.barangay_id), subject: `SOS: ${a.alert_type ?? 'assistance'} — ${a.resident_name}`,
+              lat: a.latitude != null ? String(a.latitude) : '', lng: a.longitude != null ? String(a.longitude) : '' }) }}>Create ticket</button>
           </article>)}
         </div>
       </section>}
+
+      {missingCount > 0 && <p className="dispatch-muted missing-hint">
+        {missingCount} missing-person report{missingCount === 1 ? ' is' : 's are'} open on the{' '}
+        {onOpenMissing ? <button type="button" className="link-button" onClick={onOpenMissing}>Missing Persons page</button> : 'Missing Persons page'}.
+        To send a search team, use New ticket.</p>}
 
       {!!board.away_sos?.length && <section className="panel">
         <h3>Your residents in other barangays</h3>
         <p className="dispatch-muted">These residents raised an SOS outside your barangay, so that barangay dispatches it. Shown here so you can help with family contacts and medical history.</p>
         <div className="intake-list">
           {board.away_sos.map(a => <article key={a.alert_id} className="intake-item">
-            <div><span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>
+            <div><span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>{notVerifiedTag(a.resident_uid)}
               <div className="dispatch-muted">{a.alert_type ?? 'alert'} · in {a.barangay_name}{a.headcount ? ` · ${a.headcount} ${a.headcount === 1 ? 'person' : 'people'}` : ''} · {elapsed(a.created_at)} ago</div></div>
             <span className={`status-badge st-${a.ticket_status ?? 'open'}`}>{a.ticket_status ? `${STATUS_LABELS[a.ticket_status]}${a.unit_name ? ` · ${a.unit_name}` : ''}` : 'Awaiting dispatch'}</span>
           </article>)}
@@ -341,7 +410,6 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
       <HazardReportsPanel />
     </>}
 
-    {tab === 'rules' && <EquipmentRulesPanel />}
 
     {board && tab === 'units' && <section className="panel">
       <div className="dispatch-head"><h3>Responder units</h3>
@@ -357,8 +425,8 @@ export function DispatchPage({ residents }: { residents: Resident[] }) {
             <div className="dispatch-checks">{[...new Set([...EQUIPMENT_OPTIONS, ...unitDraft.capabilities])].map(c => <label key={c} className="dispatch-chip">
               <input type="checkbox" checked={unitDraft.capabilities.includes(c)} onChange={e => setUnitDraft({ ...unitDraft, capabilities: e.target.checked ? [...unitDraft.capabilities, c] : unitDraft.capabilities.filter(x => x !== c) })} />{c}</label>)}</div>
             <input className="unit-extra" placeholder="Other (comma-separated), e.g. Chainsaw, Medic" value={unitDraft.extraCap} onChange={e => setUnitDraft({ ...unitDraft, extraCap: e.target.value })} /></div>
-          <div className="wide"><span className="dispatch-label">Members (rescuer accounts)</span>
-            {!board.rescuers.length && <p className="dispatch-muted">No active rescuer accounts yet.</p>}
+          <div className="wide"><span className="dispatch-label">Members (responder accounts)</span>
+            {!board.rescuers.length && <p className="dispatch-muted">No active responder accounts yet.</p>}
             <div className="dispatch-checks">{board.rescuers.map(r => <label key={r.uid} className="dispatch-chip">
               <input type="checkbox" checked={unitDraft.members.includes(r.uid)} onChange={e => setUnitDraft({ ...unitDraft, members: e.target.checked ? [...unitDraft.members, r.uid] : unitDraft.members.filter(x => x !== r.uid) })} />{r.name}</label>)}</div></div>
           <label className="dispatch-chip"><input type="checkbox" checked={unitDraft.active} onChange={e => setUnitDraft({ ...unitDraft, active: e.target.checked })} />Active (can be assigned)</label>

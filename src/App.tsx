@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ScopeContext } from './lib/scope'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
@@ -21,7 +22,6 @@ import { VerificationPage } from './pages/VerificationPage'
 import { GeoMapPage } from './pages/GeoMapPage'
 import { DisasterEventsPage } from './pages/DisasterEventsPage'
 import { RescueReconciliationPage } from './pages/RescueReconciliationPage'
-import { FamilyReunificationPage } from './pages/FamilyReunificationPage'
 import { DispatchPage } from './pages/DispatchPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { PopulationPage } from './pages/PopulationPage'
@@ -402,10 +402,6 @@ function App({ profile }: AppProps) {
       (resident) => resident.status === 'Verified',
     ).length
 
-    const floodZone = liveResidents.filter(
-      (resident) => resident.floodZone,
-    ).length
-
     return [
       {
         label: 'Total Registered',
@@ -426,12 +422,6 @@ function App({ profile }: AppProps) {
         value: verified,
         note: 'Verified profiles',
         tone: 'green',
-      },
-      {
-        label: 'Flood-Prone Residents',
-        value: floodZone,
-        note: 'Residents with mapped coordinates',
-        tone: 'blue',
       },
     ]
   }, [liveResidents, isSuperAdmin, assignedBarangayId])
@@ -454,8 +444,7 @@ function App({ profile }: AppProps) {
     isSuperAdmin &&
     (activeMenu === 'barangayOverview' ||
       activeMenu === 'adminAccounts' ||
-      activeMenu === 'responderAccounts' ||
-      activeMenu === 'activityLogs')
+      activeMenu === 'responderAccounts')
 
   function openBarangay(barangayId: number) {
     changeScope(String(barangayId))
@@ -517,11 +506,10 @@ function App({ profile }: AppProps) {
                   parts={[
                     { key: 'barangays', label: 'Barangays', content: <SuperAdminSection view="barangays" onOpenBarangay={openBarangay} /> },
                     { key: 'admins', label: 'Admin accounts', content: <SuperAdminSection view="accounts" onOpenBarangay={openBarangay} /> },
-                    { key: 'rescuers', label: 'Rescuer accounts', content: <ResponderAccountsPage /> },
+                    { key: 'rescuers', label: 'Responder accounts', content: <ResponderAccountsPage /> },
                   ]}
                 />
               )}
-              {activeMenu === 'activityLogs' && <AuditTrailPanel />}
             </>
           ) : isLoadingDatabase ? (
             <div className="dashboard-message" role="status">
@@ -539,11 +527,13 @@ function App({ profile }: AppProps) {
             </div>
           ) : (
           <>
+          <ScopeContext.Provider value={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}>
           {isSuperAdmin && activeMenu === 'home' && (
             <SuperAdminSection view="overview" onOpenBarangay={openBarangay} />
           )}
 
-          <PageTitle
+          {/* The Map page has no title block: the sidebar already says where you are, and the map gets the room. */}
+          {activeMenu !== 'geoMap' && <PageTitle
             title={activeTitle}
             description={pageDescriptions[activeMenu]}
             onExportReport={activeMenu !== 'home' ? undefined : () =>
@@ -556,7 +546,7 @@ function App({ profile }: AppProps) {
                 generatedBy,
               })
             }
-          />
+          />}
 
           {activeMenu === 'home' && (
             <HomePage
@@ -593,27 +583,24 @@ function App({ profile }: AppProps) {
           )}
 
           {activeMenu === 'geoMap' && (
-            <GeoMapPage residents={liveResidents} centers={liveEvacuationCenters}
-              focusBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null} />
+            <GeoMapPage key={assignedBarangayId || 'none'} residents={liveResidents} centers={liveEvacuationCenters}
+              focusBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
+              isSuperAdmin={isSuperAdmin} assignedBarangayName={assignedBarangayName} />
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
 
           {activeMenu === 'rescueReconciliation' && (
-            <SubTabs
-              label="Missing persons and family search"
-              parts={[
-                { key: 'missing', label: 'Missing persons', content: <RescueReconciliationPage /> },
-                { key: 'family', label: 'Find a family member', content: <FamilyReunificationPage /> },
-              ]}
-            />
+            <RescueReconciliationPage />
           )}
 
-          {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} />}
+          {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} onOpenMissing={() => setActiveMenu('rescueReconciliation')} />}
 
           {activeMenu === 'reports' && (
             <ReportsPage />
           )}
+
+          {activeMenu === 'activityLogs' && <AuditTrailPanel key={assignedBarangayId ?? 'all'} />}
 
           {activeMenu === 'preemptiveEvacuation' && (
             <PreemptiveEvacuationPage
@@ -631,6 +618,7 @@ function App({ profile }: AppProps) {
               scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
             />
           )}
+          </ScopeContext.Provider>
           </>
           )}
         </main>

@@ -101,7 +101,7 @@ export function ResponderAccountsPage() {
       ...toAccreditation(form),
       m_name: form.m_name || undefined,
       assigned_barangay_id: Number(form.assigned_barangay_id),
-    }), `${form.f_name} ${form.l_name} can now sign in to the rescuer app with ${form.email}. Add them to a unit in Dispatch.`)
+    }), `${form.f_name} ${form.l_name} can now sign in to the responder app with ${form.email}. Add them to a unit in Dispatch.`)
     if (ok) setForm(null)
   }
 
@@ -117,15 +117,15 @@ export function ResponderAccountsPage() {
 
   return <section className="panel catchment-panel">
     <div className="section-header">
-      <div><h3>Rescuer Accounts</h3></div>
+      <div><h3>Responder Accounts</h3></div>
       <div>
         <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => void load()}>Refresh</button>{' '}
-        <button type="button" className="verify-button" disabled={busy} onClick={() => { setForm(emptyForm()); setNotice('') }}>Add Rescuer</button>
+        <button type="button" className="verify-button" disabled={busy} onClick={() => { setForm(emptyForm()); setNotice('') }}>Add Responder</button>
       </div>
     </div>
     <p className="catchment-muted">
-      Rescuers cannot sign up in the app. Register them here after the LDRRMO accredits them as community disaster volunteers
-      (RA 10121 Sec. 13; NDRRMC MC No. 64 s. 2021, as amended). Only responders with current accreditation can be added to a rescue unit.
+      Responders cannot sign up in the app. Register them here after the LDRRMO accredits them as community disaster volunteers
+      (RA 10121 Sec. 13; NDRRMC MC No. 64 s. 2021, as amended). Only responders with current accreditation can be added to a response unit.
     </p>
     {error && <p role="alert" className="dashboard-error">{error}</p>}
     {notice && <p role="status" className="catchment-notice">{notice}</p>}
@@ -190,6 +190,6 @@ export function ResponderAccountsPage() {
         </tr>
       })}</tbody>
     </table>
-    {!responders.length && <p className="catchment-muted">No rescuer accounts yet.</p>}</div>}
+    {!responders.length && <p className="catchment-muted">No responder accounts yet.</p>}</div>}
   </section>
 }

@@ -176,7 +176,7 @@ function describeAccountState(resident: Resident) {
   return [resident.statusReason, when].filter(Boolean).join(' · ') || resident.accountState || ''
 }
 
-// Turns "Walk Assist" into "walk-assist" so CSS can style it.
+// Turns "Needs help walking" into "needs-help-walking" so CSS can style it.
 function getConstraintClassName(constraint: Resident['constraint']) {
-  return constraint.toLowerCase().replace(' ', '-')
+  return constraint.toLowerCase().replace(/\s+/g, '-')
 }
