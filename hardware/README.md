@@ -1,4 +1,13 @@
-# PriorityCare offline SOS buttons (ESP32 + LoRa)
+# PriorityCare offline SOS (ESP32)
+
+## Recommended: SOS hotspot (`prioritycare_hotspot/`)
+One ESP32 at the purok or barangay hall broadcasts an open WiFi "PriorityCare SOS". Residents with no load connect, a page pops up, they enter their registered mobile number and the emergency, and press SEND SOS. The ESP32 forwards it to the dashboard over its own internet, or holds it until the internet is back. Staff can see everything it received at http://192.168.4.1/list.
+
+Setup: set the secret in the last lines of `supabase/migrations/20261117_01_offline_sos_buttons.sql` and run the whole file in the Supabase SQL Editor; set `WIFI_SSID`, `WIFI_PASS`, `GATEWAY_KEY` (same secret) and `PLACE_NAME` in the sketch; upload to an "ESP32 Dev Module".
+
+---
+
+# Other option: SOS buttons (ESP32 + LoRa)
 
 Household button --LoRa radio, no internet--> Gateway at the barangay hall --WiFi--> Supabase `device_sos()` --> admin dashboard (same `sos_alerts` row the app creates).
 

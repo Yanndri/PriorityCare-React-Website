@@ -24,6 +24,7 @@
 */
 #include <WiFi.h>
 #include <WebServer.h>
+#include <DNSServer.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
@@ -31,7 +32,7 @@
 const char* WIFI_SSID   = "YOUR_WIFI_NAME";
 const char* WIFI_PASS   = "YOUR_WIFI_PASSWORD";
 const char* GATEWAY_ID  = "GW-01";                          // sos_gateways.gateway_id
-const char* GATEWAY_KEY = "CHANGE-ME-long-random-secret";   // secret you hashed into sos_gateways
+const char* GATEWAY_KEY = "pc-gw01-UxD0ggEg8DZnvrlbIHqtrD68";   // secret you hashed into sos_gateways
 const char* NODE_ID     = "NODE-001";                       // sos_devices.node_id (the household)
 const char* SOS_TYPE    = "OTHER";                          // FLOOD, FIRE, MEDICAL, TRAPPED or OTHER
 const char* HOUSEHOLD   = "Santos household, Sitio Example"; // shown on the beacon page
@@ -51,6 +52,7 @@ unsigned long pressStart = 0, nextTry = 0, ledTimer = 0, wifiTimer = 0, lastBeep
 bool ledOn = false;
 
 WebServer server(80);
+DNSServer dns;          // answers every web address with the beacon page (captive portal)
 
 void beep(int ms) { digitalWrite(PIN_BUZZER, HIGH); delay(ms); digitalWrite(PIN_BUZZER, LOW); }
 
@@ -70,17 +72,27 @@ void handlePage() {
   server.send(200, "text/html", html);
 }
 
+void redirectToPage() {
+  server.sendHeader("Location", "http://192.168.4.1/", true);
+  server.send(302, "text/plain", "");
+}
+
 void startBeacon() {
   WiFi.mode(WIFI_AP_STA);                       // keep trying the internet WiFi too
   String name = String("SOS PriorityCare ") + NODE_ID;
   WiFi.softAP(name.c_str());                    // open network so any rescuer can join
+  // Captive portal: every address the phone asks for points to the ESP32,
+  // so Android/iPhone pop up the SOS page by themselves after connecting.
+  dns.setErrorReplyCode(DNSReplyCode::NoError);
+  dns.start(53, "*", WiFi.softAPIP());
   server.on("/", handlePage);
-  server.onNotFound(handlePage);
+  server.onNotFound(redirectToPage);   // Android /generate_204, iPhone /hotspot-detect.html, Windows /connecttest.txt
   server.begin();
   Serial.println("Beacon on: " + name + " (http://192.168.4.1)");
 }
 
 void stopBeacon() {
+  dns.stop();
   server.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
@@ -123,7 +135,7 @@ void setup() {
 }
 
 void loop() {
-  if (sosActive) server.handleClient();
+  if (sosActive) { dns.processNextRequest(); server.handleClient(); }
 
   bool wifiUp = WiFi.status() == WL_CONNECTED;
   if (!wifiUp && millis() - wifiTimer > 15000) {

@@ -25,7 +25,7 @@
 const char* WIFI_SSID     = "YOUR_WIFI_NAME";
 const char* WIFI_PASS     = "YOUR_WIFI_PASSWORD";
 const char* GATEWAY_ID    = "GW-01";                    // must match sos_gateways.gateway_id
-const char* GATEWAY_KEY   = "CHANGE-ME-long-random-secret"; // the secret you hashed into sos_gateways
+const char* GATEWAY_KEY   = "pc-gw01-UxD0ggEg8DZnvrlbIHqtrD68"; // the secret you hashed into sos_gateways
 const char* NETWORK_KEY   = "pc-cordova-2026";          // same value in every node sketch
 const long  LORA_FREQ     = 433E6;                      // must match the nodes
 
