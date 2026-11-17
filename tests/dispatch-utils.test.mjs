@@ -23,21 +23,21 @@ test('priority and equipment suggestions', () => {
     householdMembers: [{ name: 'B', relationship: '', birthdate: '2024-05-01', sex: 'female', is_pregnant: false, needs: '' },
       { name: 'M', relationship: '', birthdate: '1998-01-01', sex: 'female', is_pregnant: true, needs: '' }] }, null, asOf)
   assert.equal(bedriddenFamily.priority, 'critical') // 30 + (18 + 8 + 6) + 25 = 87
-  assert.deepEqual(elder.equipment.sort(), ['Stretcher / spineboard', 'Wheelchair']) // non-ambulatory + age ≥ 80
-  assert.equal(suggestForResident({ ...base, vulnerabilityNeeds: 'needs oxygen' }, null, asOf).equipment[0], 'Oxygen')
+  assert.deepEqual(elder.equipment.sort(), ['Stretcher / spine board', 'Wheelchair']) // non-ambulatory + age ≥ 80
+  assert.equal(suggestForResident({ ...base, vulnerabilityNeeds: 'uses a wheelchair' }, null, asOf).equipment[0], 'Wheelchair')
   assert.deepEqual(suggestForResident({ ...base, mobilityStatus: 'non_ambulatory' }, null, asOf, []).equipment, []) // no rules, no suggestions
   assert.equal(suggestForResident({ ...base, isPregnant: true, houseType: 'light' }, null, asOf).priority, 'high') // 18 + 25 = 43
   assert.equal(suggestForResident(undefined, 3, asOf).priority, 'critical')
   assert.equal(suggestForResident(undefined, 2, asOf).priority, 'high')
   const withBaby = suggestForResident({ ...base, householdMembers: [{ name: 'B', relationship: '', birthdate: '2024-05-01', sex: 'female', is_pregnant: false, needs: '' }] }, null, asOf)
-  assert.deepEqual(withBaby.equipment, ['Infant kit'])
+  assert.deepEqual(withBaby.equipment, ['Infant kit', 'Child life vest'])
 })
 
 test('unit ranking prefers capability coverage, then least busy; skips inactive', () => {
   const u = (id, caps, live, active = true) => ({ unit_id: id, unit_name: `U${id}`, barangay_id: 1, capabilities: caps, member_uids: [], is_active: active, editable: true, members: [], live_tickets: live })
-  const ranked = rankUnits([u(1, ['boat'], 0), u(2, ['stretcher'], 3), u(3, ['stretcher', 'boat'], 5), u(4, ['stretcher'], 0, false)], ['Stretcher / spineboard', 'Boat'])
+  const ranked = rankUnits([u(1, ['boat'], 0), u(2, ['stretcher'], 3), u(3, ['stretcher', 'boat'], 5), u(4, ['stretcher'], 0, false)], ['Stretcher / spine board', 'Boat'])
   assert.deepEqual(ranked.map(r => [r.unit.unit_id, r.covered]), [[3, 2], [1, 1], [2, 1]])
-  assert.deepEqual(ranked[1].missing, ['Stretcher / spineboard'])
+  assert.deepEqual(ranked[1].missing, ['Stretcher / spine board'])
 })
 
 test('elapsed', () => {

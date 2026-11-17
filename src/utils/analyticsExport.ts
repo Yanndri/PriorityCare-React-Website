@@ -1,5 +1,5 @@
 // Shared download helpers for the Disaster Analytics module exports.
-// ExcelJS is already a project dependency (used by the DROMIC exports) and is
+// ExcelJS is already a project dependency and is
 // imported only when a workbook is actually created.
 
 export type ExportCell = string | number | null

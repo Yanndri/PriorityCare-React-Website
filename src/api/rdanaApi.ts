@@ -13,13 +13,18 @@ async function byResidentChunks<T>(ids: string[], read: (ids: string[], from: nu
   }
   return rows
 }
-export async function fetchRdanaData(hours: 24 | 48): Promise<RdanaData> {
+// barangayId: the Super Admin's chosen scope (an Admin always gets their assigned barangay).
+export async function fetchRdanaData(hours: 24 | 48, barangayId: number | null = null): Promise<RdanaData> {
   const window = makeReportWindow(hours)
   const { data: auth, error: authError } = await supabase.auth.getUser()
   if (authError || !auth.user) throw new Error('Sign in again before generating a report.')
   const { data: actor, error: actorError } = await supabase.from('users')
     .select('role,account_status,assigned_barangay_id').eq('uid', auth.user.id).single()
   if (actorError || !actor || actor.account_status !== 'active' || !['admin','super_admin'].includes(actor.role)) throw new Error('Active administrator access is required.')
+  if (actor.role === 'super_admin') {
+    if (barangayId == null) throw new Error('Choose one barangay in the Scope selector at the top first. An RDANA summary covers one barangay.')
+    actor.assigned_barangay_id = barangayId
+  }
   if (actor.assigned_barangay_id == null) throw new Error('A barangay assignment is required for this scoped report.')
   const { data: barangay, error: barangayError } = await supabase.from('barangays').select('barangay_name').eq('barangay_id', actor.assigned_barangay_id).single()
   if (barangayError || !barangay) throw new Error('Unable to verify the report’s barangay scope.')

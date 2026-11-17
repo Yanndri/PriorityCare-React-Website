@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
-import { useEquipmentRules } from '../api/equipmentRulesApi'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
 type VerificationPageProps = {
@@ -240,10 +239,9 @@ type DetailItemProps = {
   value: string
 }
 
-// Module 5.4 — rescue equipment suggested by the equipment rules for this resident and their dependents.
+// Rescue equipment suggested by the fixed equipment list for this resident and their household.
 function EquipmentNeeds({ resident }: { resident: Resident }) {
-  const { rules } = useEquipmentRules()
-  const needs = matchEquipment(resident, rules)
+  const needs = matchEquipment(resident)
   const gaps = equipmentDataGaps(resident)
   const text = needs.length
     ? needs.map((n) => `${n.equipment} (${n.reasons.join('; ')})`).join(' · ')

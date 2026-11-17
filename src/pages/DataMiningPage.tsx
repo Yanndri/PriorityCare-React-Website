@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import type { Resident } from '../types/dashboard'
 import { RdanaSummaryPanel } from '../components/RdanaSummaryPanel'
-import { DromicExportPanel } from '../components/DromicExportPanel'
 import { RescueReconciliationPanel } from '../components/analytics/RescueReconciliationPanel'
 import { VulnerabilityHeatmapPanel } from '../components/analytics/VulnerabilityHeatmapPanel'
-import { AuditTrailPanel } from '../components/analytics/AuditTrailPanel'
 
 // Appendix N, Module 3: Statutory Disaster Analytics & Report Generation.
 // Every view reads live, role-scoped records: the database functions and the
@@ -13,9 +11,7 @@ import { AuditTrailPanel } from '../components/analytics/AuditTrailPanel'
 const tabs = [
   { key: 'reconciliation', label: 'Rescued vs. Missing', title: 'Reconcile Master Rescued Directory vs. Missing Persons Manifest' },
   { key: 'rdana', label: 'RDANA Summaries', title: 'Automated 24–48 Hour RDANA Situation Summaries' },
-  { key: 'dromic', label: 'DROMIC Reports', title: 'DSWD-DROMIC-style Relief & Population Reports (PDF / Excel)' },
   { key: 'heatmaps', label: 'Heatmaps', title: 'Spatial Demographic Vulnerability & Incident Heatmaps' },
-  { key: 'audit', label: 'Audit Trails', title: 'Evacuation Audit Trails & Operational Timestamp Logs' },
 ] as const
 type TabKey = (typeof tabs)[number]['key']
 
@@ -71,9 +67,7 @@ export function DataMiningPage({ residents }: DataMiningPageProps) {
         >
           {tab.key === 'reconciliation' && <RescueReconciliationPanel />}
           {tab.key === 'rdana' && <RdanaSummaryPanel />}
-          {tab.key === 'dromic' && <DromicExportPanel />}
           {tab.key === 'heatmaps' && <VulnerabilityHeatmapPanel residents={residents} active={active === 'heatmaps'} />}
-          {tab.key === 'audit' && <AuditTrailPanel />}
         </div>
       ))}
     </section>

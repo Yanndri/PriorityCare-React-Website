@@ -89,3 +89,35 @@
 .hazard-status.hs-dismissed, .hazard-status.hs-resolved { background: #f1f5f9; color: #475569; }
 .hazard-note { display: grid; gap: 8px; flex: 1 1 280px; }
 .hazard-note input { width: 100%; }
+
+.ticket-backup { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; border-radius: 6px; padding: 6px 8px; }
+.hazard-alarm { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #e2e8f0; color: #334155; }
+.hazard-alarm.alarm-2 { background: #fed7aa; color: #9a3412; }
+.hazard-alarm.alarm-3 { background: #dc2626; color: #fff; }
+/* STEP21: a confirmed flood/fire/landslide report can be declared as a disaster. */
+.hazard-declare-button { background: #b91c1c; color: #fff; border: 1px solid #991b1b; border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; }
+.hazard-declare-button:hover:not(:disabled) { background: #991b1b; }
+.hazard-declare-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.hazard-event-tag { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 700; }
+
+/* The resident's own words from the SOS */
+.sos-note { margin: 4px 0; padding: 6px 8px; border-left: 3px solid #b45309; background: #fffbeb; border-radius: 4px; font-size: 13px; white-space: pre-wrap; }
+
+/* SOS ticket form: who sent it, and where to go */
+.sos-resident { display: grid; grid-template-columns: 1fr 200px; gap: 12px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff; }
+.sos-resident-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; margin: 8px 0; }
+.sos-resident-facts dt { font-size: 12px; color: #64748b; }
+.sos-resident-facts dd { margin: 0; font-weight: 600; font-size: 14px; }
+.sos-resident-head { font-size: 13px; }
+.sos-resident-people { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
+.sos-resident-photo { width: 200px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; }
+.sos-resident-nophoto { display: flex; align-items: center; justify-content: center; color: #94a3b8; background: #f8fafc; font-size: 13px; }
+@media (max-width: 700px) { .sos-resident { grid-template-columns: 1fr; } .sos-resident-photo { width: 100%; } }
+.ticket-map-frame { height: 280px; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; isolation: isolate; }
+.ticket-pin span { display: block; width: 22px; height: 22px; border: 3px solid #fff; border-radius: 50% 50% 50% 0; background: #dc2626; transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.35); cursor: grab; }
+.facility-picker-legend .legend-sos { background: #dc2626; }
+.facility-picker-legend .legend-home { background: #1d4ed8; }
+.missing-hint { margin: 4px 0 12px; }
+.link-button { background: none; border: 0; padding: 0; color: #1d4ed8; text-decoration: underline; cursor: pointer; font: inherit; }
+.sos-visiting { margin: 0 0 8px; padding: 6px 10px; border-left: 4px solid #1d4ed8; background: #eff6ff; font-size: 0.85rem; }
+.sos-not-with { color: #94a3b8; font-style: italic; }

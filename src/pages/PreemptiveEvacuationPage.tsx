@@ -48,7 +48,7 @@ const statusTone: Record<PreemptiveStatus, string> = {
   returned_home: '',
 }
 
-const sourceLabels = { resident: 'resident (app)', staff: 'staff', rescuer: 'rescuer' } as const
+const sourceLabels = { resident: 'resident (app)', staff: 'staff', rescuer: 'responder' } as const
 
 const mobilityLabels: Record<string, string> = {
   ambulatory: 'Can walk',

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { EvacuationCenter } from '../types/dashboard'
 import { FacilityForm } from '../components/FacilityForm'
 import { facilityTypeLabel } from '../utils/facility'
-import { ReliefDemandPlanner } from '../components/ReliefDemandPlanner'
 import { FacilityLifecycleForm } from '../components/FacilityLifecycleForm'
 import { ShelterCatchmentPanel } from '../components/ShelterCatchmentPanel'
 import { SubTabs } from '../components/SubTabs'
@@ -15,13 +14,9 @@ type EvacCentersPageProps = {
   barangayOptions?: { barangay_id: number; barangay_name: string }[]
   // Barangay in scope, so the location map opens there; null = all of Cordova.
   scopeBarangayId?: number | null
-  // Relief requisition (Appendix N 2.3) is for Municipal and System Admin only,
-  // so the Relief supplies tab is shown to super admins only.
-  canPlanRelief?: boolean
 }
 
-// Three tabs: the centers themselves, which shelter each barangay uses,
-// and the relief supplies the centers need.
+// Two tabs: the centers themselves, and which shelter each barangay uses.
 export function EvacCentersPage(props: EvacCentersPageProps) {
   return (
     <SubTabs
@@ -29,9 +24,6 @@ export function EvacCentersPage(props: EvacCentersPageProps) {
       parts={[
         { key: 'centers', label: 'Centers', content: <CentersList {...props} /> },
         { key: 'plan', label: 'Shelter plan', content: <ShelterCatchmentPanel /> },
-        ...(props.canPlanRelief
-          ? [{ key: 'relief', label: 'Relief supplies', content: <ReliefDemandPlanner centers={props.centers} /> }]
-          : []),
       ]}
     />
   )

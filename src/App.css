@@ -361,22 +361,17 @@ td {
   font-weight: 800;
 }
 
-.badge.bedridden {
+.badge.cannot-walk {
   color: #d51f42;
   background: #ffe1e7;
 }
 
-.badge.wheelchair {
-  color: #a08300;
+.badge.needs-help-walking {
+  color: #8a6d00;
   background: #fff5b8;
 }
 
-.badge.visual {
-  color: #1f75b4;
-  background: #dff0ff;
-}
-
-.badge.walk-assist {
+.badge.can-walk {
   color: #098f4e;
   background: #ddf8e9;
 }

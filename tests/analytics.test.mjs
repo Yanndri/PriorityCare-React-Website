@@ -4,7 +4,6 @@ import { reconcile, namesAgree, reconciliationTables } from '../src/utils/reconc
 import { toCoordinate, hasFactor, matchesCategory, gridCells, eventsInFilter, categoryBreakdown } from '../src/utils/vulnerabilityHeat.ts'
 import { manilaDateRange, toCsv, manilaTimestamp, countByCategory, timelineRows } from '../src/utils/auditTrail.ts'
 import { makeReportWindow, buildRdanaSummary, manifestActivity, eventsDuringWindow } from '../src/utils/rdana.ts'
-import { buildDromicReport } from '../src/utils/dromicReport.ts'
 
 const asOf = '2026-10-16T00:00:00Z'
 const resident = (uid, f, l, extra = {}) => ({
@@ -184,18 +183,4 @@ test('RDANA without the new sections keeps the previous wording', () => {
   const text = buildRdanaSummary(base())
   assert.match(text, /Deaths, injuries, missing persons, damaged homes/)
   assert.doesNotMatch(text, /Missing-person manifest/)
-})
-
-test('DROMIC summary reports manifest values, or Not available / Not assessed', () => {
-  const row = (report, label) => report.tables[0].rows.find((r) => r[0] === label)
-  const withData = buildDromicReport({ ...base(), missingReports: available(manifestRows), declaredEvents: available(eventRows) }, '', null)
-  assert.equal(row(withData, 'Open missing-person reports (at retrieval)')[1], 2)
-  assert.equal(row(withData, 'Missing-person reports filed in period')[1], 1)
-  assert.equal(row(withData, 'Declared disaster events active in period')[1], 1)
-  assert.deepEqual(withData.tables.map((t) => t.name), ['Summary', 'Population', 'Shelters', 'Relief'])
-  const failed = buildDromicReport({ ...base(), missingReports: { available: false, reason: 'denied' } }, '', null)
-  assert.equal(row(failed, 'Open missing-person reports (at retrieval)')[1], 'Not available')
-  assert.equal(row(failed, 'Open missing-person reports (at retrieval)')[2], 'denied')
-  const legacy = buildDromicReport(base(), '', null)
-  assert.equal(row(legacy, 'Open missing-person reports (at retrieval)')[1], 'Not assessed')
 })

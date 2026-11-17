@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveSignal } from '../lib/useLiveSignal'
-import { supabase } from '../lib/supabaseClient'
+import { getDispatchBoard } from '../api/dispatchApi'
+import { columnOf } from '../utils/dispatch'
 import { getRescueReconciliation } from '../api/missingPersonsApi'
 import { getPreemptiveBoard } from '../api/preemptiveEvacuationApi'
 import type { EvacuationCenter, MenuKey, Resident } from '../types/dashboard'
@@ -34,22 +35,13 @@ type Task = {
 type Live = {
   activeSos: number | null
   teamsOut: number | null
-  events: { name: string }[] | null
+  events: { event_id: string; name: string }[] | null
   missing: number | null
-  noEvacuationReport: number | null
+  // Per disaster: households in that disaster's barangay with no evacuation report yet.
+  noReport: Record<string, number>
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-const OPEN_TICKET_STATUSES = ['open', 'assigned', 'en_route', 'on_scene']
-
-async function countRows(table: 'sos_alerts' | 'dispatch_tickets', statuses: string[], scope: number | null) {
-  let query = supabase.from(table).select('*', { count: 'exact', head: true }).in('status', statuses)
-  if (scope !== null) query = query.eq('barangay_id', scope)
-  const { count, error } = await query
-  if (error) throw error
-  return count ?? 0
-}
 
 export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Props) {
   const [live, setLive] = useState<Live | null>(null)
@@ -61,31 +53,27 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
     let cancelled = false
     const value = <T,>(result: PromiseSettledResult<T>) => (result.status === 'fulfilled' ? result.value : null)
     void (async () => {
-      const [sos, tickets, reconciliation] = await Promise.allSettled([
-        countRows('sos_alerts', ['active'], scopeBarangayId),
-        countRows('dispatch_tickets', OPEN_TICKET_STATUSES, scopeBarangayId),
-        getRescueReconciliation(),
-      ])
+      // Same numbers as the SOS & Rescue page: SOS calls that still need a ticket, and live tickets.
+      const [dispatch, reconciliation] = await Promise.allSettled([getDispatchBoard(), getRescueReconciliation()])
+      const board = value(dispatch)
       const data = value(reconciliation)
-      const inScope = (barangayId: number) => scopeBarangayId === null || barangayId === scopeBarangayId
+      const inScope = (barangayId: number | null) => scopeBarangayId === null || barangayId === scopeBarangayId
       const events = data ? data.events.filter((e) => e.status === 'active' && inScope(e.barangay_id)) : null
       // Only chase evacuation reports while a disaster is declared.
-      let noEvacuationReport: number | null = null
+      const noReport: Record<string, number> = {}
       if (events?.length) {
         try {
-          const board = await getPreemptiveBoard(scopeBarangayId)
-          noEvacuationReport = board.residents.filter((r) => !r.latest).length
-        } catch {
-          noEvacuationReport = null
-        }
+          const evac = await getPreemptiveBoard(scopeBarangayId)
+          for (const e of events) noReport[e.event_id] = evac.residents.filter((r) => r.barangay_id === e.barangay_id && !r.latest).length
+        } catch { /* leave the counts out */ }
       }
       if (cancelled) return
       setLive({
-        activeSos: value(sos),
-        teamsOut: value(tickets),
+        activeSos: board ? board.intake_sos.filter((a) => inScope(a.barangay_id)).length : null,
+        teamsOut: board ? board.tickets.filter((t) => columnOf(t.status) !== 'closed' && inScope(t.barangay_id)).length : null,
         events,
         missing: data ? data.reports.filter((r) => r.status === 'missing' && inScope(r.barangay_id)).length : null,
-        noEvacuationReport,
+        noReport,
       })
     })()
     return () => { cancelled = true }
@@ -99,15 +87,15 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
   if (live?.activeSos) {
     tasks.push({
       key: 'sos', tone: 'urgent', icon: 'sos', menu: 'dispatch',
-      title: `${plural(live.activeSos, 'SOS', 'SOS calls')} waiting`,
+      title: `${plural(live.activeSos, 'SOS call needs', 'SOS calls need')} a ticket`,
       action: 'Answer',
     })
   }
   for (const event of live?.events ?? []) {
     tasks.push({
-      key: `event-${event.name}`, tone: 'urgent', icon: 'siren-on', menu: 'preemptiveEvacuation',
-      title: live?.noEvacuationReport
-        ? `${event.name}: ${plural(live.noEvacuationReport, 'household', 'households')} with no report yet`
+      key: `event-${event.event_id}`, tone: 'urgent', icon: 'siren-on', menu: 'preemptiveEvacuation',
+      title: live?.noReport[event.event_id]
+        ? `${event.name}: ${plural(live.noReport[event.event_id], 'household has', 'households have')} not said if they evacuated`
         : `${event.name} is active`,
       action: 'Check',
     })
@@ -131,7 +119,7 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
   if (live?.teamsOut) {
     tasks.push({
       key: 'teams', tone: 'info', icon: 'ambulance', menu: 'dispatch',
-      title: `${plural(live.teamsOut, 'rescue', 'rescues')} in progress`,
+      title: `${plural(live.teamsOut, 'rescue ticket', 'rescue tickets')} open`,
       action: 'View',
     })
   }

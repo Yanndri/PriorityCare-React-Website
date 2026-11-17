@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import L from 'leaflet'
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import type { EvacuationCenter } from '../types/dashboard'
-import { BARANGAY_ZOOM, useBarangayView } from '../lib/barangayCenters'
+import { useBarangayView, CORDOVA_MAP_LIMITS } from '../lib/barangayCenters'
 import { MapFocus } from './MapFocus'
-import { BarangayBordersLayer } from './BarangayBordersLayer'
+import { isInCordova, OUTSIDE_CORDOVA, useBarangayBorders } from '../utils/barangayBorders'
 
 // Map picker for registering an evacuation facility: drag the pin (or click
 // the map) to set the GPS coordinates. Existing facilities are shown for
@@ -50,7 +50,14 @@ function ClickToPlace({ disabled, onPlace }: { disabled?: boolean; onPlace: (lat
 export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange }: Props) {
   const view = useBarangayView(focusBarangayId)
   const point = toPoint(latitude, longitude)
-  const place = (lat: number, lng: number) => onChange(format(lat), format(lng))
+  const borders = useBarangayBorders()
+  const [outside, setOutside] = useState(false)
+  // Only spots inside Cordova are accepted.
+  const place = (lat: number, lng: number) => {
+    const ok = isInCordova(lat, lng, borders)
+    setOutside(!ok)
+    if (ok) onChange(format(lat), format(lng))
+  }
 
   const existing = useMemo(
     () => centers.filter((center) =>
@@ -61,10 +68,14 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
 
   const markerHandlers = useMemo(() => ({
     dragend(event: L.LeafletEvent) {
-      const position = (event.target as L.Marker).getLatLng()
-      onChange(format(position.lat), format(position.lng))
+      const marker = event.target as L.Marker
+      const position = marker.getLatLng()
+      const ok = isInCordova(position.lat, position.lng, borders)
+      setOutside(!ok)
+      if (ok) onChange(format(position.lat), format(position.lng))
+      else if (point) marker.setLatLng(point)
     },
-  }), [onChange])
+  }), [onChange, borders, point])
 
   return (
     <div className="facility-picker">
@@ -73,10 +84,10 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
           ? 'Drag the pin to adjust the location, or click the map to move it.'
           : 'Click the map, or drag the pin, to set the facility location.'}
       </p>
+      {outside && <p className="facility-picker-hint" role="alert">{OUTSIDE_CORDOVA}</p>}
       <div className="facility-picker-map">
-        <MapContainer center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+        <MapContainer {...CORDOVA_MAP_LIMITS} center={point ?? view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          <BarangayBordersLayer highlightAt={view.zoom === BARANGAY_ZOOM ? view.center : null} />
           <MapFocus center={view.center} zoom={view.zoom} />
           <ClickToPlace disabled={disabled} onPlace={place} />
           {existing.map((center) => (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient'
@@ -11,20 +11,26 @@ import { SpatialHeatmapLayer } from '../components/SpatialHeatmapLayer'
 import { TriagePinsLayer } from '../components/TriagePinsLayer'
 import { Icon } from '../components/Icon'
 import { MapFocus } from '../components/MapFocus'
-import { BARANGAY_ZOOM, useBarangayView } from '../lib/barangayCenters'
-import { BarangayBordersLayer } from '../components/BarangayBordersLayer'
+import { StartOnBarangay } from '../components/StartOnBarangay'
+import { useBarangayView, CORDOVA_MAP_LIMITS, CORDOVA_BOUNDS } from '../lib/barangayCenters'
+
+// A little room around Cordova, so a pin's info box near the edge can open without the
+// map fighting the border (it used to pan up, get pushed back, and land somewhere else).
+const MAP_LIMITS = { ...CORDOVA_MAP_LIMITS, maxBounds: L.latLngBounds(CORDOVA_BOUNDS).pad(0.25), maxBoundsViscosity: 1 }
 import { buildTriagePins, TRIAGE_LEVELS, TRIAGE_ORDER } from '../utils/triagePins'
 import type { TriageLevel } from '../utils/triagePins'
 import { HEAT_RAMPS } from '../utils/spatialHeatmap'
 
 // The Map page: the map on the left, and one panel on the right that
 // says what is on the map and lets staff turn each thing on or off.
-// A second tab shows the live weather map (Windy) over Cordova.
+// An admin's map opens zoomed on their own barangay; the super admin's on all of Cordova.
 
 type GeoMapPageProps = {
   residents?: Resident[]
   centers?: EvacuationCenter[]
   focusBarangayId?: number | null // the barangay in scope; null = all of Cordova
+  isSuperAdmin?: boolean
+  assignedBarangayName?: string | null // an admin's own barangay (the map opens on it)
 }
 
 type SosAlert = {
@@ -91,83 +97,80 @@ function timeAgo(iso?: string | null) {
   return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`
 }
 
-async function loadActiveSos(): Promise<SosAlert[]> {
+async function loadActiveSos(barangayId: number | null): Promise<SosAlert[]> {
   if (!hasSupabaseConfig) return []
   const { data, error } = await supabase
     .from('sos_alerts')
-    .select('alert_id, resident_uid, alert_type, alert_level, latitude, longitude, headcount, note, created_at')
+    .select('alert_id, resident_uid, alert_type, alert_level, latitude, longitude, headcount, note, created_at, barangay_id')
     .eq('status', 'active')
   if (error) throw error
+  // Only the barangay in scope (SOS filed there).
+  if (barangayId != null) return (data ?? []).filter((a) => a.barangay_id === barangayId)
   return data ?? []
 }
 
-const WINDY_URL = 'https://embed.windy.com/embed2.html?lat=10.25&lon=123.95&detailLat=10.25&detailLon=123.95'
-  + '&zoom=9&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure='
-  + '&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1'
-
-export function GeoMapPage({ residents = [], centers = [], focusBarangayId = null }: GeoMapPageProps) {
+export function GeoMapPage({ residents = [], centers = [], focusBarangayId = null, isSuperAdmin = false, assignedBarangayName = null }: GeoMapPageProps) {
   const view = useBarangayView(focusBarangayId)
-  const [tab, setTab] = useState<'map' | 'weather'>('map')
   const [sos, setSos] = useState<SosAlert[]>([])
 
   // What is switched on. Everything starts on except the heatmap.
   const [levels, setLevels] = useState<Record<TriageLevel, boolean>>({ red: true, yellow: true, green: true })
-  const [show, setShow] = useState({ borders: true, sos: true, centers: true, hazards: true, disasters: true })
+  const [show, setShow] = useState({ sos: true, centers: true, hazards: true, disasters: true })
   const [heat, setHeat] = useState<'off' | 'vulnerability' | 'incidents'>('off')
   const toggle = (key: keyof typeof show) => setShow(s => ({ ...s, [key]: !s[key] }))
 
   useEffect(() => {
     let active = true
-    loadActiveSos().then(rows => { if (active) setSos(rows) }).catch(() => undefined)
+    loadActiveSos(focusBarangayId).then(rows => { if (active) setSos(rows) }).catch(() => undefined)
     return () => { active = false }
-  }, [])
-  useLiveSignal(['sos', 'tickets'], () => { loadActiveSos().then(setSos).catch(() => undefined) })
+  }, [focusBarangayId])
+  useLiveSignal(['sos', 'tickets'], () => { loadActiveSos(focusBarangayId).then(setSos).catch(() => undefined) })
 
   // Make the map fill the window below where it starts, so the page does not scroll.
+  // Re-measured whenever the page above it changes size (e.g. the scope bar finishes loading).
   const fitRef = useRef<HTMLDivElement | null>(null)
   const [height, setHeight] = useState(500)
   useEffect(() => {
     const fit = () => {
-      const top = fitRef.current?.getBoundingClientRect().top ?? 0
-      setHeight(Math.max(380, window.innerHeight - top - window.scrollY - 24))
+      const top = (fitRef.current?.getBoundingClientRect().top ?? 0) + window.scrollY
+      setHeight(Math.max(380, window.innerHeight - top - 16))
     }
     fit()
+    const watch = new ResizeObserver(fit)
+    watch.observe(document.body)
     window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [tab])
+    return () => { watch.disconnect(); window.removeEventListener('resize', fit) }
+  }, [])
+  // The filter panel can be folded away to give the map the full width (remembered per browser).
+  const [sideOpen, setSideOpen] = useState(() => { try { return localStorage.getItem('pc.mapSide') !== 'closed' } catch { return true } })
+  const toggleSide = () => setSideOpen((open) => {
+    try { localStorage.setItem('pc.mapSide', open ? 'closed' : 'open') } catch { /* private window */ }
+    return !open
+  })
 
   const triage = useMemo(() => buildTriagePins(residents), [residents])
   const openCenters = centers.filter(c => Number.isFinite(c.gpsLat) && Number.isFinite(c.gpsLong) && c.status.toLowerCase() !== 'closed')
   const sosOnMap = sos.filter(r => r.latitude != null && r.longitude != null
     && Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude)))
+  const householdPins = triage.pins
 
   return (
     <section className="map-page">
-      <div className="analytics-tabs" role="tablist" aria-label="Map type">
-        <button type="button" role="tab" aria-selected={tab === 'map'} className={`analytics-tab ${tab === 'map' ? 'active' : ''}`} onClick={() => setTab('map')}>
-          <Icon name="map" /> Map
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'weather'} className={`analytics-tab ${tab === 'weather' ? 'active' : ''}`} onClick={() => setTab('weather')}>
-          <Icon name="cloud-rain" /> Weather
-        </button>
-      </div>
-
-      {tab === 'weather' ? (
-        <div className="map-frame" ref={fitRef} style={{ height }}>
-          <iframe title="Live weather over Cordova (Windy)" src={WINDY_URL} />
-        </div>
-      ) : (
-        <div className="map-layout" ref={fitRef} style={{ height }}>
+        <div className={`map-layout${sideOpen ? '' : ' side-closed'}`} ref={fitRef} style={{ height }}>
           <div className="map-frame">
-            <MapContainer center={view.center} zoom={view.zoom} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+            {/* Smoother zoom: half steps on the mouse wheel, and hazard/disaster circles drawn on one canvas. */}
+            <MapContainer {...MAP_LIMITS} center={view.center} zoom={view.zoom} scrollWheelZoom
+              zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={90} wheelDebounceTime={30} preferCanvas
+              style={{ width: '100%', height: '100%' }}>
               <MapFocus center={view.center} zoom={view.zoom} />
+              <RefitOnResize trigger={`${sideOpen}-${height}`} />
               <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              {show.borders && <BarangayBordersLayer highlightAt={view.zoom === BARANGAY_ZOOM ? view.center : null} />}
 
+              <StartOnBarangay name={isSuperAdmin ? null : assignedBarangayName} />
               {heat !== 'off' && <SpatialHeatmapLayer residents={residents} kind={heat} />}
               {show.disasters && <DisasterEventMarkers />}
               {show.hazards && <HazardPinsLayer />}
-              <TriagePinsLayer pins={triage.pins.filter(p => levels[p.triage])} />
+              <TriagePinsLayer pins={householdPins.filter(p => levels[p.triage])} />
 
               {show.centers && openCenters.map(center => (
                 <Marker key={`center-${center.id ?? center.name}`} position={[center.gpsLat!, center.gpsLong!]} icon={centerIcon}>
@@ -204,7 +207,10 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
             </MapContainer>
           </div>
 
-          <aside className="map-side" aria-label="What the map shows">
+          {!sideOpen && <button type="button" className="map-side-open" onClick={toggleSide} aria-label="Show map filters">
+            <Icon name="angle-left" /> Filters</button>}
+          {sideOpen && <aside className="map-side" aria-label="What the map shows">
+            <button type="button" className="map-side-close" onClick={toggleSide}>Hide filters <Icon name="angle-right" /></button>
             <h2>Households</h2>
             <p className="map-side-note">Coloured by household VPI. The number on a pin is how many people live there.</p>
             {TRIAGE_ORDER.map(level => (
@@ -212,16 +218,12 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
                 <input type="checkbox" checked={levels[level]} onChange={() => setLevels(s => ({ ...s, [level]: !s[level] }))} />
                 <span className="triage-swatch" style={{ background: TRIAGE_LEVELS[level].color, color: level === 'yellow' ? '#1f2937' : '#fff' }}>{TRIAGE_LEVELS[level].short}</span>
                 <span>{TRIAGE_LEVELS[level].label}</span>
-                <strong>{triage.counts[level]}</strong>
+                <strong>{householdPins.filter(p => p.triage === level).length}</strong>
               </label>
             ))}
             {triage.unmappedHouseholds > 0 && <p className="map-side-note">{triage.unmappedHouseholds} household(s) have no home pin yet.</p>}
 
             <h2>Also show</h2>
-            <label className="map-toggle">
-              <input type="checkbox" checked={show.borders} onChange={() => toggle('borders')} />
-              <span className="map-key map-key-borders" /><span>Barangay borders</span>
-            </label>
             <label className="map-toggle">
               <input type="checkbox" checked={show.sos} onChange={() => toggle('sos')} />
               <span className="map-key map-key-sos" /><span>SOS calls</span><strong>{sosOnMap.length}</strong>
@@ -251,9 +253,15 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
                 <small><span>Fewer</span><span>More</span></small>
               </div>
             )}
-          </aside>
+          </aside>}
         </div>
-      )}
     </section>
   )
+}
+
+// Leaflet must be told when its box changes size (filters folded, window resized).
+function RefitOnResize({ trigger }: { trigger: string }) {
+  const map = useMap()
+  useEffect(() => { const t = setTimeout(() => map.invalidateSize(), 50); return () => clearTimeout(t) }, [map, trigger])
+  return null
 }

@@ -8,7 +8,6 @@ export type MenuKey =
   | 'geoMap'
   | 'disasterEvents'
   | 'rescueReconciliation'
-  | 'familyReunification'
   | 'dispatch'
   | 'reports'
   | 'dataMining'
@@ -20,7 +19,8 @@ export type MenuKey =
   | 'responderAccounts'
   | 'activityLogs'
 
-export type Constraint = 'Bedridden' | 'Wheelchair' | 'Visual' | 'Walk Assist'
+// Mobility of the account holder (same three levels as the app).
+export type Constraint = 'Can walk' | 'Needs help walking' | 'Cannot walk'
 
 export type Status = 'Pending' | 'Verified' | 'Rejected'
 

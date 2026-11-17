@@ -1,4 +1,4 @@
-// Module 5.4 — match extraction equipment to a resident's medical / vulnerability profile.
+// Match rescue equipment to a resident's mobility / vulnerability profile.
 // Pure helpers (no Supabase) so they can be unit-tested. Suggestions only; trained personnel confirm.
 import type { Resident } from '../types/dashboard'
 import { vpiToday } from './vpi.ts'
@@ -16,8 +16,6 @@ export type EquipmentRule = {
   updated_by_name?: string | null
 }
 
-export type EquipmentRuleSet = { can_edit: boolean; disability_types: string[]; rules: EquipmentRule[] }
-
 export const MATCH_KIND_LABELS: Record<MatchKind, string> = {
   mobility: 'Mobility is',
   disability: 'Has disability',
@@ -30,26 +28,33 @@ export const MATCH_KIND_LABELS: Record<MatchKind, string> = {
 const r = (match_kind: MatchKind, match_value: string, equipment: string, note: string): EquipmentRule =>
   ({ match_kind, match_value, equipment, note, is_active: true })
 
-/** Same defaults the migration seeds; used if the rules cannot be loaded. */
-export const DEFAULT_EQUIPMENT_RULES: EquipmentRule[] = [
-  r('mobility', 'non_ambulatory', 'Stretcher / spineboard', 'Cannot walk; carry out lying down'),
+/**
+ * The one fixed list of equipment rules (user decision 2026-11-14: no editable
+ * rules screen). The responder app uses the same equipment names in src/utils/vpi.js.
+ * Suggestions only; responders confirm on site.
+ * No medical conditions (dialysis, asthma, ...): the system records mobility, disability
+ * type, pregnancy and age only, to keep the scope small. The needs keywords below are
+ * mobility aids written in the household's needs text.
+ */
+export const EQUIPMENT_RULES: EquipmentRule[] = [
+  r('mobility', 'non_ambulatory', 'Stretcher / spine board', 'Cannot walk; carry out lying down (4 people)'),
   r('mobility', 'semi_ambulatory', 'Wheelchair', 'Can stand or walk short distances with help'),
-  r('disability', 'Physical', 'Wheelchair', 'Physical disability; confirm on scene'),
-  r('disability', 'Visual', 'Guide rope / sighted escort', 'Low or no vision'),
-  r('disability', 'Hearing', 'Written cards / light signals', 'Cannot rely on spoken or siren instructions'),
-  r('disability', 'Intellectual', 'Familiar companion / calm escort', 'May need simple, patient instructions'),
-  r('disability', 'Psychosocial', 'Familiar companion / calm escort', 'Reduce stress during extraction'),
-  r('pregnancy', 'true', 'First aid kit', 'Pregnancy recorded'),
+  r('disability', 'Physical', 'Wheelchair', 'Physical disability; confirm on site'),
+  r('disability', 'Visual', 'Guide rope / escort', 'Low or no vision'),
+  r('disability', 'Hearing', 'Written cards / flashlight signals', 'Cannot rely on spoken or siren instructions'),
+  r('disability', 'Intellectual', 'Calm escort (family member if possible)', 'Give simple, patient instructions'),
+  r('disability', 'Psychosocial', 'Calm escort (family member if possible)', 'Keep stress low during rescue'),
+  r('pregnancy', 'true', 'First aid / maternity kit', 'Pregnant'),
   r('age_under', '5', 'Infant kit', 'Infant or toddler'),
+  r('age_under', '13', 'Child life vest', 'Child; needs a smaller life vest in flood water'),
   r('age_at_least', '80', 'Wheelchair', 'Very elderly; long walks may not be safe'),
-  r('needs_keyword', 'oxygen', 'Oxygen', 'Needs oxygen support'),
-  r('needs_keyword', 'bedridden', 'Stretcher / spineboard', 'Bedridden mentioned in needs'),
+  r('needs_keyword', 'bedridden', 'Stretcher / spine board', 'Bedridden'),
   r('needs_keyword', 'wheelchair', 'Wheelchair', 'Uses a wheelchair'),
-  r('needs_keyword', 'dialysis', 'Medical transport', 'Needs regular dialysis'),
-  r('needs_keyword', 'insulin', 'Medicine cooler', 'Insulin must stay cool'),
-  r('needs_keyword', 'seizure', 'First aid kit', 'Seizure history'),
   r('needs_keyword', 'cane', 'Walking aid', 'Uses a cane'),
 ]
+
+/** Old name, kept so existing imports and tests still work. */
+export const DEFAULT_EQUIPMENT_RULES = EQUIPMENT_RULES
 
 function ageOn(birthdate: string | undefined, asOf: string) {
   if (!birthdate || !/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > asOf) return null

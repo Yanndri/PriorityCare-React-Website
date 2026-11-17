@@ -1,10 +1,10 @@
 # PriorityCare
 
-PriorityCare is a web dashboard for disaster preparedness and response at the barangay level. Administrators use it to verify residents, map vulnerable households, declare disaster events, manage evacuation centers, and draft situation and relief reports.
+PriorityCare is a web dashboard for disaster preparedness and response at the barangay level. Administrators use it to verify residents, map vulnerable households, declare disaster events, manage evacuation centers, and draft situation reports.
 
 The frontend is built with React, TypeScript, and Vite, and uses Supabase for authentication and data. A small Express API (`prioritycare-api/`) handles privileged Super Admin operations that need the Supabase service-role key.
 
-> **Prototype notice:** Scoring (VPI), relief arithmetic, and the RDANA/DROMIC-style exports are for demonstration only. They are **not** validated for real triage, rescue ordering, or official DSWD submissions. The docs in [`docs/`](docs/) cover the details.
+> **Prototype notice:** Scoring (VPI) and the RDANA summaries are for demonstration only. They are **not** validated for real triage, rescue ordering, or official DSWD submissions. The docs in [`docs/`](docs/) cover the details.
 
 ## Features
 
@@ -14,9 +14,9 @@ The frontend is built with React, TypeScript, and Vite, and uses Supabase for au
 | **Verification** | Review and verify pending resident registrations; edit resident profiles |
 | **Geo Map** | Leaflet map of residents, active disaster events, and weather (OpenWeather) |
 | **Disaster Events** | Declare and resolve flood, fire, earthquake, and landslide events for a barangay |
-| **Reports** | 24/48-hour RDANA situation-summary drafts and DROMIC-style PDF/Excel exports |
+| **Reports** | 24/48-hour RDANA situation-summary drafts and the evacuation audit trail |
 | **Data Mining** | Analytics charts over resident data |
-| **Evac Centers** | Register facilities, manage their lifecycle, and plan daily relief requisition demand |
+| **Evac Centers** | Register facilities, manage their lifecycle, and set each barangay's shelter |
 | **Super Admin** | Create admin accounts and view a dashboard across all barangays |
 
 ## Project structure
@@ -26,7 +26,7 @@ src/
   api/          Supabase / backend API calls
   components/   Reusable UI (panels, forms, tables, sidebar)
   pages/        Top-level dashboard sections
-  utils/        Pure logic: VPI, RDANA, relief demand, DROMIC export builders
+  utils/        Pure logic: VPI, RDANA, audit trail
   lib/          Supabase client
 prioritycare-api/   Express backend for Super Admin endpoints
 supabase/
@@ -138,7 +138,7 @@ Every `/api/super-admin/*` route requires a Supabase bearer token from a Super A
 Unit tests use Node's built-in test runner:
 
 ```bash
-node --test tests/vpi.test.mjs tests/rdana.test.mjs tests/relief-demand.test.mjs
+node --test tests/vpi.test.mjs tests/rdana.test.mjs
 ```
 
 The migration integration scripts (`disaster-events.mjs`, `facility-*.mjs`, `resident-profile-migration.mjs`) run the SQL against an in-memory PostgreSQL using [`@electric-sql/pglite`](https://pglite.dev/). That package is not a project dependency. Install it in a temporary directory and pass its path:
@@ -147,7 +147,6 @@ The migration integration scripts (`disaster-events.mjs`, `facility-*.mjs`, `res
 node tests/disaster-events.mjs file:///path/to/node_modules/@electric-sql/pglite/dist/index.js
 ```
 
-`tests/dromic-export.mjs <output-dir>` generates synthetic PDF and XLSX samples for checking the exports.
 
 ## Deployment
 
@@ -164,7 +163,5 @@ The Express backend has to be hosted separately. The `MYSQL*` env var names sugg
 
 - [Prototype VPI](docs/PROTOTYPE_VPI.md)
 - [RDANA situation summaries](docs/RDANA_SUMMARIES.md)
-- [DROMIC-style exports](docs/DROMIC_EXPORTS.md)
-- [Daily relief demand](docs/DAILY_RELIEF_DEMAND.md)
 - [Disaster events](docs/disaster-events.md)
 - [Facility registration](supabase/FACILITY_REGISTRATION.md), [facility lifecycle](supabase/FACILITY_LIFECYCLE.md), and [resident editing](supabase/RESIDENT_EDITING.md)

@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useScopeBarangay } from '../lib/scope'
 import { fetchRdanaData } from '../api/rdanaApi'
 import { buildRdanaSummary } from '../utils/rdana'
 
 export function RdanaSummaryPanel() {
   const [hours, setHours] = useState<24 | 48>(24)
+  const scope = useScopeBarangay()
   const [context, setContext] = useState('')
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +17,7 @@ export function RdanaSummaryPanel() {
     if (loading) return
     setLoading(true); setError(''); setReviewed(false); setDraft(''); setPartial(false)
     try {
-      const data = await fetchRdanaData(hours)
+      const data = await fetchRdanaData(hours, scope)
       setDraft(buildRdanaSummary(data, context))
       setFileStamp(`${data.window.hours}h-${data.window.end.replaceAll(':', '-').slice(0, 19)}`)
       setPartial([data.sos, data.loggedEvacuations, data.completedEvacuations, data.profiles, data.disabilityResidents, data.shelters].some((section) => !section.available))

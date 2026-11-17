@@ -1,36 +1,24 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './supabaseClient'
 
-// Where maps open: the barangay's centre point (barangays.center_lat/lng), or
-// Cordova town centre when no single barangay is chosen.
+// Where maps open (Cordova town centre) and how far they can be moved.
 
 export const CORDOVA_CENTER: [number, number] = [10.2526, 123.9496]
 export const BARANGAY_ZOOM = 15
 export const MUNICIPAL_ZOOM = 14
 
-type Centers = Map<number, [number, number]>
-let cache: Promise<Centers> | null = null
-
-function loadCenters(): Promise<Centers> {
-  cache ??= Promise.resolve(supabase.from('barangays').select('barangay_id, center_lat, center_lng')).then(({ data, error }) => {
-    if (error) throw error
-    const map: Centers = new Map()
-    for (const row of data ?? []) {
-      if (row.center_lat != null && row.center_lng != null) map.set(row.barangay_id, [Number(row.center_lat), Number(row.center_lng)])
-    }
-    return map
-  }).catch((e) => { cache = null; throw e })
-  return cache
+// Every map opens on all of Cordova (user decision 2026-11-14). The barangay
+// argument is kept so callers do not change; zoom into a barangay by
+// clicking its border on the Map page instead.
+export function useBarangayView(barangayId?: number | null): { center: [number, number]; zoom: number } {
+  void barangayId
+  return { center: CORDOVA_CENTER, zoom: MUNICIPAL_ZOOM }
 }
 
-// [centre, zoom] for a barangay, or for all of Cordova when barangayId is null.
-export function useBarangayView(barangayId: number | null | undefined): { center: [number, number]; zoom: number } {
-  const [centers, setCenters] = useState<Centers | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    loadCenters().then((c) => { if (!cancelled) setCenters(c) }).catch(() => { /* fall back to Cordova */ })
-    return () => { cancelled = true }
-  }, [])
-  const point = barangayId != null ? centers?.get(barangayId) : undefined
-  return point ? { center: point, zoom: BARANGAY_ZOOM } : { center: CORDOVA_CENTER, zoom: MUNICIPAL_ZOOM }
-}
+// Cordova's outline (from the barangay borders) plus a small margin. Maps
+// cannot be panned or zoomed out past it, so only Cordova tiles load.
+export const CORDOVA_BOUNDS: [[number, number], [number, number]] = [[10.175, 123.895], [10.295, 124.02]]
+// Viscosity below 1 lets the edge give a little instead of snapping back hard while zooming.
+export const CORDOVA_MAP_LIMITS = { maxBounds: CORDOVA_BOUNDS, maxBoundsViscosity: 0.85, minZoom: 13 }
+
+// Rough check used until the exact borders have loaded.
+export const inCordovaBox = (lat: number, lng: number) =>
+  lat >= CORDOVA_BOUNDS[0][0] && lat <= CORDOVA_BOUNDS[1][0] && lng >= CORDOVA_BOUNDS[0][1] && lng <= CORDOVA_BOUNDS[1][1]

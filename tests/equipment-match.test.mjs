@@ -12,16 +12,16 @@ test('nothing for an ambulatory adult without needs', () => {
 })
 
 test('mobility, disability types, pregnancy and age', () => {
-  assert.deepEqual(eq({ ...base, mobilityStatus: 'non_ambulatory' }), ['Stretcher / spineboard'])
-  assert.deepEqual(eq({ ...base, disabilityTypes: ['Visual', 'Hearing'] }), ['Guide rope / sighted escort', 'Written cards / light signals'])
-  assert.deepEqual(eq({ ...base, isPregnant: true }), ['First aid kit'])
+  assert.deepEqual(eq({ ...base, mobilityStatus: 'non_ambulatory' }), ['Stretcher / spine board'])
+  assert.deepEqual(eq({ ...base, disabilityTypes: ['Visual', 'Hearing'] }), ['Guide rope / escort', 'Written cards / flashlight signals'])
+  assert.deepEqual(eq({ ...base, isPregnant: true }), ['First aid / maternity kit'])
   assert.deepEqual(eq({ ...base, birthdate: '1940-01-01' }), ['Wheelchair'])
-  assert.deepEqual(eq({ ...base, birthdate: '2024-01-01' }), ['Infant kit'])
+  assert.deepEqual(eq({ ...base, birthdate: '2024-01-01' }).sort(), ['Child life vest', 'Infant kit'])
 })
 
 test('needs keywords are whole-word and case-insensitive; duplicates merge with all reasons', () => {
-  const r = matchEquipment({ ...base, mobilityStatus: 'semi_ambulatory', disabilityTypes: ['Physical'], vulnerabilityNeeds: 'On OXYGEN at night; uses a wheelchair' }, undefined, asOf)
-  assert.deepEqual(r.map(n => n.equipment).sort(), ['Oxygen', 'Wheelchair'])
+  const r = matchEquipment({ ...base, mobilityStatus: 'semi_ambulatory', disabilityTypes: ['Physical'], vulnerabilityNeeds: 'Uses a WHEELCHAIR at night' }, undefined, asOf)
+  assert.deepEqual(r.map(n => n.equipment).sort(), ['Wheelchair'])
   assert.equal(r.find(n => n.equipment === 'Wheelchair').reasons.length, 3)
   assert.deepEqual(eq({ ...base, vulnerabilityNeeds: 'Lost roof in the hurricane' }), []) // "cane" inside a word
   assert.deepEqual(eq({ ...base, vulnerabilityNeeds: 'Walks with a cane.' }), ['Walking aid'])
@@ -29,13 +29,14 @@ test('needs keywords are whole-word and case-insensitive; duplicates merge with 
 
 test('household dependents count, labelled by name', () => {
   const r = matchEquipment({ ...base, householdMembers: [{ name: 'Baby', relationship: 'Granddaughter', birthdate: '2024-05-01', sex: 'female', is_pregnant: false, needs: 'asthma, oxygen' }] }, undefined, asOf)
-  assert.deepEqual(r.map(n => n.equipment).sort(), ['Infant kit', 'Oxygen'])
+  // Medical conditions are out of scope: only her age counts.
+  assert.deepEqual(r.map(n => n.equipment).sort(), ['Child life vest', 'Infant kit'])
   assert.ok(r[0].reasons[0].startsWith('Baby: '))
 })
 
 test('inactive and custom rules', () => {
   const rules = DEFAULT_EQUIPMENT_RULES.map(x => x.match_value === 'non_ambulatory' ? { ...x, is_active: false } : x)
-    .concat([{ match_kind: 'needs_keyword', match_value: 'cpap', equipment: 'Oxygen', note: '', is_active: true }])
+    .concat([{ match_kind: 'needs_keyword', match_value: 'cpap', equipment: 'Portable oxygen', note: '', is_active: true }])
   assert.deepEqual(eq({ ...base, mobilityStatus: 'non_ambulatory' }, rules), [])
   const cpap = matchEquipment({ ...base, vulnerabilityNeeds: 'CPAP machine' }, rules, asOf)
   assert.deepEqual(cpap[0].reasons, ['Needs text mentions cpap'])
