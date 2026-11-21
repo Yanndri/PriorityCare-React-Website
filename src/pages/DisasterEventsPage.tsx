@@ -12,6 +12,17 @@ function manilaNow() {
 }
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' })
 
+
+// Common reasons for ending a declaration; "Other" lets staff type their own.
+const RESOLUTION_REASONS = [
+  'Hazard has passed (water receded, fire out, shaking stopped)',
+  'All affected residents are safe and accounted for',
+  'Evacuees have returned home',
+  'Declared by mistake or a duplicate',
+  'Moved under a municipal or wider declaration',
+]
+const OTHER_REASON = 'Other'
+
 export function DisasterEventsPage() {
   const [rawRegister, setRegister] = useState<EventRegister | null>(null)
   // Only the barangay chosen in the Scope selector (all of them for "All barangays").
@@ -34,6 +45,7 @@ export function DisasterEventsPage() {
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null)
   const [resolving, setResolving] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [reasonChoice, setReasonChoice] = useState('')
   const [showForm, setShowForm] = useState(false)
   const formRef = useRef<HTMLElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -75,12 +87,16 @@ export function DisasterEventsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Declaration failed.') }
     finally { setBusy(false) }
   }
+  // Picked reason, plus the optional details typed under it. "Other" uses the details alone.
+  const fullReason = reasonChoice === OTHER_REASON ? reason.trim()
+    : reason.trim() ? `${reasonChoice}: ${reason.trim()}` : reasonChoice
+
   async function finish(event: FormEvent) {
     event.preventDefault()
     if (!resolving) return
     setBusy(true); setError(''); setNotice('')
     try {
-      await resolveEvent(resolving, reason); setResolving(null); setReason('')
+      await resolveEvent(resolving, fullReason); setResolving(null); setReason(''); setReasonChoice('')
       setNotice('Event resolved. The declaration and audit history are retained.'); await load()
     } catch (e) { setError(e instanceof Error ? e.message : 'Resolution failed.') }
     finally { setBusy(false) }
@@ -95,8 +111,8 @@ export function DisasterEventsPage() {
         {event.latitude !== null && <p>Pin: {Number(event.latitude).toFixed(5)}, {Number(event.longitude).toFixed(5)}</p>}
         {event.notes && <p className="disaster-notes">{event.notes}</p>}
         {event.status === 'resolved' && <p>Resolved: {formatTime(event.resolved_at!)} · {event.resolution_reason}</p>}
-        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason('') }}>Resolve event</button>}
-        {resolving === event.event_id && <form onSubmit={finish} className="disaster-resolution"><label>Resolution reason<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label><p>This ends the active declaration and keeps its history.</p><button className="primary-button" disabled={busy || loading || !reason.trim()}>Confirm resolution</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Cancel</button></form>}
+        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason(''); setReasonChoice('') }}>Resolve event</button>}
+        {resolving === event.event_id && <form onSubmit={finish} className="disaster-resolution"><label>Resolution reason<select required value={reasonChoice} onChange={e => setReasonChoice(e.target.value)}><option value="">Choose a reason</option>{RESOLUTION_REASONS.map(r => <option key={r} value={r}>{r}</option>)}<option value={OTHER_REASON}>{OTHER_REASON}</option></select></label>{reasonChoice && <label>{reasonChoice === OTHER_REASON ? 'Describe the reason' : 'Details (optional)'}<textarea required={reasonChoice === OTHER_REASON} maxLength={900} value={reason} onChange={e => setReason(e.target.value)} /></label>}<p>This ends the active declaration and keeps its history.</p><button className="primary-button" disabled={busy || loading || !fullReason}>Confirm resolution</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Cancel</button></form>}
       </article>
   return <div className="disaster-events-page">
     {error && <p role="alert" className="disaster-error">{error}</p>}

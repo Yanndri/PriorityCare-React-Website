@@ -1,9 +1,18 @@
 # PriorityCare offline SOS (ESP32)
 
-## Recommended: SOS hotspot (`prioritycare_hotspot/`)
-One ESP32 at the purok or barangay hall broadcasts an open WiFi "PriorityCare SOS". Residents with no load connect, a page pops up, they enter their registered mobile number and the emergency, and press SEND SOS. The ESP32 forwards it to the dashboard over its own internet, or holds it until the internet is back. Staff can see everything it received at http://192.168.4.1/list.
+## Recommended: SOS hotspot v2 (`prioritycare_hotspot/`)
+One ESP32 at the purok or barangay hall broadcasts an open WiFi "PriorityCare SOS". Residents with no load connect, a page pops up, they enter their registered mobile number and the emergency, and press SEND SOS. The SOS is saved to the ESP32's flash first (it survives power loss), then sent to PriorityCare through the hall router whenever that has internet. It is marked sent only after PriorityCare confirms it, and each report has a unique id so it is never created twice.
 
-Setup: set the secret in the last lines of `supabase/migrations/20261117_01_offline_sos_buttons.sql` and run the whole file in the Supabase SQL Editor; set `WIFI_SSID`, `WIFI_PASS`, `GATEWAY_KEY` (same secret) and `PLACE_NAME` in the sketch; upload to an "ESP32 Dev Module".
+Setup (no secrets in the code):
+1. Database: run `supabase/migrations/20261118_01_esp32_device_management.sql` once.
+2. Upload the sketch to an "ESP32 Dev Module". The Serial Monitor (115200) prints the staff PIN.
+3. Dashboard: ESP32 Devices > Connect ESP32. Note the Device ID and the one-time secret.
+4. Join "PriorityCare SOS", open http://192.168.4.1/staff, log in with the PIN, open Settings and enter the hall WiFi (plus an optional backup WiFi), the Device ID and the secret. Change the PIN there.
+5. Within a minute the device shows Online on the ESP32 Devices page.
+
+Staff console: http://<device IP>/staff from the hall WiFi (the IP is on the dashboard), or http://192.168.4.1/staff from "PriorityCare SOS". It lists every saved report and works with no internet. Forgot the PIN: hold BOOT for 10 s while it runs; settings reset, reports are kept, a new PIN is printed.
+
+Limits: the hall router must not use the 192.168.4.x range; up to 10 phones at once; the ESP32 does not check PriorityCare's HTTPS certificate yet (`setInsecure`); the local console is plain HTTP on the hall WiFi.
 
 ---
 
