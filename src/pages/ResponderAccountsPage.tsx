@@ -7,6 +7,7 @@ import {
   type Barangay,
   type Responder,
 } from '../api/superAdminApi'
+import { ResetLoginButton } from '../components/ResetLoginButton'
 import { supabase } from '../lib/supabaseClient'
 
 // Municipal admin only. Rescuers cannot sign up themselves: under RA 10121
@@ -185,7 +186,8 @@ export function ResponderAccountsPage() {
             <button type="button" className="secondary-button" disabled={busy}
               onClick={() => void run(() => updateRescuer(r.uid, { account_status: r.account_status === 'active' ? 'suspended' : 'active' }),
                 `${r.name} ${r.account_status === 'active' ? 'suspended' : 'reactivated'}.`)}>
-              {r.account_status === 'active' ? 'Suspend' : 'Reactivate'}</button>
+              {r.account_status === 'active' ? 'Suspend' : 'Reactivate'}</button>{' '}
+            {r.account_status === 'active' && <ResetLoginButton uid={r.uid} name={r.name} kind="password" className="secondary-button" />}
           </td>
         </tr>
       })}</tbody>

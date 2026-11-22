@@ -2,6 +2,7 @@ import type React from 'react'
 import type { AccountAction, AccountFilter, Resident, Status } from '../types/dashboard'
 import { residentVpi } from '../utils/householdVpi'
 import { VPI_LABELS } from '../utils/vpi'
+import { ResetLoginButton } from './ResetLoginButton'
 
 type ResidentTableProps = {
   title: string
@@ -144,9 +145,10 @@ export function ResidentTable({
                           )}
                           {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore.
                               Residents are never deleted; their records stay for the audit trail. */}
-                          {onChangeAccountState && accountState === 'Active' && (
+                          {onChangeAccountState && accountState === 'Active' && <>
+                            <ResetLoginButton uid={String(resident.id)} name={resident.name} kind="pin" />
                             <button className="account-button" onClick={() => onChangeAccountState(resident, 'deactivate')}>Deactivate</button>
-                          )}
+                          </>}
                           {onChangeAccountState && accountState === 'Deactivated' && <>
                             <button className="account-button" onClick={() => onChangeAccountState(resident, 'reactivate')}>Reactivate</button>
                             <button className="account-button archive" onClick={() => onChangeAccountState(resident, 'archive')}>Archive</button>

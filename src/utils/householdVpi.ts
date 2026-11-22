@@ -14,6 +14,8 @@ export function residentVpi(r: Resident, asOf = vpiToday()) {
   return vpiBreakdown(countVulnerable(householdPeople(r), asOf), r.houseType)
 }
 
+const coord = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) || Number(v) === 0 ? null : Number(v))
+
 // Every household (or lone resident) with its VPI, highest first.
 export function scoreHouseholds(residents: Resident[], asOf = vpiToday()) {
   const groups = new Map<string, Resident[]>()
@@ -33,6 +35,9 @@ export function scoreHouseholds(residents: Resident[], asOf = vpiToday()) {
     const counts = countVulnerable(everyone, asOf)
     return {
       key, name: head.householdName ?? head.name, barangay: head.barangay, sitio: head.sitio ?? '',
+      // Home pin of the head (or first account holder with one); null when none was set.
+      lat: coord(people.find((p) => coord(p.gpsLat) !== null && coord(p.gpsLong) !== null)?.gpsLat),
+      lng: coord(people.find((p) => coord(p.gpsLat) !== null && coord(p.gpsLong) !== null)?.gpsLong),
       size: everyone.length, houseType, counts,
       ...vpiBreakdown(counts, houseType),
     }

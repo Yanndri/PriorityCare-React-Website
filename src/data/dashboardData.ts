@@ -24,6 +24,7 @@ const operationalItems: MenuItem[] = [
   { key: 'preemptiveEvacuation', label: 'Evacuations', group: DURING }, // 1.3
   { key: 'rescueReconciliation', label: 'Missing Persons', group: DURING }, // 4.1
   { key: 'reports', label: 'Reports', group: AFTER }, // 4.2
+  { key: 'dataMining', label: 'Data Mining', group: AFTER }, // UC-13: priority zones, center demand, response time
   { key: 'activityLogs', label: 'Activity Logs', group: AFTER }, // 4.4
 ]
 
@@ -51,7 +52,7 @@ export const pageDescriptions: Record<MenuKey, string> = {
   dispatch: 'Answer SOS calls: open a rescue request and send a rescue team.',
   rescueReconciliation: 'Record people reported missing, mark them found, and search the rescued list to tell families where a relative is.',
   reports: 'Make the 24/48-hour situation report (RDANA).',
-  dataMining: 'Charts about your residents, such as who needs the most help during evacuation.',
+  dataMining: 'Find where the households that need help are grouped, which evacuation centers may run out of space, and how fast rescues are.',
   barangayOverview: 'Every barangay at a glance. Click one to open its dashboard.',
   adminAccounts: 'Every barangay at a glance, plus barangay admin and responder accounts.',
   responderAccounts: 'Create and manage accounts for accredited responders.',

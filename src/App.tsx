@@ -30,6 +30,7 @@ import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
 import { PreemptiveEvacuationPage } from './pages/PreemptiveEvacuationPage'
 import { DevicesPage } from './pages/DevicesPage'
+import { DataMiningPage } from './pages/DataMiningPage'
 import { EditResidentModal } from './components/EditResidentModal'
 import { RegisterResidentModal } from './components/RegisterResidentModal'
 import { AuditTrailPanel } from './components/AuditTrailPanel'
@@ -600,6 +601,8 @@ function App({ profile }: AppProps) {
           {activeMenu === 'reports' && (
             <ReportsPage />
           )}
+
+          {activeMenu === 'dataMining' && <DataMiningPage residents={liveResidents} centers={liveEvacuationCenters} />}
 
           {activeMenu === 'activityLogs' && <AuditTrailPanel key={assignedBarangayId ?? 'all'} />}
 
