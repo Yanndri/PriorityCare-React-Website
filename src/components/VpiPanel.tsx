@@ -17,7 +17,7 @@ export function VpiPanel({ residents }: { residents: Resident[] }) {
         <li>Dependents, up to 35: pregnant 18; children under 12, 8 each (up to 16); seniors 60+, 6 each (up to 12).</li>
         <li>House: light materials 25, mixed 12, concrete 0.</li>
       </ul>
-      <p>Team-chosen prototype weights. They support, not replace, responder judgement.</p>
+      <p>Team-chosen weights. They support, not replace, responder judgement.</p>
     </details>
     {households.length === 0 && <p className="empty-state">No resident profiles available.</p>}
     <div className="vpi-list">{households.map((h) => <details className="vpi-resident" key={h.key}>

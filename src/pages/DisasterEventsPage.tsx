@@ -108,10 +108,10 @@ export function DisasterEventsPage() {
         <div className="disaster-list-header"><h4>{event.name}</h4><span className={`disaster-status ${event.status}`}>{hazardLabels[event.hazard_type]} · {event.status}</span></div>
         <p>{register?.barangays.find(s => s.barangay_id === event.barangay_id)?.barangay_name} · {event.location_description}</p>
         <p>Onset: {formatTime(event.started_at)} · Declared: {formatTime(event.declared_at)}</p>
-        {event.latitude !== null && <p>Pin: {Number(event.latitude).toFixed(5)}, {Number(event.longitude).toFixed(5)}</p>}
+        {event.latitude !== null && <p>Location: <a href={`https://www.openstreetmap.org/?mlat=${event.latitude}&mlon=${event.longitude}#map=17/${event.latitude}/${event.longitude}`} target="_blank" rel="noreferrer">See on map ↗</a></p>}
         {event.notes && <p className="disaster-notes">{event.notes}</p>}
         {event.status === 'resolved' && <p>Resolved: {formatTime(event.resolved_at!)} · {event.resolution_reason}</p>}
-        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason(''); setReasonChoice('') }}>Resolve event</button>}
+        {event.status === 'active' && resolving !== event.event_id && <button type="button" className="secondary-button" disabled={busy || loading} onClick={() => { setResolving(event.event_id); setReason(''); setReasonChoice('') }}>Resolve disaster</button>}
         {resolving === event.event_id && <form onSubmit={finish} className="disaster-resolution"><label>Resolution reason<select required value={reasonChoice} onChange={e => setReasonChoice(e.target.value)}><option value="">Choose a reason</option>{RESOLUTION_REASONS.map(r => <option key={r} value={r}>{r}</option>)}<option value={OTHER_REASON}>{OTHER_REASON}</option></select></label>{reasonChoice && <label>{reasonChoice === OTHER_REASON ? 'Describe the reason' : 'Details (optional)'}<textarea required={reasonChoice === OTHER_REASON} maxLength={900} value={reason} onChange={e => setReason(e.target.value)} /></label>}<p>This ends the active declaration and keeps its history.</p><button className="primary-button" disabled={busy || loading || !fullReason}>Confirm resolution</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Cancel</button></form>}
       </article>
   return <div className="disaster-events-page">

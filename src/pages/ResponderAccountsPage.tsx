@@ -6,9 +6,10 @@ import {
   type Accreditation,
   type Barangay,
   type Responder,
+  type ResponderDetails,
 } from '../api/superAdminApi'
-import { ResetLoginButton } from '../components/ResetLoginButton'
 import { supabase } from '../lib/supabaseClient'
+import { resetLogin } from '../api/residentProfileApi'
 
 // Municipal admin only. Rescuers cannot sign up themselves: under RA 10121
 // Sec. 13 and NDRRMC MC No. 64 s. 2021 (amended by MC No. 02 s. 2024),
@@ -51,6 +52,7 @@ export function ResponderAccountsPage() {
   const [notice, setNotice] = useState('')
   const [form, setForm] = useState<ReturnType<typeof emptyForm> | null>(null)
   const [renewing, setRenewing] = useState<{ uid: string; name: string; draft: AccreditationDraft } | null>(null)
+  const [editing, setEditing] = useState<{ uid: string; oldEmail: string; draft: Omit<ResponderDetails, 'assigned_barangay_id' | 'm_name'> & { m_name: string; assigned_barangay_id: string } } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -113,6 +115,24 @@ export function ResponderAccountsPage() {
     if (ok) setRenewing(null)
   }
 
+  async function saveDetails(event: FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+    const d = editing.draft
+    if (!d.assigned_barangay_id) { setError('Select the responder\'s barangay.'); return }
+    const emailChanged = d.email.trim().toLowerCase() !== editing.oldEmail.toLowerCase()
+    const name = [d.f_name, d.m_name, d.l_name].map((part) => part.trim()).filter(Boolean).join(' ')
+    const ok = await run(() => updateRescuer(editing.uid, { details: {
+      ...d, m_name: d.m_name.trim() || null, assigned_barangay_id: Number(d.assigned_barangay_id),
+    } }), emailChanged
+      ? `Details for ${name} saved. They now sign in with ${d.email.trim().toLowerCase()}; their password is unchanged.`
+      : `Details for ${name} saved.`)
+    if (ok) setEditing(null)
+  }
+
+  const editField = (name: keyof NonNullable<typeof editing>['draft'], label: string, props: Record<string, unknown> = {}) => editing &&
+    <label><span>{label}</span><input value={editing.draft[name]} onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, [name]: e.target.value } })} {...props} /></label>
+
   const field = (name: keyof ReturnType<typeof emptyForm>, label: string, props: Record<string, unknown> = {}) => form &&
     <label><span>{label}</span><input value={form[name]} onChange={(e) => setForm({ ...form, [name]: e.target.value })} {...props} /></label>
 
@@ -121,7 +141,7 @@ export function ResponderAccountsPage() {
       <div><h3>Responder Accounts</h3></div>
       <div>
         <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => void load()}>Refresh</button>{' '}
-        <button type="button" className="verify-button" disabled={busy} onClick={() => { setForm(emptyForm()); setNotice('') }}>Add Responder</button>
+        <button type="button" className="verify-button" disabled={busy} onClick={() => { setForm(emptyForm()); setEditing(null); setRenewing(null); setNotice('') }}>Add Responder</button>
       </div>
     </div>
     <p className="catchment-muted">
@@ -154,6 +174,25 @@ export function ResponderAccountsPage() {
       </div>
     </form>}
 
+    {editing && <form className="edit-form-grid" onSubmit={(e) => void saveDetails(e)}>
+      <p><strong>Edit details for {editing.draft.f_name || 'responder'} {editing.draft.l_name}</strong></p>
+      {editField('f_name', 'First name', { required: true, maxLength: 100 })}
+      {editField('m_name', 'Middle name', { maxLength: 100 })}
+      {editField('l_name', 'Last name', { required: true, maxLength: 100 })}
+      {editField('contact_no', 'Contact number', { required: true, maxLength: 50 })}
+      {editField('email', 'Login email', { required: true, type: 'email', maxLength: 100 })}
+      <label><span>Barangay</span><select required value={editing.draft.assigned_barangay_id} onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, assigned_barangay_id: e.target.value } })}>
+        <option value="">Select…</option>
+        {barangays.map((b) => <option key={b.barangay_id} value={b.barangay_id}>{b.barangay_name}</option>)}
+      </select></label>
+      {editing.draft.email.trim().toLowerCase() !== editing.oldEmail.toLowerCase() &&
+        <p className="catchment-muted">This also changes the email they use to sign in to the responder app. Their password stays the same. Tell them before you save.</p>}
+      <div>
+        <button type="submit" className="verify-button" disabled={busy}>{busy ? 'Saving…' : 'Save Details'}</button>{' '}
+        <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+      </div>
+    </form>}
+
     {renewing && <form className="edit-form-grid" onSubmit={(e) => void renew(e)}>
       <p><strong>Accreditation for {renewing.name}</strong></p>
       {(['organization', 'accreditation_no', 'accredited_on', 'valid_until', 'trainings', 'insurance_ref'] as const).map((key) =>
@@ -178,6 +217,13 @@ export function ResponderAccountsPage() {
           <td>{r.units.length ? r.units.join(', ') : '—'}</td>
           <td>{r.account_status === 'active' ? 'Active' : 'Suspended'}{!r.deployable && <div className="catchment-muted"><small>Not deployable</small></div>}</td>
           <td>
+            <button type="button" className="secondary-button" disabled={busy} onClick={() => {
+              setForm(null); setRenewing(null); setNotice('')
+              setEditing({ uid: r.uid, oldEmail: r.email, draft: {
+                f_name: r.f_name ?? '', m_name: r.m_name ?? '', l_name: r.l_name ?? '', contact_no: r.contact_no ?? '',
+                email: r.email, assigned_barangay_id: r.barangay_id ? String(r.barangay_id) : '',
+              } })
+            }}>Edit details</button>{' '}
             <button type="button" className="secondary-button" disabled={busy} onClick={() => setRenewing({ uid: r.uid, name: r.name, draft: {
               organization: r.organization ?? '', accreditation_no: r.accreditation_no ?? '',
               accredited_on: r.accredited_on ?? today(), valid_until: r.valid_until && r.valid_until > today() ? r.valid_until : inYears(today(), 2),
@@ -187,7 +233,15 @@ export function ResponderAccountsPage() {
               onClick={() => void run(() => updateRescuer(r.uid, { account_status: r.account_status === 'active' ? 'suspended' : 'active' }),
                 `${r.name} ${r.account_status === 'active' ? 'suspended' : 'reactivated'}.`)}>
               {r.account_status === 'active' ? 'Suspend' : 'Reactivate'}</button>{' '}
-            {r.account_status === 'active' && <ResetLoginButton uid={r.uid} name={r.name} kind="password" className="secondary-button" />}
+            <button type="button" className="secondary-button" disabled={busy}
+              title="Forgot password: set a new one after checking their ID"
+              onClick={() => {
+                if (!window.confirm(`Reset the password for ${r.name}? Their old password stops working right away. You will see the new one once.`)) return
+                void run(async () => {
+                  const { secret } = await resetLogin(r.uid)
+                  window.alert(`New password for ${r.name} (${r.email}): ${secret}\n\nGive it to them in person. It is not shown again.`)
+                }, `Password reset for ${r.name}.`)
+              }}>Reset password</button>
           </td>
         </tr>
       })}</tbody>

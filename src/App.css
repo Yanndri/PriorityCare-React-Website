@@ -2983,3 +2983,79 @@ tbody tr:hover {
   text-transform: uppercase;
 }
 .sos-popup-level.sos-level-3 { background: #a3001f; color: #ffffff; }
+
+/* Resident row: one main button plus a "More" menu */
+.row-more {
+  position: relative;
+}
+
+.row-more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  list-style: none;
+  border: 1px solid #b8c0cc;
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink, #183153);
+  background: var(--paper, #ffffff);
+  cursor: pointer;
+  user-select: none;
+}
+
+.row-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-more[open] > summary {
+  background: #f3f1ec;
+}
+
+/* Opens inside the cell (not floating) so the table's scroll box never clips it. */
+.row-more-menu {
+  margin-top: 6px;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #e3dfd6;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(24, 49, 83, 0.14);
+}
+
+.row-more-menu button,
+.app .table-actions .row-more-menu button {
+  border: 0;
+  background: transparent;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #183153;
+  cursor: pointer;
+}
+
+.row-more-menu button:hover,
+.app .table-actions .row-more-menu button:hover {
+  background: #f3f1ec;
+}
+
+.row-more-menu button.danger,
+.app .table-actions .row-more-menu button.danger {
+  color: #b4233c;
+  border: 0;
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+  border-radius: 0 0 7px 7px;
+}
+
+/* Phones: resident search takes a full row, the account filter goes under it. */
+@media (max-width: 560px) {
+  .filters, .table-panel .filters { grid-template-columns: 1fr; }
+}

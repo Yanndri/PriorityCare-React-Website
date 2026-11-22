@@ -41,3 +41,8 @@
   .reconcile-form { grid-template-columns: 1fr; }
   .reconcile-table { min-width: 560px; }
 }
+/* Keep the page inside narrow screens: long text wraps instead of widening the page. */
+.reconcile-page { grid-template-columns: minmax(0, 1fr); }
+.reconcile-header > div:first-child { flex: 1 1 280px; min-width: 0; }
+.reconcile-table { display: block; overflow-x: auto; }
+.reconcile-actions { display: flex; flex-wrap: wrap; gap: 8px; }

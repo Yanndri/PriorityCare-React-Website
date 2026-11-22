@@ -14,6 +14,7 @@ type VerificationPageProps = {
   onRejectResident: (residentId: number | string, reason: string) => void
   onEditResident: (resident: Resident) => void
   onChangeAccountState: (resident: Resident, action: AccountAction) => void
+  onResetPin?: (resident: Resident) => void
   accountFilter: AccountFilter
   onAccountFilterChange: (value: AccountFilter) => void
   onRegisterResident?: () => void
@@ -30,6 +31,7 @@ export function VerificationPage({
   onRejectResident,
   onEditResident,
   onChangeAccountState,
+  onResetPin,
   accountFilter,
   onAccountFilterChange,
   onRegisterResident,
@@ -54,6 +56,7 @@ export function VerificationPage({
         onViewResidentRequest={setSelectedResident}
         onEditResident={onEditResident}
         onChangeAccountState={onChangeAccountState}
+        onResetPin={onResetPin}
         accountFilter={accountFilter}
         onAccountFilterChange={onAccountFilterChange}
       />

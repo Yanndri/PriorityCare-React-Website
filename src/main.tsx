@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Icons are bundled (not loaded from a CDN) so they still show on a weak connection.
+import './assets/uicons/uicons-regular-straight.css'
 import './index.css'
 import AppRouter from './AppRouter'
 import { AppErrorBoundary } from './components/AppErrorBoundary'

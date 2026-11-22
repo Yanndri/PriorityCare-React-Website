@@ -178,7 +178,7 @@ export function DevicesPage({ isSuperAdmin, scopeBarangayId, barangayOptions }: 
         <p className="empty-documents">No ESP32 devices yet. Press Connect ESP32 to add one.</p>
       )}
 
-      <div className="evac-grid">
+      <div className="evac-grid device-grid">
         {shown.map((g) => {
           const state = deviceState(g, now)
           const busy = busyId === g.gateway_id

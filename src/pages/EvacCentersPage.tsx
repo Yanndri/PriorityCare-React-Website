@@ -124,7 +124,7 @@ function CentersList({ centers, onReload, barangayOptions, scopeBarangayId = nul
                   {!isClosed(center) && center.occupied > 0 && (
                     <button type="button" className="secondary-button" disabled={busy} onClick={() => void wentHome(center)}>Everyone went home</button>
                   )}
-                  <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{isClosed(center) ? 'Reopen' : 'Close'}</button>
+                  <button type="button" className="secondary-button" onClick={() => setStatusCenter(center)}>{isClosed(center) ? 'Reopen center' : 'Close center'}</button>
                 </div>
               )}
             </article>

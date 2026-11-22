@@ -77,7 +77,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
   const ages = residents.map((row) => ageAt(row.birthdate, data.window.end))
   const lines = [
     'PRIORITYCARE — RDANA SITUATION SUMMARY',
-    'PROTOTYPE DRAFT — administrator review required; not an official completed RDANA form.',
+    'DRAFT — administrator review required; not an official completed RDANA form.',
     `Reporting period: ${manila(data.window.start)} to ${manila(data.window.end)} (Asia/Manila)`,
     `Window: ${data.window.hours} hours; start inclusive, end exclusive.`,
     `Geographic population scope: ${data.scope} (residents currently registered in this barangay).`,

@@ -5,7 +5,7 @@
 //   POST  .../api/super-admin/admins           create a barangay admin
 //   PATCH .../api/super-admin/admins/:uid      suspend / reactivate / reassign
 //   POST  .../api/super-admin/rescuers         create an accredited responder
-//   PATCH .../api/super-admin/rescuers/:uid    suspend / reactivate / renew accreditation
+//   PATCH .../api/super-admin/rescuers/:uid    suspend / reactivate / renew accreditation / edit details
 //   GET   .../api/super-admin/check            authorization test
 // Every route requires a signed-in, active super_admin.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -47,17 +47,23 @@ async function requireSuperAdmin(req: Request): Promise<Me | Response> {
   return { id: data.user.id, email: data.user.email }
 }
 
-// Shared checks for a new admin or responder account. Returns an error message or the clean values.
-function checkPerson(b: Body) {
-  const { email, password, f_name, m_name, l_name, contact_no, assigned_barangay_id } = b
+// Shared checks for an admin or responder account. Returns an error message or the clean values.
+// withPassword=false is used when editing the details of an existing account.
+function checkPerson(b: Body, withPassword = true) {
+  const { email, f_name, m_name, l_name, contact_no, assigned_barangay_id } = b
+  const password = withPassword ? b.password : ''
   if (typeof email !== 'string' || typeof password !== 'string' || typeof f_name !== 'string' ||
-      typeof l_name !== 'string' || typeof contact_no !== 'string' || !email.trim() || !password ||
+      typeof l_name !== 'string' || typeof contact_no !== 'string' || !email.trim() || (withPassword && !password) ||
       !f_name.trim() || !l_name.trim() || !contact_no.trim() ||
       assigned_barangay_id === undefined || assigned_barangay_id === null || assigned_barangay_id === '') {
-    return { error: 'Email, password, first name, last name, contact number, and barangay are required.' }
+    return {
+      error: withPassword
+        ? 'Email, password, first name, last name, contact number, and barangay are required.'
+        : 'Email, first name, last name, contact number, and barangay are required.',
+    }
   }
-  if (password.length < 8) return { error: 'Password must be at least 8 characters long.' }
-  if (bytes(password) > 72) return { error: 'Password must be at most 72 characters long.' }
+  if (withPassword && password.length < 8) return { error: 'Password must be at least 8 characters long.' }
+  if (withPassword && bytes(password) > 72) return { error: 'Password must be at most 72 characters long.' }
   if (m_name !== undefined && m_name !== null && typeof m_name !== 'string') return { error: 'Middle name must be text.' }
   if (email.trim().length > 100 || f_name.trim().length > 100 || l_name.trim().length > 100 ||
       (typeof m_name === 'string' && m_name.trim().length > 100) || contact_no.trim().length > 50) {
@@ -278,9 +284,50 @@ async function createRescuer(me: Me, b: Body) {
 async function updateRescuer(me: Me, uidRaw: string, b: Body) {
   const uid = uidRaw.trim().toLowerCase()
   if (!UUID.test(uid)) return json(400, { message: 'Invalid responder account ID.' })
-  const { data: target, error: targetError } = await admin.from('users').select('uid, role').eq('uid', uid).maybeSingle()
+  const { data: target, error: targetError } = await admin.from('users').select('uid, role, email').eq('uid', uid).maybeSingle()
   if (targetError) return json(500, { message: 'Unable to find the responder.' })
   if (!target || target.role !== 'rescuer') return json(404, { message: 'Responder account not found.' })
+
+  if (b.details !== undefined) {
+    if (!b.details || typeof b.details !== 'object' || Array.isArray(b.details)) {
+      return json(400, { message: 'Invalid responder details.' })
+    }
+    const p = checkPerson(b.details as Body, false)
+    if ('error' in p) return json(400, { message: p.error })
+    const missing = await barangayExists(p.barangayId)
+    if (missing) return missing
+    const byEmail = await admin.from('users').select('uid').eq('email', p.email).neq('uid', uid).limit(1)
+    if (byEmail.error) return json(500, { message: 'Unable to verify the email address.' })
+    if (byEmail.data?.length) return json(409, { message: 'Another account already uses this email.' })
+    const byContact = await admin.from('users').select('uid').eq('contact_no', p.contact_no).neq('uid', uid).limit(1)
+    if (byContact.error) return json(500, { message: 'Unable to verify the contact number.' })
+    if (byContact.data?.length) return json(409, { message: 'Another account already uses this contact number.' })
+
+    // The sign-in email lives in Supabase Auth; change it there first so both stay in step.
+    const oldEmail = typeof target.email === 'string' ? target.email.toLowerCase() : null
+    const emailChanged = oldEmail !== p.email
+    if (emailChanged) {
+      const { error: authError } = await admin.auth.admin.updateUserById(uid, { email: p.email, email_confirm: true })
+      if (authError) {
+        const taken = /already|registered|exists/i.test(authError.message ?? '')
+        return json(taken ? 409 : 500, {
+          message: taken ? 'Another account already uses this email.' : 'Unable to change the sign-in email.',
+        })
+      }
+    }
+    const { error } = await admin.from('users').update({
+      f_name: p.f_name, m_name: p.m_name, l_name: p.l_name, contact_no: p.contact_no,
+      email: p.email, assigned_barangay_id: p.barangayId,
+    }).eq('uid', uid)
+    if (error) {
+      if (emailChanged && oldEmail) await admin.auth.admin.updateUserById(uid, { email: oldEmail, email_confirm: true })
+      return json(error.code === '23505' ? 409 : 500, {
+        message: error.code === '23505'
+          ? 'Another account already uses this email or contact number.'
+          : 'Unable to save the responder details.',
+      })
+    }
+  }
 
   if (b.account_status !== undefined) {
     if (b.account_status !== 'active' && b.account_status !== 'suspended') {

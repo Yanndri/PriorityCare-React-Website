@@ -233,12 +233,12 @@ export function DispatchPage({ residents, onOpenMissing }: { residents: Resident
         <span className={`status-badge st-${t.status}`}>{STATUS_LABELS[t.status]}</span>
       </div>
       <h4>{t.subject}</h4>
-      {t.source === 'sos' && t.source_ref && <p className="sos-note"><strong>Resident says:</strong>{' '}
-        {sosNotes.get(t.source_ref) ? `"${sosNotes.get(t.source_ref)}"` : <em className="dispatch-muted">No details given</em>}</p>}
+      {t.source === 'sos' && t.source_ref && sosNotes.get(t.source_ref) && <p className="sos-note"><strong>Resident says:</strong>{' '}
+        "{sosNotes.get(t.source_ref)}"</p>}
       <p className="dispatch-muted">{SOURCE_LABELS[t.source]} · {barangayName(t.barangay_id)} · opened {elapsed(t.created_at)} ago{t.created_by_name ? ` by ${t.created_by_name}` : ''}</p>
       {resident && <p className="dispatch-muted">Resident: {resident.name}{resident.mobilityStatus ? ` · ${resident.mobilityStatus.replace('_', '-')}` : ''}</p>}
       {(t.latitude !== null || t.location_note) && <p className="dispatch-muted"><Icon name="marker" /> {t.location_note}{t.location_note && t.latitude !== null ? ' · ' : ''}
-        {t.latitude !== null && <a href={`https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=18/${t.latitude}/${t.longitude}`} target="_blank" rel="noreferrer">{Number(t.latitude).toFixed(5)}, {Number(t.longitude).toFixed(5)}</a>}</p>}
+        {t.latitude !== null && <a href={`https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=18/${t.latitude}/${t.longitude}`} target="_blank" rel="noreferrer">See on map ↗</a>}</p>}
       {t.equipment.length > 0 && <p className="ticket-equip">{t.equipment.map(e => <span key={e}>{e}</span>)}</p>}
       {t.instructions && <p className="ticket-instr">{t.instructions}</p>}
       {backups.filter(b => b.ticket_id === t.ticket_id).map(b => <div key={b.request_id} className="ticket-backup" role="alert">
@@ -369,7 +369,7 @@ export function DispatchPage({ residents, onOpenMissing }: { residents: Resident
             <div>{newSos.has(a.alert_id) && <span className="new-badge">New</span>}<span className="prio-badge prio-critical">SOS {a.alert_level ?? ''}</span> <strong>{a.resident_name}</strong>{notVerifiedTag(a.resident_uid)}
               {a.home_barangay_id != null && a.home_barangay_id !== a.barangay_id && <> <span className="prio-badge prio-normal">Visiting from {a.home_barangay_name ?? `Barangay ${a.home_barangay_id}`}</span></>}
               <div className="dispatch-muted">{a.alert_type ?? 'alert'} · {a.barangay_name ?? barangayName(a.barangay_id)}{a.headcount ? ` · ${a.headcount} ${a.headcount === 1 ? 'person' : 'people'}` : ''} · {elapsed(a.created_at)} ago</div>
-              <div className="sos-note"><strong>Resident says:</strong> {a.note ? `"${a.note}"` : <em className="dispatch-muted">No details given</em>}</div></div>
+              {a.note && <div className="sos-note"><strong>Resident says:</strong> "{a.note}"</div>}</div>
             <button type="button" className="verify-button" disabled={busy} onClick={() => { void loadWithMembers(a.alert_id); openDraft({ barangay: String(a.barangay_id), resident: a.resident_uid, source: 'sos', sourceRef: a.alert_id,
               sosLevel: a.alert_level, sosNote: a.note ?? '', sosHeadcount: a.headcount,
               visitingFrom: a.home_barangay_id != null && a.home_barangay_id !== a.barangay_id ? (a.home_barangay_name ?? `Barangay ${a.home_barangay_id}`) : null,
@@ -399,9 +399,9 @@ export function DispatchPage({ residents, onOpenMissing }: { residents: Resident
       <section className="dispatch-board">
         {COLUMNS.map(col => {
           const list = tickets.filter(t => columnOf(t.status) === col.key)
-          return <div key={col.key} className={`dispatch-col col-${col.key}`}>
+          return <div key={col.key} className={`dispatch-col col-${col.key}${list.length ? '' : ' is-empty'}`}>
             <h3>{col.title} <span>{list.length}</span></h3>
-            {!list.length && <p className="dispatch-muted">None.</p>}
+            {!list.length && <p className="dispatch-muted">Nothing here right now.</p>}
             {list.map(t => renderTicket(t))}
           </div>
         })}

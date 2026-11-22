@@ -306,7 +306,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
         <td>{r.barangay_name}{r.sitio ? <div className="catchment-muted"><small>{r.sitio}</small></div> : null}</td>
         <td>{r.latest
           ? <span className={`catchment-load ${statusTone[r.latest.status]}`}>{preemptiveStatusLabels[r.latest.status]}</span>
-          : <span className="catchment-load load-over">No report yet</span>}</td>
+          : <span className="catchment-load load-none">No report yet</span>}</td>
         <td>{r.latest && destinationLabel(r.latest)
           ? <>{destinationLabel(r.latest)}<div className="catchment-muted"><small>
               {r.latest.destination_type ? destinationTypeLabels[r.latest.destination_type] : ''} · {r.latest.headcount} {r.latest.headcount === 1 ? 'person' : 'people'}

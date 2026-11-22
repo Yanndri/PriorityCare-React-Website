@@ -247,6 +247,9 @@ export async function updateAdminAccount(
 export type Responder = {
   uid: string
   name: string
+  f_name: string
+  m_name: string | null
+  l_name: string
   email: string
   contact_no: string | null
   account_status: 'active' | 'suspended'
@@ -260,6 +263,15 @@ export type Responder = {
   insurance_ref: string | null
   deployable: boolean
   units: string[]
+}
+
+export type ResponderDetails = {
+  f_name: string
+  m_name?: string | null
+  l_name: string
+  contact_no: string
+  email: string
+  assigned_barangay_id: number
 }
 
 export type Accreditation = {
@@ -292,7 +304,7 @@ export async function createRescuer(input: CreateRescuerInput) {
 
 export async function updateRescuer(
   uid: string,
-  changes: { account_status?: 'active' | 'suspended' } | Accreditation,
+  changes: { account_status?: 'active' | 'suspended' } | Accreditation | { details: ResponderDetails },
 ) {
   if (!UUID_PATTERN.test(uid)) throw new Error('Invalid responder account ID.')
   return apiRequest<{ message?: string }>(`/api/super-admin/rescuers/${encodeURIComponent(uid)}`, {

@@ -1,8 +1,8 @@
 import type React from 'react'
+import { useEffect } from 'react'
 import type { AccountAction, AccountFilter, Resident, Status } from '../types/dashboard'
 import { residentVpi } from '../utils/householdVpi'
 import { VPI_LABELS } from '../utils/vpi'
-import { ResetLoginButton } from './ResetLoginButton'
 
 type ResidentTableProps = {
   title: string
@@ -14,6 +14,8 @@ type ResidentTableProps = {
   onViewResidentRequest?: (resident: Resident) => void
   onEditResident?: (resident: Resident) => void
   onChangeAccountState?: (resident: Resident, action: AccountAction) => void
+  // Forgot PIN: staff set a new one after checking the resident's ID.
+  onResetPin?: (resident: Resident) => void
   accountFilter?: AccountFilter
   onAccountFilterChange?: (value: AccountFilter) => void
   // Shown at the right of the header, e.g. "Register resident".
@@ -34,13 +36,25 @@ export function ResidentTable({
   onViewResidentRequest,
   onEditResident,
   onChangeAccountState,
+  onResetPin,
   accountFilter,
   onAccountFilterChange,
   headerAction,
 }: ResidentTableProps) {
   const hasActions = Boolean(
-    onViewResidentRequest || onEditResident || onChangeAccountState,
+    onViewResidentRequest || onEditResident || onChangeAccountState || onResetPin,
   )
+
+  // Clicking anywhere else closes an open "More" menu.
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      document.querySelectorAll('details.row-more[open]').forEach((d) => {
+        if (!d.contains(e.target as Node)) d.removeAttribute('open')
+      })
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [])
 
   return (
     <section className="panel table-panel">
@@ -87,7 +101,7 @@ export function ResidentTable({
               <th>Name</th>
               <th>Barangay</th>
               <th>Needs</th>
-              <th title="One score out of 100 for the whole household: mobility, pregnancy, children, seniors and house type. Critical 70+, Assisted 40+.">Household VPI</th>
+              <th title="One score out of 100 for the whole household: mobility, pregnancy, children, seniors and house type. Critical 70+, Assisted 40+.">Priority (VPI)</th>
               <th>Status</th>
               {hasActions && <th>Actions</th>}
             </tr>
@@ -140,21 +154,30 @@ export function ResidentTable({
                           ) : (
                             <button className="view-request-button" onClick={() => onViewResidentRequest(resident)}>Details</button>
                           ))}
-                          {onEditResident && (
-                            <button className="edit-button" onClick={() => onEditResident(resident)}>Edit</button>
-                          )}
-                          {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore.
-                              Residents are never deleted; their records stay for the audit trail. */}
-                          {onChangeAccountState && accountState === 'Active' && <>
-                            <ResetLoginButton uid={String(resident.id)} name={resident.name} kind="pin" />
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'deactivate')}>Deactivate</button>
-                          </>}
-                          {onChangeAccountState && accountState === 'Deactivated' && <>
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'reactivate')}>Reactivate</button>
-                            <button className="account-button archive" onClick={() => onChangeAccountState(resident, 'archive')}>Archive</button>
-                          </>}
-                          {onChangeAccountState && accountState === 'Archived' && (
-                            <button className="account-button" onClick={() => onChangeAccountState(resident, 'restore')}>Restore</button>
+                          {(onEditResident || onResetPin || onChangeAccountState) && (
+                            <details className="row-more">
+                              <summary aria-label={`More actions for ${resident.name}`}>More ▾</summary>
+                              <div className="row-more-menu">
+                                {onEditResident && (
+                                  <button onClick={(e) => { closeMenu(e); onEditResident(resident) }}>Edit details</button>
+                                )}
+                                {onResetPin && accountState !== 'Archived' && (
+                                  <button title="Forgot PIN: set a new one after checking their ID" onClick={(e) => { closeMenu(e); onResetPin(resident) }}>Reset PIN</button>
+                                )}
+                                {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore.
+                                    Residents are never deleted; their records stay for the audit trail. */}
+                                {onChangeAccountState && accountState === 'Active' && (
+                                  <button className="danger" onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'deactivate') }}>Deactivate account</button>
+                                )}
+                                {onChangeAccountState && accountState === 'Deactivated' && <>
+                                  <button onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'reactivate') }}>Reactivate</button>
+                                  <button className="danger" onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'archive') }}>Archive</button>
+                                </>}
+                                {onChangeAccountState && accountState === 'Archived' && (
+                                  <button onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'restore') }}>Restore</button>
+                                )}
+                              </div>
+                            </details>
                           )}
                         </div>
                       </td>
@@ -171,6 +194,11 @@ export function ResidentTable({
 }
 
 
+
+// Closes the row's "More" menu after a choice.
+function closeMenu(e: { currentTarget: HTMLElement }) {
+  e.currentTarget.closest('details')?.removeAttribute('open')
+}
 
 // Hover text for a Deactivated / Archived tag: why and when.
 function describeAccountState(resident: Resident) {

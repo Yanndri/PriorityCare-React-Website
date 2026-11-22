@@ -22,7 +22,7 @@ export function PageTitle({ title, description, onExportReport }: PageTitleProps
       {onExportReport && (
         <button type="button" className="primary-button" onClick={onExportReport}>
           <Icon name="download" />
-          Export Report
+          Download summary (CSV)
         </button>
       )}
     </section>

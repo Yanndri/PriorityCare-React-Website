@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useScopeBarangay } from '../lib/scope'
 import { getOperationalTimeline } from '../api/auditTrailApi'
 import {
@@ -50,11 +50,15 @@ export function AuditTrailPanel() {
       to = new Date(phtDayStart(toDate).getTime() + 86_400_000) // include the whole "to" day
     } catch { setError('Choose valid dates.'); return }
     if (from >= to) { setError('The start date must be on or before the end date.'); return }
-    setBusy('Loading audit trail…')
+    setBusy('Loading activity…')
     try { setData(await getOperationalTimeline(from, to)) }
     catch (e) { setData(null); setError(e instanceof Error ? e.message : 'Unable to load the audit trail.') }
     finally { setBusy('') }
   }
+
+  // Show the last 7 days straight away, so the page is never blank.
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { void load() }, [])
 
   function filterSummary() {
     const cats = categories.length === ALL_CATEGORIES.length ? 'All categories' : categories.map(c => CATEGORY_LABELS[c]).join(', ')
@@ -78,20 +82,20 @@ export function AuditTrailPanel() {
   const rows = timelineTableRows(filtered.slice(0, PREVIEW_LIMIT), barangayName)
 
   return <section className="panel rdana-panel audit-panel">
-    <div className="section-header"><div><h3>Evacuation Audit Trail & Operational Timestamp Log</h3></div><span>PDF · Excel · CSV</span></div>
-    <p>One time-ordered log of evacuation status changes, record edits/deletions, evacuation center status and capacity changes, disaster declarations, missing-person actions, verification reviews and SOS alerts. Times are Philippine time (UTC+8).</p>
+    <div className="section-header"><div><h3>Activity log</h3></div></div>
+    <p>Everything staff and residents did, newest first: evacuation check-ins, record changes, evacuation center updates, disasters, missing person reports, ID reviews and SOS alerts. Times are Philippine time.</p>
     <fieldset className="resident-edit-fields" disabled={Boolean(busy)}>
       <div className="audit-range">
         <label><span>From (PHT)</span><input type="date" value={fromDate} max={toDate} onChange={e => setFromDate(e.target.value)} /></label>
         <label><span>To (PHT, inclusive)</span><input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)} /></label>
-        <button type="button" className="verify-button" onClick={() => void load()}>{data ? 'Reload log' : 'Load log'}</button>
+        <button type="button" className="verify-button" onClick={() => void load()}>Show these dates</button>
       </div>
     </fieldset>
     {busy && <p role="status">{busy}</p>}
     {error && <p role="alert" className="dashboard-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {data && <>
-      <p className="audit-meta"><strong>Scope:</strong> {data.scope} · {formatPht(data.from)} to {formatPht(data.to)} PHT (end exclusive) · retrieved {formatPht(data.generated_at)} · {data.events.length} events loaded</p>
+      <p className="audit-meta"><strong>{data.scope}</strong> · {fromDate} to {toDate} · {data.events.length} event{data.events.length === 1 ? '' : 's'} · updated {formatPht(data.generated_at)}</p>
       <div className="audit-filters">
         <div className="audit-categories" role="group" aria-label="Categories">
           {ALL_CATEGORIES.map(c => <label key={c} className="audit-chip">
@@ -116,7 +120,7 @@ export function AuditTrailPanel() {
         <thead><tr>{TIMELINE_HEADERS.slice(0, 10).map(h => <th key={h}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={`${filtered[i].ref_id}-${filtered[i].occurred_at}-${i}`}>{r.slice(0, 10).map((cell, j) => <td key={j}>{cell}</td>)}</tr>)}</tbody>
       </table></div>}
-      <p className="audit-meta">Evacuation record edits/deletions and “entered by” are captured from when the audit-trail migration was applied; earlier edits cannot be recovered. SOS alerts record only their creation time. “Not recorded” means the source stores no actor.</p>
+      <p className="audit-meta">Edits and deletions are logged from the day this log was switched on. SOS alerts show only the time they were sent. “Not recorded” means the system did not save who did it.</p>
     </>}
   </section>
 }

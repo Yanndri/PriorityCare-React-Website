@@ -113,3 +113,20 @@ export async function fetchDisabilityTypes() {
   if (error) throw error
   return (data ?? []) as { disability_id: number; disability_name: string }[]
 }
+
+// Forgot PIN / password: staff set a new random one through the reset-password Edge Function
+// and hand it over in person. Residents get a 6-digit PIN; responders and admins a password.
+export async function resetLogin(uid: string) {
+  const { data, error } = await supabase.functions.invoke<{ role: string; kind: 'pin' | 'password'; secret: string; error?: string }>(
+    'reset-password',
+    { body: { uid } },
+  )
+  if (error) {
+    const context = (error as { context?: Response }).context
+    const body = context ? await context.json().catch(() => null) as { error?: string } | null : null
+    if (!body && context?.status === 404) throw new Error('The reset-password function is not deployed yet.')
+    throw new Error(body?.error ?? error.message)
+  }
+  if (!data?.secret) throw new Error(data?.error ?? 'The login could not be reset.')
+  return data
+}

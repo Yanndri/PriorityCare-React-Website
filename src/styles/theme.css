@@ -1505,3 +1505,6 @@ textarea {
 /* Residents: the Review ID button stands out on rows that need checking */
 .app .table-actions .review-button, .app .review-button { min-height: 38px; padding: 6px 14px; border: 0; border-radius: var(--radius-sm); background: #b45309; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .app .table-actions .review-button:hover, .app .review-button:hover { background: #92400e; }
+/* ESP32 cards: wider so the device name and facts fit on one line. */
+.device-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.device-grid .evac-card-head > div { min-width: 0; flex: 1; }

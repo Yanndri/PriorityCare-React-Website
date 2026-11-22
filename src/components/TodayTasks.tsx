@@ -86,7 +86,7 @@ export function TodayTasks({ scopeBarangayId, residents, centers, onOpen }: Prop
   const tasks: Task[] = []
   if (live?.activeSos) {
     tasks.push({
-      key: 'sos', tone: 'urgent', icon: 'sos', menu: 'dispatch',
+      key: 'sos', tone: 'urgent', icon: 'light-emergency-on', menu: 'dispatch',
       title: `${plural(live.activeSos, 'SOS call needs', 'SOS calls need')} a ticket`,
       action: 'Answer',
     })

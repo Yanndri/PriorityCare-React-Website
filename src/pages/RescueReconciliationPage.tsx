@@ -41,6 +41,7 @@ export function RescueReconciliationPage() {
   const [closing, setClosing] = useState<Closing>(null)
   const [closingText, setClosingText] = useState('')
   const [directorySearch, setDirectorySearch] = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   async function load() {
     setLoading(true); setError('')
@@ -96,6 +97,7 @@ export function RescueReconciliationPage() {
         lastSeenLocation: form.where, lastSeenAt, reporterName: form.reporter, reporterContact: form.contact, notes: form.notes,
       })
       setForm({ ...emptyForm, barangay: form.barangay })
+      setShowForm(false)
       setNotice('Missing-person report added.'); await load()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to file the report.') }
     finally { setBusy(false) }
@@ -143,22 +145,20 @@ export function RescueReconciliationPage() {
       <div className="reconcile-header">
         <div>
           <h3>Missing persons vs. rescued list</h3>
-          <p>Each open missing-person report is compared with the rescued list (residents whose latest evacuation record is <em>safely evacuated</em>). Matches are suggestions only — an administrator must confirm each one.</p>
+          <p>Each open missing-person report is compared with the rescued list (residents whose latest evacuation record is <em>safely evacuated</em>). Matches are only suggestions: staff confirm each one.</p>
           {data && <p className="reconcile-muted">Snapshot: {formatTime(data.generated_at)} (Philippine time)</p>}
         </div>
         <div className="reconcile-actions">
+          <button type="button" className="primary-button" disabled={!data} onClick={() => setShowForm(v => !v)}>{showForm ? 'Close form' : '+ File a report'}</button>
           <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => { void load() }}>Refresh</button>
-          <button type="button" className="secondary-button" disabled={!result} onClick={exportCsv}>Export CSV</button>
+          <button type="button" className="secondary-button" disabled={!result} onClick={exportCsv}>Download CSV</button>
         </div>
       </div>
       {s && <div className="reconcile-stats">
-        <article><span>Rescued</span><strong>{s.rescued}</strong></article>
-        <article><span>Open missing reports</span><strong>{s.openReports}</strong></article>
-        <article className="tone-good"><span>Confirmed rescued — close</span><strong>{s.linkedRescued}</strong></article>
-        <article className="tone-warn"><span>Probable / possible matches</span><strong>{s.probable + s.possible}</strong></article>
         <article className="tone-bad"><span>Still missing</span><strong>{s.noMatch}</strong></article>
-        <article className="tone-bad"><span>Unaccounted, not reported</span><strong>{s.unaccounted}</strong></article>
-        <article><span>Found / withdrawn</span><strong>{s.found} / {s.withdrawn}</strong></article>
+        <article className="tone-warn"><span>May be found (check)</span><strong>{s.probable + s.possible + s.linkedRescued}</strong></article>
+        <article className="tone-bad"><span>Not checked in, not reported</span><strong>{s.unaccounted}</strong></article>
+        <article><span>Safely evacuated</span><strong>{s.rescued}</strong></article>
       </div>}
     </section>
 
@@ -209,7 +209,7 @@ export function RescueReconciliationPage() {
       </article>)}
     </section>
 
-    <section className="panel">
+    {showForm && <section className="panel">
       <h3>File a missing-person report</h3>
       <form onSubmit={submit}>
         <fieldset className="reconcile-form" disabled={!data || busy || loading || !data.barangays.length}>
@@ -233,7 +233,7 @@ export function RescueReconciliationPage() {
           <button className="primary-button" type="submit">{busy ? 'Saving…' : 'Add report'}</button>
         </fieldset>
       </form>
-    </section>
+    </section>}
 
     {result && result.unaccounted.length > 0 && <section className="panel">
       <h3>Unaccounted registered residents</h3>

@@ -46,7 +46,7 @@ import {
   verifyResidentUser,
   type DashboardData,
 } from './api/dashboardApi'
-import { saveResidentProfile, type ResidentProfileInput } from './api/residentProfileApi'
+import { resetLogin, saveResidentProfile, type ResidentProfileInput } from './api/residentProfileApi'
 
 import {
   hasSupabaseConfig,
@@ -380,6 +380,23 @@ function App({ profile }: AppProps) {
     }
   }
 
+  // Forgot PIN: the admin checks the resident's ID first, then gives them the new PIN in person.
+  async function handleResetPin(resident: Resident) {
+    if (!window.confirm(
+      `Reset the PIN for ${resident.name}?\n\nCheck their valid ID first. Their old PIN stops working right away, `
+      + 'and you will see the new 6-digit PIN once to give to them in person.',
+    )) return
+    try {
+      const { secret } = await resetLogin(String(resident.id))
+      window.alert(
+        `New PIN for ${resident.name}: ${secret}\n\nGive it to them in person or by a call to their registered number. `
+        + 'It is not shown again. They can change it in the app under Profile > Change PIN.',
+      )
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to reset this PIN.')
+    }
+  }
+
   const liveAlerts = dashboardData.alerts
   const liveEvacuationCenters =
     dashboardData.evacuationCenters
@@ -530,10 +547,6 @@ function App({ profile }: AppProps) {
           ) : (
           <>
           <ScopeContext.Provider value={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}>
-          {isSuperAdmin && activeMenu === 'home' && (
-            <SuperAdminSection view="overview" onOpenBarangay={openBarangay} />
-          )}
-
           {/* The Map page has no title block: the sidebar already says where you are, and the map gets the room. */}
           {activeMenu !== 'geoMap' && <PageTitle
             title={activeTitle}
@@ -560,6 +573,11 @@ function App({ profile }: AppProps) {
             />
           )}
 
+          {/* Account numbers come after the To do list: what needs attention first. */}
+          {isSuperAdmin && activeMenu === 'home' && (
+            <SuperAdminSection view="overview" onOpenBarangay={openBarangay} />
+          )}
+
           {activeMenu === 'verification' && (
             <VerificationPage
               residents={filteredResidents}
@@ -572,6 +590,7 @@ function App({ profile }: AppProps) {
               onRejectResident={handleRejectResident}
               onEditResident={setEditingResident}
               onChangeAccountState={handleResidentAccountState}
+              onResetPin={handleResetPin}
               accountFilter={accountFilter}
               onAccountFilterChange={setAccountFilter}
               onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}

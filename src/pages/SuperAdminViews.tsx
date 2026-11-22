@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CreateAdminForm } from '../components/CreateAdminForm'
+import { resetLogin } from '../api/residentProfileApi'
 import {
   updateAdminAccount,
   type AdminAccount,
@@ -44,24 +45,24 @@ export function SuperAdminOverview({ admins, barangays }: AccountsData) {
   ).length
 
   return (
-    <section className="super-admin-stats" aria-label="Administrator summary">
+    <section className="super-admin-stats" aria-label="Barangay admin accounts">
       <article className="super-admin-card">
         <span>Barangays</span>
         <strong>{barangays.length}</strong>
       </article>
 
       <article className="super-admin-card">
-        <span>Active Admins</span>
+        <span>Active admins</span>
         <strong>{activeAdmins}</strong>
       </article>
 
       <article className="super-admin-card">
-        <span>Suspended Admins</span>
+        <span>Suspended admins</span>
         <strong>{suspendedAdmins}</strong>
       </article>
 
       <article className="super-admin-card">
-        <span>Barangays without an active Admin</span>
+        <span>Barangays with no admin</span>
         <strong>{unstaffedBarangays}</strong>
       </article>
     </section>
@@ -127,6 +128,23 @@ function AdminAccountRow({
     })
   }
 
+  // Forgot password: a new random password, shown once to hand over in person.
+  async function resetPassword() {
+    if (!window.confirm(`Reset the password for ${name || admin.email}? Their old password stops working right away. You will see the new one once.`)) return
+    setBusy('Resetting…')
+    setError('')
+    setMessage('')
+    try {
+      const { secret } = await resetLogin(admin.uid)
+      window.alert(`New password for ${name || admin.email} (${admin.email}): ${secret}\n\nGive it to them in person. It is not shown again.`)
+      setMessage('Password reset.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed.')
+    } finally {
+      setBusy('')
+    }
+  }
+
   return (
     <tr>
       <td>{name || 'Not provided'}</td>
@@ -185,6 +203,14 @@ function AdminAccountRow({
           onClick={toggleStatus}
         >
           {isActive ? 'Suspend' : 'Reactivate'}
+        </button>{' '}
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={Boolean(busy)}
+          onClick={() => void resetPassword()}
+        >
+          Reset password
         </button>
         {busy && <small role="status">{busy}</small>}
         {message && !busy && <small role="status">{message}</small>}
@@ -289,7 +315,7 @@ export function SuperAdminBarangayOverview({
           <thead>
             <tr>
               <th>Barangay</th>
-              <th>Active Admins</th>
+              <th>Admin</th>
               <th>Admin email</th>
               <th>Dashboard</th>
             </tr>

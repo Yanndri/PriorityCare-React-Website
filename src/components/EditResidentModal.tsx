@@ -135,7 +135,7 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
             </section>)}
             <button type="button" className="secondary-button" disabled={profile.household_members.length >= 30} onClick={() => setField('household_members', [...profile.household_members, { name: '', relationship: '', birthdate: '', sex: '', is_pregnant: false, needs: '', mobility: 'ambulatory' }])}>Add dependent</button>
           </fieldset>
-          <p>Saving recalculates the prototype VPI on the Home dashboard. Verification and barangay assignment stay in their existing workflows.</p>
+          <p>Saving recalculates the VPI on the Home dashboard. Verification and barangay assignment stay in their existing workflows.</p>
           <div className="request-modal-actions"><button type="button" className="secondary-button" disabled={isSaving || householdLoading} onClick={onClose}>Cancel</button><button type="submit" className="verify-button large" disabled={isSaving || householdLoading}>{householdLoading ? 'Loading household…' : isSaving ? 'Saving…' : 'Save Changes'}</button></div>
         </form>}
         {!profile && !loading && <button type="button" className="secondary-button" onClick={onClose}>Close</button>}
