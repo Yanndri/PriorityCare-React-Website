@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import type { MapPin } from '../lib/showOnMap'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient'
@@ -26,6 +27,7 @@ import { HEAT_RAMPS } from '../utils/spatialHeatmap'
 // An admin's map opens zoomed on their own barangay; the super admin's on all of Cordova.
 
 type GeoMapPageProps = {
+  pin?: MapPin | null // opened from a "See on map" button: center here and mark it
   residents?: Resident[]
   centers?: EvacuationCenter[]
   focusBarangayId?: number | null // the barangay in scope; null = all of Cordova
@@ -109,8 +111,9 @@ async function loadActiveSos(barangayId: number | null): Promise<SosAlert[]> {
   return data ?? []
 }
 
-export function GeoMapPage({ residents = [], centers = [], focusBarangayId = null, isSuperAdmin = false, assignedBarangayName = null }: GeoMapPageProps) {
-  const view = useBarangayView(focusBarangayId)
+export function GeoMapPage({ residents = [], centers = [], focusBarangayId = null, isSuperAdmin = false, assignedBarangayName = null, pin = null }: GeoMapPageProps) {
+  const barangayView = useBarangayView(focusBarangayId)
+  const view: { center: [number, number]; zoom: number } = pin ? { center: [pin.lat, pin.lng], zoom: 18 } : barangayView
   const [sos, setSos] = useState<SosAlert[]>([])
 
   // What is switched on. Everything starts on except the heatmap.
@@ -166,7 +169,10 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
               <RefitOnResize trigger={`${sideOpen}-${height}`} />
               <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-              <StartOnBarangay name={isSuperAdmin ? null : assignedBarangayName} />
+              {!pin && <StartOnBarangay name={isSuperAdmin ? null : assignedBarangayName} />}
+              {pin && <CircleMarker center={[pin.lat, pin.lng]} radius={14} pathOptions={{ color: '#c81e1e', weight: 3, fillOpacity: 0.15 }}>
+                <Tooltip permanent direction="top" offset={[0, -14]}>{pin.label}</Tooltip>
+              </CircleMarker>}
               {heat !== 'off' && <SpatialHeatmapLayer residents={residents} kind={heat} />}
               {show.disasters && <DisasterEventMarkers />}
               {show.hazards && <HazardPinsLayer />}
@@ -212,7 +218,7 @@ export function GeoMapPage({ residents = [], centers = [], focusBarangayId = nul
           {sideOpen && <aside className="map-side" aria-label="What the map shows">
             <button type="button" className="map-side-close" onClick={toggleSide}>Hide filters <Icon name="angle-right" /></button>
             <h2>Households</h2>
-            <p className="map-side-note">Coloured by household VPI. The number on a pin is how many people live there.</p>
+            <p className="map-side-note">Colored by household VPI. The number on a pin is how many people live there.</p>
             {TRIAGE_ORDER.map(level => (
               <label key={level} className="map-toggle">
                 <input type="checkbox" checked={levels[level]} onChange={() => setLevels(s => ({ ...s, [level]: !s[level] }))} />

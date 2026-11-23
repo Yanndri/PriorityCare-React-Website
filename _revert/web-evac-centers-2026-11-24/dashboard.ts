@@ -1,0 +1,162 @@
+// These types define the shape of the dashboard data.
+// TypeScript uses them to catch mistakes while coding.
+
+export type MenuKey =
+  | 'home'
+  | 'verification'
+  | 'population'
+  | 'geoMap'
+  | 'disasterEvents'
+  | 'rescueReconciliation'
+  | 'dispatch'
+  | 'reports'
+  | 'dataMining'
+  | 'evacCenters'
+  | 'preemptiveEvacuation'
+  | 'responderTeams'
+  // Super Admin only
+  | 'barangayOverview'
+  | 'adminAccounts'
+  | 'responderAccounts'
+  | 'activityLogs'
+
+// Mobility of the account holder (same three levels as the app).
+export type Constraint = 'Can walk' | 'Needs help walking' | 'Cannot walk'
+
+export type Status = 'Pending' | 'Verified' | 'Rejected'
+
+// Sign-in state of a resident account, separate from verification Status.
+export type AccountState = 'Active' | 'Deactivated' | 'Archived'
+
+// 'Current' = Active and Deactivated; archived residents are hidden unless asked for.
+export type AccountFilter = 'Current' | 'All' | AccountState
+
+export type AccountAction = 'deactivate' | 'reactivate' | 'archive' | 'restore'
+
+export type VerificationDocument = {
+  id: number | string
+  residentId: number | string
+  typeName: string
+  fileUrl: string
+  reviewStatus: 'Pending' | 'Approved' | 'Rejected'
+  uploadedAt: string
+  rejectionReason?: string | null
+}
+
+export type Resident = {
+  id: number | string
+  name: string
+  barangay: string
+  constraint: Constraint
+  status: Status
+  floodZone: boolean
+  lastUpdated: string
+  sex?: string
+  birthdate?: string
+  mobilityStatus?: string
+  disabilityCount?: number
+  isPregnant?: boolean
+  householdId?: string
+  /** Names from disability_types; undefined when the disability assessment was never loaded. */
+  disabilityTypes?: string[]
+  householdName?: string
+  /** households.house_type: light / mixed / concrete. */
+  houseType?: string | null
+  isHouseholdHead?: boolean
+  vulnerabilityNeeds?: string
+  householdMembers?: {
+    member_id?: string
+    name: string
+    relationship: string
+    birthdate: string
+    sex: string
+    is_pregnant: boolean
+    needs: string
+    mobility?: string
+    age_group?: string
+  }[]
+  address?: string
+  /** residents.sitio: the sitio picked from the barangay's list (may be blank). */
+  sitio?: string
+  landmark?: string
+  emergencyContactName?: string
+  emergencyContactNo?: string
+  gpsLat?: number | string | null
+  gpsLong?: number | string | null
+  documents?: VerificationDocument[]
+  accountState?: AccountState
+  statusReason?: string | null
+  statusChangedAt?: string | null
+}
+
+export type Alert = {
+  id: number
+  title: string
+  time: string
+  priority: 'high' | 'medium' | 'info'
+}
+
+export type EvacuationCenterResident = {
+  id: number | string
+  name: string
+  barangay: string
+  constraint: Constraint
+  evacuationStatus: string
+  rescued?: boolean // true = a rescuer brought them; false = came on their own
+  headcount?: number
+}
+
+export type EvacuationCenter = {
+  closedAt?: string | null
+  closureReason?: string | null
+  capacityConfirmed?: boolean
+  occupancyKnown?: boolean
+  facilityType?: string
+  barangayId?: number | null
+  barangayName?: string | null
+  // False when this admin can see the center (an open center in another barangay) but not change it.
+  editable?: boolean
+  households?: number
+  gpsLat?: number
+  gpsLong?: number
+  id?: number | string
+  name: string
+  capacity: number
+  occupied: number
+  status: string
+  residents?: EvacuationCenterResident[]
+}
+
+export type MenuItem = {
+  key: MenuKey
+  label: string
+  // Sidebar heading the tab sits under; items without one sit at the top.
+  group?: string
+}
+
+export type StatCardData = {
+  label: string
+  value: number
+  note: string
+  tone: string
+}
+
+export type ConstraintStat = {
+  label: string
+  value: number
+  percent: number
+}
+
+export type EvacuationHistoryRecord = {
+  id: number | string
+  residentName: string
+  barangay: string
+  constraint: Constraint
+  status: 'Safely Evacuated' | 'Missing / Relocated' | 'Pending' | 'In Transit'
+  evacuationCenter: string
+  disasterEvent: string
+  month: string
+  year: number
+  responseMinutes: number
+  floodZone: boolean
+}

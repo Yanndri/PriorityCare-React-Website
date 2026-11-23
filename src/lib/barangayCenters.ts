@@ -1,5 +1,5 @@
 
-// Where maps open (Cordova town centre) and how far they can be moved.
+// Where maps open (Cordova town center) and how far they can be moved.
 
 export const CORDOVA_CENTER: [number, number] = [10.2526, 123.9496]
 export const BARANGAY_ZOOM = 15

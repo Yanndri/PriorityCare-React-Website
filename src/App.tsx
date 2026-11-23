@@ -3,7 +3,7 @@ import { ScopeContext } from './lib/scope'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
-import { adminMenuItems, pageDescriptions, superAdminMenuItems } from './data/dashboardData'
+import { adminMenuItems, menuParent, pageDescriptions, superAdminMenuItems, tabLabels } from './data/dashboardData'
 
 import type {
   AccountAction,
@@ -15,6 +15,8 @@ import type {
 
 import { AppHeader } from './components/AppHeader'
 import { Sidebar } from './components/Sidebar'
+import { OperationBar } from './components/OperationBar'
+import { useOperationStatus } from './lib/useOperationStatus'
 import { PageTitle } from './components/PageTitle'
 
 import { HomePage } from './pages/HomePage'
@@ -57,6 +59,7 @@ import {
   type StaffProfile,
 } from './lib/staffProfile'
 import { useLiveSignal } from './lib/useLiveSignal'
+import { ShowOnMapContext, type MapPin } from './lib/showOnMap'
 
 type AppProps = {
   // Verified by RequireStaffRole from public.users before App renders.
@@ -75,6 +78,8 @@ function App({ profile }: AppProps) {
   const menuItems = isSuperAdmin ? superAdminMenuItems : adminMenuItems
 
   const [activeMenu, setActiveMenu] = useState<MenuKey>('home')
+  // Set by a "See on map" button; cleared when another menu item is chosen.
+  const [mapPin, setMapPin] = useState<MapPin | null>(null)
   const [scope, setScope] = useState<string>(
     isSuperAdmin ? ALL_BARANGAYS : String(profile.assignedBarangayId ?? ''),
   )
@@ -226,7 +231,7 @@ function App({ profile }: AppProps) {
     }
   }, [isSuperAdmin, profile.assignedBarangayId, scope])
 
-  // Residents, centres and check-ins changed elsewhere (the app, a rescuer, another admin):
+  // Residents, centers and check-ins changed elsewhere (the app, a rescuer, another admin):
   // reload the same scope quietly so lists, occupancy and the verification queue stay current.
   useLiveSignal(['residents', 'accounts', 'centers', 'evacuation', 'shelter_plans'], () => {
     if (assignedBarangayId) void reloadDashboardData().catch(() => { /* keep what is shown */ })
@@ -409,6 +414,16 @@ function App({ profile }: AppProps) {
       )
     })
   }, [allResidents, searchTerm, statusFilter, accountFilter])
+  // How many residents each status tab holds (same search and account filter).
+  const residentStatusCounts = useMemo(() => {
+    const counts = { All: 0, Pending: 0, Verified: 0, Rejected: 0 }
+    allResidents.forEach((resident) => {
+      if (!matchesSearch(resident, searchTerm) || !matchesAccount(resident, accountFilter)) return
+      counts.All += 1
+      counts[resident.status] += 1
+    })
+    return counts
+  }, [allResidents, searchTerm, accountFilter])
 
 
   const stats = useMemo(() => {
@@ -448,9 +463,15 @@ function App({ profile }: AppProps) {
     return getConstraintStats(liveResidents)
   }, [liveResidents])
 
+  // A tab of a merged page (e.g. Missing persons) takes its parent's title and sentence.
+  const pageKey = menuParent[activeMenu] ?? activeMenu
   const activeTitle =
-    menuItems.find((item) => item.key === activeMenu)?.label ??
+    menuItems.find((item) => item.key === pageKey)?.label ??
     'Dashboard'
+  const scopeBarangayId =
+    assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null
+  // Active disasters and hazard reports waiting for Yes/No: red bar and sidebar counts.
+  const operation = useOperationStatus(scopeBarangayId)
 
   const scopeLabel = isSuperAdmin
     ? assignedBarangayId === ALL_BARANGAYS ? 'All barangays' : assignedBarangayName
@@ -464,6 +485,13 @@ function App({ profile }: AppProps) {
       activeMenu === 'adminAccounts' ||
       activeMenu === 'responderAccounts')
 
+  // Tabs of the merged pages: switching a tab is the same as choosing that page.
+  const tabsOf = () => ({
+    active: activeMenu,
+    onChange: (key: string) => setActiveMenu(key as MenuKey),
+    label: activeTitle,
+  })
+
   function openBarangay(barangayId: number) {
     changeScope(String(barangayId))
     setActiveMenu('home')
@@ -475,47 +503,43 @@ function App({ profile }: AppProps) {
         name={profile.fullName || profile.email}
         roleLabel={isSuperAdmin ? 'Super Admin' : 'Admin'}
         onSignOut={() => void handleSignOut()}
+        scope={isSuperAdmin ? (
+          <label className="scope-select header-scope">
+            <span>Viewing</span>
+            <select
+              value={scope}
+              disabled={isLoadingDatabase}
+              onChange={(event) => changeScope(event.target.value)}
+            >
+              <option value={ALL_BARANGAYS}>All barangays</option>
+              {barangayOptions.map((barangay) => (
+                <option key={barangay.barangay_id} value={String(barangay.barangay_id)}>
+                  {barangay.barangay_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="header-scope">Barangay <strong>{scopeLabel || '…'}</strong></span>
+        )}
       />
+      <OperationBar active={operation.active} onOpen={() => setActiveMenu('dispatch')} />
 
       <div className="app-layout">
         <Sidebar
           items={menuItems}
           subtitle={isSuperAdmin ? 'Super Admin' : 'Admin Dashboard'}
           activeMenu={activeMenu}
-          onMenuChange={setActiveMenu}
+          onMenuChange={(menu) => { setMapPin(null); setActiveMenu(menu) }}
+          badges={{
+            ...(operation.waitingAlarms ? { disasterEvents: { text: String(operation.waitingAlarms), tone: 'urgent' as const } } : {}),
+            dispatch: operation.active.length
+              ? { text: 'Active', tone: 'urgent' as const }
+              : { text: 'None', tone: 'quiet' as const },
+          }}
         />
 
         <main className="page-content">
-          <div className="admin-barangay-banner">
-            <div>
-              <span>
-                {isSuperAdmin ? 'Super Admin · Viewing' : 'Admin Dashboard'}
-              </span>
-              <strong>{scopeLabel || '…'}</strong>
-            </div>
-            {isSuperAdmin ? (
-              <label className="scope-select">
-                <span>Scope</span>
-                <select
-                  value={scope}
-                  disabled={isLoadingDatabase}
-                  onChange={(event) => changeScope(event.target.value)}
-                >
-                  <option value={ALL_BARANGAYS}>All barangays</option>
-                  {barangayOptions.map((barangay) => (
-                    <option key={barangay.barangay_id} value={String(barangay.barangay_id)}>
-                      {barangay.barangay_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <span className="barangay-status">
-                Assigned Barangay
-              </span>
-            )}
-          </div>
-
           {isManagementTab ? (
             <>
               {activeMenu === 'adminAccounts' && (
@@ -546,10 +570,11 @@ function App({ profile }: AppProps) {
           ) : (
           <>
           <ScopeContext.Provider value={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}>
+          <ShowOnMapContext.Provider value={(pin) => { setMapPin(pin); setActiveMenu('geoMap') }}>
           {/* The Map page has no title block: the sidebar already says where you are, and the map gets the room. */}
           {activeMenu !== 'geoMap' && <PageTitle
             title={activeTitle}
-            description={pageDescriptions[activeMenu]}
+            description={pageDescriptions[pageKey]}
             onExportReport={activeMenu !== 'home' ? undefined : () =>
               exportReport({
                 stats,
@@ -564,57 +589,72 @@ function App({ profile }: AppProps) {
 
           {activeMenu === 'home' && (
             <HomePage
-              stats={stats}
               evacuationCenters={liveEvacuationCenters}
-              scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
+              scopeBarangayId={scopeBarangayId}
+              scopeLabel={scopeLabel}
+              isSuperAdmin={isSuperAdmin}
               allResidents={liveResidents}
               onOpen={setActiveMenu}
+              operation={operation}
             />
           )}
 
-          {/* Account numbers come after the To do list: what needs attention first. */}
-          {isSuperAdmin && activeMenu === 'home' && (
-            <SuperAdminSection view="overview" onOpenBarangay={openBarangay} />
-          )}
 
-          {activeMenu === 'verification' && (
-            <VerificationPage
-              residents={filteredResidents}
-              searchTerm={searchTerm}
-              statusFilter={statusFilter}
-              onSearchChange={setSearchTerm}
-              onStatusFilterChange={setStatusFilter}
-              verifyingResidentId={verifyingResidentId}
-              onVerifyResident={handleVerifyResident}
-              onRejectResident={handleRejectResident}
-              onEditResident={setEditingResident}
-              onChangeAccountState={handleResidentAccountState}
-              onResetPin={handleResetPin}
-              accountFilter={accountFilter}
-              onAccountFilterChange={setAccountFilter}
-              onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
-            />
-          )}
-
-          {activeMenu === 'population' && (
-            <PopulationPage key={assignedBarangayId ?? 'all'} residents={liveResidents} constraintStats={constraintStats}
-              barangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
-              barangayName={assignedBarangayName} />
-          )}
+          {(activeMenu === 'verification' || activeMenu === 'population') && (() => {
+            const t = tabsOf()
+            return <SubTabs label={t.label} active={t.active} onChange={t.onChange} parts={[
+              { key: 'verification', label: tabLabels.verification!, content: (
+                <VerificationPage
+                  residents={filteredResidents}
+                  statusCounts={residentStatusCounts}
+                  searchTerm={searchTerm}
+                  statusFilter={statusFilter}
+                  onSearchChange={setSearchTerm}
+                  onStatusFilterChange={setStatusFilter}
+                  verifyingResidentId={verifyingResidentId}
+                  onVerifyResident={handleVerifyResident}
+                  onRejectResident={handleRejectResident}
+                  onEditResident={setEditingResident}
+                  onChangeAccountState={handleResidentAccountState}
+                  onResetPin={handleResetPin}
+                  accountFilter={accountFilter}
+                  onAccountFilterChange={setAccountFilter}
+                  onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
+                />
+              ) },
+              { key: 'population', label: tabLabels.population!, content: (
+                <PopulationPage key={assignedBarangayId ?? 'all'} residents={liveResidents} constraintStats={constraintStats}
+                  barangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
+                  barangayName={assignedBarangayName} />
+              ) },
+            ]} />
+          })()}
 
           {activeMenu === 'geoMap' && (
-            <GeoMapPage key={assignedBarangayId || 'none'} residents={liveResidents} centers={liveEvacuationCenters}
+            <GeoMapPage key={`${assignedBarangayId || 'none'}-${mapPin ? `${mapPin.lat},${mapPin.lng}` : ''}`} pin={mapPin} residents={liveResidents} centers={liveEvacuationCenters}
               focusBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
               isSuperAdmin={isSuperAdmin} assignedBarangayName={assignedBarangayName} />
           )}
 
           {activeMenu === 'disasterEvents' && <DisasterEventsPage />}
 
-          {activeMenu === 'rescueReconciliation' && (
-            <RescueReconciliationPage />
-          )}
+          {(activeMenu === 'dispatch' || activeMenu === 'preemptiveEvacuation' || activeMenu === 'rescueReconciliation') && (() => {
+            const t = tabsOf()
+            return <>
+              {!operation.active.length && (
+                <p className="operation-idle" role="note">
+                  No disaster is declared right now. Rescue requests can still come in from SOS calls; to start an operation, answer a report on the Alarms page.
+                </p>
+              )}
+              <SubTabs label={t.label} active={t.active} onChange={t.onChange} parts={[
+                { key: 'dispatch', label: tabLabels.dispatch!, content: <DispatchPage residents={liveResidents} onOpenMissing={() => setActiveMenu('rescueReconciliation')} /> },
+                { key: 'preemptiveEvacuation', label: tabLabels.preemptiveEvacuation!, content: <PreemptiveEvacuationPage scopeBarangayId={scopeBarangayId} /> },
+                { key: 'rescueReconciliation', label: tabLabels.rescueReconciliation!, content: <RescueReconciliationPage /> },
+              ]} />
+            </>
+          })()}
 
-          {activeMenu === 'dispatch' && <DispatchPage residents={liveResidents} onOpenMissing={() => setActiveMenu('rescueReconciliation')} />}
+          {activeMenu === 'responderTeams' && <DispatchPage view="units" residents={liveResidents} />}
 
           {activeMenu === 'reports' && (
             <ReportsPage />
@@ -624,13 +664,6 @@ function App({ profile }: AppProps) {
 
           {activeMenu === 'activityLogs' && <AuditTrailPanel key={assignedBarangayId ?? 'all'} />}
 
-          {activeMenu === 'preemptiveEvacuation' && (
-            <PreemptiveEvacuationPage
-              scopeBarangayId={
-                assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null
-              }
-            />
-          )}
 
           {activeMenu === 'evacCenters' && (
             <EvacCentersPage
@@ -640,6 +673,7 @@ function App({ profile }: AppProps) {
               scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
             />
           )}
+          </ShowOnMapContext.Provider>
           </ScopeContext.Provider>
           </>
           )}

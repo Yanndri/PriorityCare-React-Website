@@ -53,6 +53,15 @@ export async function markMissingPersonFound(reportId: string, residentUid: stri
   if (error) throw reconciliationError(error)
 }
 
+/** Close a report against a household member's or walk-in's center check-in (STEP36). */
+export async function markMissingFoundAtCenter(reportId: string, recordId: string, note = '') {
+  const { error } = await supabase.rpc('mark_missing_found_at_center', {
+    p_report_id: reportId, p_record_id: recordId, p_note: note.trim(),
+  })
+  if (error) throw new Error(error.code === 'PGRST202'
+    ? 'Matching household members and walk-ins needs STEP36 to be run in the Supabase SQL Editor.' : error.message)
+}
+
 export async function withdrawMissingPersonReport(reportId: string, reason: string) {
   const { error } = await supabase.rpc('withdraw_missing_person_report', {
     p_report_id: reportId, p_reason: reason.trim(),

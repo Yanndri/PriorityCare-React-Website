@@ -4,10 +4,8 @@ import type { LatLngBoundsExpression } from 'leaflet'
 import type { EvacuationCenter, Resident } from '../types/dashboard'
 import { CORDOVA_MAP_LIMITS } from '../lib/barangayCenters'
 import { useScopeBarangay } from '../lib/scope'
-import { getShelterAssignments } from '../api/shelterPlanApi'
 import { getEventRegister, type EventRegister } from '../api/disasterEventsApi'
 import { getResponseTimes, type TicketTimes } from '../api/dataMiningApi'
-import type { ShelterPlanData } from '../utils/shelterCatchments'
 import { ELBOW_DROP, MAX_K, MIN_PER_ZONE, priorityZones } from '../utils/priorityZones'
 import { centerDemand } from '../utils/centerDemand'
 import { VPI_CRITICAL_AT } from '../utils/vpi'
@@ -17,7 +15,7 @@ import { AnalyticsBars, AnalyticsCard } from '../components/analytics/AnalyticsW
 // Data Mining (Chapter IV / UC-13). Barangay admins see their own barangay; the Super Admin
 // sees all of Cordova, or the barangay picked in the scope selector.
 //  1. Priority Zones   - weighted K-means of ASSISTED/CRITICAL households, k by the elbow method
-//  2. Center Demand    - expected evacuees per center (shelter plan) vs capacity
+//  2. Center Demand    - expected evacuees per center (nearest open center) vs capacity
 //  3. Response Time    - average minutes from SOS ticket opened to each rescue step
 //  4. Missing Persons  - rescued vs missing ledger
 
@@ -61,7 +59,7 @@ export function DataMiningPage({ residents, centers }: { residents: Resident[]; 
       {tabs.map((tab) => visited.includes(tab.key) && (
         <div key={tab.key} role="tabpanel" id={`analytics-panel-${tab.key}`} aria-labelledby={`analytics-tab-${tab.key}`} hidden={active !== tab.key}>
           {tab.key === 'zones' && <PriorityZonesPanel residents={residents} centers={centers} active={active === 'zones'} />}
-          {tab.key === 'demand' && <CenterDemandPanel residents={residents} />}
+          {tab.key === 'demand' && <CenterDemandPanel residents={residents} centers={centers} />}
           {tab.key === 'response' && <ResponseTimePanel />}
           {tab.key === 'missing' && <RescueReconciliationPanel />}
         </div>
@@ -161,7 +159,7 @@ function PriorityZonesPanel({ residents, centers, active }: { residents: Residen
         <>
           <h4>Elbow method: error (SSE) for each k</h4>
           <AnalyticsBars rows={elbow.map((e) => ({ label: `k = ${e.k}${e.k === k ? '  ← chosen' : ''}`, value: Math.round(e.sse) }))} empty="Not enough households." />
-          <p className="mining-description">SSE is the VPI-weighted sum of squared distances (km²) from each household to its zone centre.</p>
+          <p className="mining-description">SSE is the VPI-weighted sum of squared distances (km²) from each household to its zone center.</p>
         </>
       )}
     </div>
@@ -169,44 +167,34 @@ function PriorityZonesPanel({ residents, centers, active }: { residents: Residen
 }
 
 // ---------- 2. Center Demand ----------
-function CenterDemandPanel({ residents }: { residents: Resident[] }) {
-  const scope = useScopeBarangay()
-  const [plan, setPlan] = useState<ShelterPlanData | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    let live = true
-    getShelterAssignments().then((p) => { if (live) setPlan(p) }, (e: unknown) => { if (live) setError(e instanceof Error ? e.message : 'Unable to load the shelter plan.') })
-    return () => { live = false }
-  }, [])
-  const rows = useMemo(() => (plan ? centerDemand(plan, residents, scope) : []), [plan, residents, scope])
+function CenterDemandPanel({ residents, centers }: { residents: Resident[]; centers: EvacuationCenter[] }) {
+  const { rows, noPin } = useMemo(() => centerDemand(residents, centers), [residents, centers])
 
   return (
     <div className="analytics-panel">
       <p className="mining-description">
-        For each evacuation center: the barangays whose shelter plan names it as their primary center, the people
-        registered there (expected evacuees), and how many of them cannot walk or need help walking. Use = expected ÷ capacity.
+        Every household is counted at its nearest open evacuation center (the same rule the app uses to send people).
+        For each center: the people expected, how many of them cannot walk or need help walking, and use = expected ÷ capacity.
         Over is above 100%, Tight is 80% or more.
       </p>
-      {error && <p role="alert" className="dashboard-error">{error}</p>}
-      {!plan && !error && <p role="status">Loading the shelter plan…</p>}
-      {plan && (
-        <section className="mining-summary-grid">
-          <AnalyticsCard label="Centers in the plan" value={rows.length} note="primary center of a barangay" />
-          <AnalyticsCard label="Over capacity" value={rows.filter((r) => r.status === 'Over').length} note="expected above 100%" />
-          <AnalyticsCard label="Tight" value={rows.filter((r) => r.status === 'Tight').length} note="80% to 100%" />
-          <AnalyticsCard label="Need help to evacuate" value={rows.reduce((t, r) => t + r.needHelp, 0)} note="cannot walk or need help walking" />
-        </section>
-      )}
-      {plan && !rows.length && <p className="mining-description">No barangay in this scope has a primary evacuation center in its shelter plan yet.</p>}
+      <section className="mining-summary-grid">
+        <AnalyticsCard label="Centers that would be used" value={rows.length} note="nearest open center of a household" />
+        <AnalyticsCard label="Over capacity" value={rows.filter((r) => r.status === 'Over').length} note="expected above 100%" />
+        <AnalyticsCard label="Tight" value={rows.filter((r) => r.status === 'Tight').length} note="80% to 100%" />
+        <AnalyticsCard label="Need help to evacuate" value={rows.reduce((t, r) => t + r.needHelp, 0)} note="cannot walk or need help walking" />
+      </section>
+      {noPin > 0 && <p className="mining-description">{noPin} household{noPin === 1 ? ' has' : 's have'} no home pin and {noPin === 1 ? 'is' : 'are'} not counted.</p>}
+      {!rows.length && <p className="mining-description">No open evacuation center with a map location in this scope yet.</p>}
       {rows.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table className="catchment-table">
-            <thead><tr><th>Center</th><th>Serves</th><th>Expected evacuees</th><th>Need help</th><th>Capacity</th><th>Use</th><th>Status</th></tr></thead>
+            <thead><tr><th>Center</th><th>Households from</th><th>Households</th><th>Expected evacuees</th><th>Need help</th><th>Capacity</th><th>Use</th><th>Status</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td><strong>{r.name}</strong></td>
                   <td>{r.barangays.join(', ')}</td>
+                  <td>{r.households}</td>
                   <td>{r.expected}</td>
                   <td>{r.needHelp}</td>
                   <td>{r.capacity || '—'}</td>

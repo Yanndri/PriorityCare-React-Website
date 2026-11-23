@@ -47,12 +47,12 @@ export async function fetchRdanaData(hours: 24 | 48, barangayId: number | null =
       .select('resident_uid,disability_id').in('resident_uid', chunk).order('resident_uid').order('disability_id').range(from, to))).map((row) => row.resident_uid), 'Disability records could not be retrieved completely.'),
     optional(async () => {
       const { data, error } = await supabase.rpc('get_evacuation_facility_catalog')
-      if (error || !Array.isArray(data)) throw new Error('Shelter catalog unavailable.')
+      if (error || !Array.isArray(data)) throw new Error('Evacuation center list unavailable.')
       const names = await readReportPages<{ center_id: number; center_name: string }>((from, to) => supabase
         .from('evacuation_centers').select('center_id,center_name').order('center_id').range(from, to))
       const nameMap = new Map(names.map((row) => [row.center_id, row.center_name]))
       return (data as ShelterReportRow[]).map((row) => ({ ...row, center_name: nameMap.get(row.center_id) ?? `Facility ${row.center_id}` }))
-    }, 'Shared shelter catalog is unavailable; verify the facility migrations and permissions.'),
+    }, 'The evacuation center list is unavailable; check the facility migrations and permissions.'),
     // Existing scoped RPCs; rows are narrowed to the assigned barangay so super admins get the same scope as the report.
     optional(async () => {
       const { data, error } = await supabase.rpc('get_disaster_event_register')

@@ -2,14 +2,14 @@ import type { Resident } from '../types/dashboard'
 import { scoreHouseholds } from '../utils/householdVpi'
 import { VPI_LABELS } from '../utils/vpi'
 
-// Household VPI (0–100), the same score rescuers see in the app.
+// Household VPI (0–100), the same score responders see in the app.
 const houseLabels: Record<string, string> = { light: 'light materials', mixed: 'mixed materials', concrete: 'concrete' }
 
 export function VpiPanel({ residents }: { residents: Resident[] }) {
   const households = scoreHouseholds(residents)
   return <section className="panel prototype-vpi">
     <div className="section-header"><div><h3>Household vulnerability (VPI)</h3></div><span>{households.length} households</span></div>
-    <p>Each household gets one score out of 100, the same score rescuers see in the app. Critical is 70 or more, Assisted is 40 to 69, Low is below 40.</p>
+    <p>Each household gets one score out of 100, the same score responders see in the app. Critical is 70 or more, Assisted is 40 to 69, Low is below 40.</p>
     <details className="vpi-settings">
       <summary>How the score is counted</summary>
       <ul>

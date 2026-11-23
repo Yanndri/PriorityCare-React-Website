@@ -4,7 +4,7 @@ import { useSitios } from '../api/sitiosApi'
 
 // Staff register a resident who cannot sign up in the app themselves
 // (no phone, elderly, PWD). The resident gets the same login as an app
-// sign-up: their contact number and the 6-digit PIN entered here.
+// sign-up: their mobile number and the 6-digit PIN entered here.
 
 type BarangayOption = { barangay_id: number; barangay_name: string }
 
@@ -89,14 +89,14 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
               {textField('f_name', 'First name')}
               {textField('m_name', 'Middle name (optional)', false)}
               {textField('l_name', 'Last name')}
-              {textField('contact_no', 'Contact number (app login)', true, 'tel')}
+              {textField('contact_no', 'Mobile number (app login)', true, 'tel')}
               <label><span>6-digit PIN (app login)</span><input required inputMode="numeric" pattern="\d{6}" maxLength={6} autoComplete="new-password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} /></label>
               <label><span>Sex</span><select value={form.sex} onChange={(e) => setField('sex', e.target.value as ResidentRegistrationInput['sex'])}><option value="female">Female</option><option value="male">Male</option></select></label>
               {textField('birthdate', 'Birthdate', true, 'date')}
               {textField('emerg_contact_name', 'Emergency contact name')}
-              {textField('emerg_contact_no', 'Emergency contact number', true, 'tel')}
+              {textField('emerg_contact_no', 'Emergency contact mobile number', true, 'tel')}
             </div>
-            <p>Give the resident their contact number and PIN so they can sign in to the app later.</p>
+            <p>Give the resident their mobile number and PIN so they can sign in to the app later.</p>
           </fieldset>
           <fieldset disabled={saving} className="resident-edit-fields">
             <legend>Location</legend>
@@ -114,7 +114,7 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
               <label><span>GPS latitude (optional)</span><input type="number" step="any" min={-90} max={90} value={form.gps_lat} onChange={(e) => setField('gps_lat', e.target.value)} /></label>
               <label><span>GPS longitude (optional)</span><input type="number" step="any" min={-180} max={180} value={form.gps_long} onChange={(e) => setField('gps_long', e.target.value)} /></label>
             </div>
-            <p>Without GPS, the house pin starts at the barangay centre. Move it later with Edit.</p>
+            <p>Without GPS, the house pin starts at the barangay center. Move it later with Edit.</p>
           </fieldset>
           <fieldset disabled={saving} className="resident-edit-fields">
             <legend>Vulnerability & assistance needs</legend>

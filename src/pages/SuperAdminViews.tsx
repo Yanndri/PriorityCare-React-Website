@@ -1,3 +1,4 @@
+import { SidePanel } from '../components/SidePanel'
 import { useState } from 'react'
 import { CreateAdminForm } from '../components/CreateAdminForm'
 import { resetLogin } from '../api/residentProfileApi'
@@ -196,6 +197,7 @@ function AdminAccountRow({
         </span>
       </td>
       <td>
+        <div className="row-actions">
         <button
           type="button"
           className={isActive ? 'danger-button' : 'secondary-button'}
@@ -212,6 +214,7 @@ function AdminAccountRow({
         >
           Reset password
         </button>
+        </div>
         {busy && <small role="status">{busy}</small>}
         {message && !busy && <small role="status">{message}</small>}
         {error && (
@@ -256,7 +259,9 @@ export function SuperAdminAdminAccounts({
       </section>
 
       {showCreate && (
-        <CreateAdminForm barangays={barangays} onCreated={() => reload()} />
+        <SidePanel title="Create admin account" onClose={() => setShowCreate(false)}>
+          <CreateAdminForm barangays={barangays} onCreated={() => reload()} />
+        </SidePanel>
       )}
 
       <section className="super-admin-section">

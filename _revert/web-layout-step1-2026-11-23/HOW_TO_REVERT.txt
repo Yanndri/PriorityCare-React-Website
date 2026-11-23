@@ -1,0 +1,5 @@
+Web layout step 1 (menu + top bar), 23 Nov 2026.
+To undo: copy every file in this folder back over the same path in the project
+(e.g. _revert/web-layout-step1-2026-11-23/src/App.tsx -> src/App.tsx),
+and remove the new files src/components/OperationBar.tsx and src/lib/useOperationStatus.ts.
+Or, since git was clean before this change: git checkout -- src  (then delete those two new files).

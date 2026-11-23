@@ -1,0 +1,5 @@
+Simplify changes, 2026-11-24 (web). Copies of every changed or deleted file are in this folder, same paths.
+To undo one file: copy it back, e.g.  cp _revert/simplify-2026-11-24/src/pages/DataMiningPage.tsx src/pages/
+Deleted tracked files can also come back from git:  git checkout -- prioritycare-api docs/SHELTER_CATCHMENTS.md ...
+New files to remove when undoing: src/utils/geo.ts, src/components/CatchmentTable.css (was ShelterCatchmentPanel.css).
+Database: run STEP34_undo.sql (project files, supabase-alignment) to bring the shelter plan back.

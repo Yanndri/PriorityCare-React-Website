@@ -38,6 +38,8 @@ export type RescueUnit = {
   unit_name: string
   barangay_id: number | null
   capabilities: string[]
+  // Another barangay's team the municipality sent to one of your rescues: name only (STEP32).
+  borrowed?: boolean
   member_uids: string[]
   is_active: boolean
   editable: boolean
@@ -80,7 +82,7 @@ export type DispatchBoard = {
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   open: 'Unassigned', assigned: 'Assigned', acknowledged: 'Acknowledged', en_route: 'En route',
-  on_scene: 'On scene', resolved: 'Resolved', cancelled: 'Cancelled',
+  on_scene: 'On scene', resolved: 'Resolved', cancelled: 'Canceled',
 }
 export const PRIORITY_LABELS: Record<TicketPriority, string> = { critical: 'Critical', high: 'High', normal: 'Normal' }
 export const SOURCE_LABELS: Record<TicketSource, string> = { manual: 'Manual', sos: 'SOS alert', missing_report: 'Missing person', triage: 'Triage pin' }

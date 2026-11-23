@@ -6,6 +6,7 @@ import {
 } from '../api/hazardReportsApi'
 import { getEventRegister, type DisasterEvent } from '../api/disasterEventsApi'
 import { useLiveSignal } from '../lib/useLiveSignal'
+import { useShowOnMap } from '../lib/showOnMap'
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' })
 const OPEN = new Set(['unverified', 'under_review', 'confirmed'])
@@ -34,6 +35,7 @@ export function HazardReportsPanel() {
   const [rawRows, setRows] = useState<HazardReport[] | null>(null)
   // Only the barangay chosen in the Scope selector (all of them for "All barangays").
   const scope = useScopeBarangay()
+  const showOnMap = useShowOnMap()
   const rows = useMemo(() => (rawRows && scope != null ? rawRows.filter((r) => r.barangay_id === scope) : rawRows), [rawRows, scope])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -129,7 +131,7 @@ export function HazardReportsPanel() {
                 ? <>, <a href={`tel:${reporters.get(h.hazard_id)!.contact_no}`}>{reporters.get(h.hazard_id)!.contact_no}</a></> : null}</>
               : `a ${h.reporter_role === 'rescuer' ? 'responder' : 'resident'}`}
             {reporters.get(h.hazard_id)?.reporter_verified === false && <> <span className="hazard-status hs-under_review" title="Not verified by the barangay yet: their reports count less toward the alarm level.">Account not verified</span></>} · {fmt(h.created_at)} ·{' '}
-            <a href={`https://www.openstreetmap.org/?mlat=${h.latitude}&mlon=${h.longitude}#map=18/${h.latitude}/${h.longitude}`} target="_blank" rel="noreferrer">See location</a>
+            {showOnMap && <button type="button" className="link-button" onClick={() => showOnMap({ lat: h.latitude, lng: h.longitude, label: `${HAZARD_TYPE_LABELS[h.hazard_type] ?? 'Hazard'} report` })}>See on map</button>}
           </div>
           {h.review_note && <div className="dispatch-muted">Note: {h.review_note}</div>}
           {h.event_id && <div className="hazard-event-tag">Part of the declared disaster: {eventName(h.event_id) ?? 'a declared disaster'}</div>}

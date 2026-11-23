@@ -26,6 +26,10 @@ type Props = {
   focusBarangayId?: number | null
   disabled?: boolean
   onChange: (latitude: string, longitude: string) => void
+  // Label for the pin being placed ("New facility" when registering, the center's name when editing).
+  pinLabel?: string
+  // The center being edited, left out of the "existing" dots.
+  excludeId?: number | string
 }
 
 function toPoint(latitude: string, longitude: string): [number, number] | null {
@@ -47,7 +51,7 @@ function ClickToPlace({ disabled, onPlace }: { disabled?: boolean; onPlace: (lat
   return null
 }
 
-export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange }: Props) {
+export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange, pinLabel = 'New facility', excludeId }: Props) {
   const view = useBarangayView(focusBarangayId)
   const point = toPoint(latitude, longitude)
   const borders = useBarangayBorders()
@@ -61,9 +65,9 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
 
   const existing = useMemo(
     () => centers.filter((center) =>
-      Number.isFinite(center.gpsLat) && Number.isFinite(center.gpsLong)
+      center.id !== excludeId && Number.isFinite(center.gpsLat) && Number.isFinite(center.gpsLong)
       && !(center.gpsLat === 0 && center.gpsLong === 0)),
-    [centers],
+    [centers, excludeId],
   )
 
   const markerHandlers = useMemo(() => ({
@@ -107,12 +111,12 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
             eventHandlers={markerHandlers}
             opacity={point ? 1 : 0.6}
           >
-            <Tooltip>New facility location</Tooltip>
+            <Tooltip>{pinLabel} location</Tooltip>
           </Marker>
         </MapContainer>
       </div>
       <p className="facility-picker-legend">
-        <span><i className="legend-new" /> New facility</span>
+        <span><i className="legend-new" /> {pinLabel}</span>
         <span><i className="legend-existing" /> Existing facilities</span>
       </p>
     </div>

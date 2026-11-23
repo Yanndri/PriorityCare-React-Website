@@ -72,7 +72,7 @@ export function LoginPage() {
         <p className="login-hero-sub">Disaster response for Cordova, Cebu</p>
         <ul className="login-facts" aria-label="What the portal covers">
           <li><Icon name="users" />Resident records</li>
-          <li><Icon name="building" />Evacuation centers and shelters</li>
+          <li><Icon name="building" />Evacuation centers</li>
           <li><Icon name="siren-on" />Rescue dispatch</li>
         </ul>
       </section>

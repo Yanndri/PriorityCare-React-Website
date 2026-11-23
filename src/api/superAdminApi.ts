@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 
 // Account management runs in the `super-admin` Supabase Edge Function, so the
 // published site needs no separate server. VITE_API_BASE_URL can still point
-// at the old Node backend (prioritycare-api) for local development.
+// at the old Node backend (removed 2026-11-24; a copy is in _revert/simplify-2026-11-24).
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   `${import.meta.env.VITE_SUPABASE_URL ?? ''}/functions/v1/super-admin`

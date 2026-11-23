@@ -5,12 +5,19 @@ import { useState, type ReactNode } from 'react'
 // switching back keeps what the officer typed.
 type Part = { key: string; label: string; content: ReactNode }
 
-export function SubTabs({ parts, label }: { parts: Part[]; label: string }) {
-  const [active, setActive] = useState(parts[0].key)
-  const [opened, setOpened] = useState<string[]>([parts[0].key])
+// Pass `active` and `onChange` when the parent decides the tab (e.g. a To do
+// card that opens the Missing persons tab straight away).
+export function SubTabs({ parts, label, active: activeProp, onChange }: {
+  parts: Part[]; label: string; active?: string; onChange?: (key: string) => void
+}) {
+  const [ownActive, setOwnActive] = useState(parts[0].key)
+  const active = activeProp ?? ownActive
+  const [opened, setOpened] = useState<string[]>([active])
+  if (!opened.includes(active)) setOpened([...opened, active])
 
   function open(key: string) {
-    setActive(key)
+    setOwnActive(key)
+    onChange?.(key)
     setOpened((keys) => (keys.includes(key) ? keys : [...keys, key]))
   }
 

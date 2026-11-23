@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
+import { SidePanel } from '../components/SidePanel'
+import { useShowOnMap } from '../lib/showOnMap'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
 type VerificationPageProps = {
   residents: Resident[]
+  statusCounts?: Record<'All' | Status, number>
   searchTerm: string
   statusFilter: 'All' | Status
   verifyingResidentId: number | string | null
@@ -22,6 +25,7 @@ type VerificationPageProps = {
 
 export function VerificationPage({
   residents,
+  statusCounts,
   searchTerm,
   statusFilter,
   verifyingResidentId,
@@ -49,6 +53,7 @@ export function VerificationPage({
           <button type="button" className="verify-button" onClick={onRegisterResident}>Register resident</button>
         )}
         residents={residents}
+        statusCounts={statusCounts}
         searchTerm={searchTerm}
         statusFilter={statusFilter}
         onSearchChange={onSearchChange}
@@ -68,6 +73,9 @@ export function VerificationPage({
           onClose={() => setSelectedResident(null)}
           onVerify={() => onVerifyResident(selectedResidentFromLatestData.id)}
           onReject={(reason) => onRejectResident(selectedResidentFromLatestData.id, reason)}
+          onEdit={() => { const r = selectedResidentFromLatestData; setSelectedResident(null); onEditResident(r) }}
+          onResetPin={onResetPin ? () => onResetPin(selectedResidentFromLatestData) : undefined}
+          onAccount={(action) => onChangeAccountState(selectedResidentFromLatestData, action)}
         />
       )}
     </>
@@ -80,184 +88,164 @@ type VerificationRequestModalProps = {
   onClose: () => void
   onVerify: () => void
   onReject: (reason: string) => void
+  onEdit: () => void
+  onResetPin?: () => void
+  onAccount: (action: AccountAction) => void
 }
 
+function ageFrom(birthdate?: string) {
+  if (!birthdate) return null
+  const b = new Date(birthdate)
+  if (Number.isNaN(b.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - b.getFullYear()
+  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age -= 1
+  return age >= 0 ? age : null
+}
+
+// Resident details in the right side panel: who they are, where to find them, what a rescue needs,
+// their household and ID. The buttons at the bottom depend on the verification status.
 function VerificationRequestModal({
   resident,
   isProcessing,
   onClose,
   onVerify,
   onReject,
+  onEdit,
+  onResetPin,
+  onAccount,
 }: VerificationRequestModalProps) {
   const documents = resident.documents ?? []
   const [showRejectPopup, setShowRejectPopup] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
-
-  function handleOpenRejectPopup() {
-    setShowRejectPopup(true)
-    setRejectReason('')
-  }
-
-  function handleCancelReject() {
-    setShowRejectPopup(false)
-    setRejectReason('')
-  }
+  const showOnMap = useShowOnMap()
 
   function handleSubmitReject() {
     const trimmedReason = rejectReason.trim()
-
     if (!trimmedReason) {
       window.alert('Please enter a note/reason before rejecting this request.')
       return
     }
-
     onReject(trimmedReason)
     setShowRejectPopup(false)
     setRejectReason('')
   }
 
+  const age = ageFrom(resident.birthdate)
+  const hasGps = resident.gpsLat != null && resident.gpsLong != null && Number(resident.gpsLat) !== 0
+  const needs = matchEquipment(resident)
+  const gaps = equipmentDataGaps(resident)
+  const rejection = documents.find((d) => d.rejectionReason)?.rejectionReason
+  const members = resident.householdMembers ?? []
+  const accountState = resident.accountState ?? 'Active'
+  const contact = [resident.emergencyContactName, resident.emergencyContactNo].filter(Boolean).join(' · ')
+
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <section className="request-modal">
-        <div className="request-modal-header">
-          <div>
-            <h3>Resident Verification Request</h3>
-            <p>Review the submitted ID and resident information before approving or rejecting.</p>
-          </div>
+    <SidePanel title="Resident details" busy={isProcessing} onClose={onClose}>
+      <div className="rd">
+        <header className="rd-head">
+          <h4>{resident.name} <span className={`rd-status rd-${resident.status.toLowerCase()}`}>{resident.status}</span></h4>
+          <p>
+            {[resident.barangay, resident.householdName || 'No household',
+              age !== null ? `${age} years old` : null, resident.sex].filter(Boolean).join(' · ')}
+          </p>
+        </header>
 
-          <button className="modal-close-button" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
-        <div className="request-detail-grid">
-          <DetailItem label="Resident Name" value={resident.name} />
-          <DetailItem label="Status" value={resident.status} />
-          <DetailItem label="Barangay / Area" value={resident.barangay} />
-          <DetailItem label="Submitted Address" value={resident.address ?? resident.barangay} />
-          <DetailItem label="Landmark" value={resident.landmark ?? 'No landmark provided'} />
-          <DetailItem label="Mobility" value={resident.mobilityStatus?.replaceAll('_', ' ') || resident.constraint} />
-          <DetailItem label="Pregnant" value={resident.isPregnant === undefined ? 'Not recorded' : resident.isPregnant ? 'Yes' : 'No'} />
-          <DetailItem label="Assistance Needs" value={resident.vulnerabilityNeeds || 'Not recorded'} />
-          <DetailItem label="Disabilities" value={resident.disabilityTypes === undefined ? 'Not assessed' : resident.disabilityTypes.length ? resident.disabilityTypes.join(', ') : 'None recorded'} />
-          <EquipmentNeeds resident={resident} />
-          <DetailItem label="Household" value={resident.householdName || 'Not assigned'} />
-          <DetailItem label="Sex" value={resident.sex ?? 'Not specified'} />
-          <DetailItem label="Birthdate" value={resident.birthdate ?? 'Not provided'} />
-          <DetailItem
-            label="Emergency Contact"
-            value={`${resident.emergencyContactName ?? 'Not provided'} / ${resident.emergencyContactNo ?? 'Not provided'}`}
-          />
-          <DetailItem
-            label="GPS Coordinates"
-            value={
-              resident.gpsLat != null && resident.gpsLong != null
-                ? `${resident.gpsLat}, ${resident.gpsLong}`
-                : 'No coordinates provided'
-            }
-          />
-        </div>
-
-        {resident.householdMembers && resident.householdMembers.length > 0 && <section className="submitted-documents">
-          <h4>Household dependents ({resident.householdMembers.length})</h4>
-          {resident.householdMembers.map((member, index) => <p key={index}>
-            <strong>{member.name}</strong> · {member.relationship}
-            {member.birthdate && ` · Born ${member.birthdate}`}
-            {member.is_pregnant && ' · Pregnant'}
-            {member.needs && ` · ${member.needs}`}
-          </p>)}
-        </section>}
-
-        <section className="submitted-documents">
-          <h4>Submitted ID / Verification Documents</h4>
-
-          {documents.length === 0 ? (
-            <p className="empty-documents">No submitted verification document was found for this resident.</p>
-          ) : (
-            <div className="document-list">
-              {documents.map((document) => (
-                <DocumentPreview key={document.id} document={document} />
-              ))}
-            </div>
-          )}
+        <section className="rd-section">
+          <h5>Where to find them</h5>
+          <dl className="rd-facts">
+            <dt>Address</dt><dd>{resident.address || resident.barangay}{resident.sitio ? ` · Sitio ${resident.sitio}` : ''}</dd>
+            <dt>Landmark</dt><dd>{resident.landmark && resident.landmark !== 'No landmark provided' ? resident.landmark : 'None given'}</dd>
+            <dt>Emergency contact</dt><dd>{contact || 'Not provided'}</dd>
+            <dt>Home on the map</dt><dd>{hasGps && showOnMap
+              ? <button type="button" className="secondary-button" onClick={() => {
+                  showOnMap({ lat: Number(resident.gpsLat), lng: Number(resident.gpsLong), label: resident.name }); onClose()
+                }}>See on map</button>
+              : 'Not pinned yet'}</dd>
+          </dl>
         </section>
 
-        <div className="request-modal-actions">
-          <button className="secondary-button" onClick={onClose}>
-            Close
-          </button>
+        <section className="rd-section">
+          <h5>Needs in a rescue</h5>
+          <dl className="rd-facts">
+            <dt>Mobility</dt><dd>{resident.mobilityStatus?.replaceAll('_', ' ') || resident.constraint || 'Not recorded'}</dd>
+            <dt>Pregnant</dt><dd>{resident.isPregnant === undefined ? 'Not recorded' : resident.isPregnant ? 'Yes' : 'No'}</dd>
+            <dt>Disabilities</dt><dd>{resident.disabilityTypes === undefined ? 'Not assessed' : resident.disabilityTypes.length ? resident.disabilityTypes.join(', ') : 'None'}</dd>
+            <dt>Assistance needs</dt><dd>{resident.vulnerabilityNeeds || 'None recorded'}</dd>
+            <dt>Bring</dt><dd>{needs.length
+              ? <span className="rd-chips">{needs.map((n) => <span key={n.equipment} title={n.reasons.join('; ')}>{n.equipment}</span>)}</span>
+              : 'Nothing special'}
+              {gaps.length > 0 && <small className="rd-muted">Not yet known: {gaps.join(', ')}</small>}</dd>
+          </dl>
+        </section>
 
-          <button
-            className="reject-button"
-            disabled={isProcessing || resident.status === 'Rejected'}
-            onClick={handleOpenRejectPopup}
-          >
-            Reject
-          </button>
+        <section className="rd-section">
+          <h5>Household ({members.length + 1} {members.length ? 'people' : 'person'})</h5>
+          {members.length
+            ? <table className="rd-table">
+                <thead><tr><th>Name</th><th>Relationship</th><th>Age</th></tr></thead>
+                <tbody>{members.map((m, i) => {
+                  const a = ageFrom(m.birthdate)
+                  const notes = [m.is_pregnant ? 'Pregnant' : '', m.mobility && m.mobility !== 'ambulatory' ? m.mobility.replaceAll('_', ' ') : '', m.needs].filter(Boolean).join(' · ')
+                  return <tr key={m.member_id ?? i}>
+                    <td>{m.name}{notes && <small className="rd-muted">{notes}</small>}</td>
+                    <td>{m.relationship}</td>
+                    <td>{a ?? '—'}</td>
+                  </tr>
+                })}</tbody>
+              </table>
+            : <p className="rd-muted">Lives alone (no other members listed).</p>}
+        </section>
 
-          <button
-            className="verify-button large"
-            disabled={isProcessing || resident.status === 'Verified'}
-            onClick={onVerify}
-          >
-            {isProcessing ? 'Processing...' : 'Verify Resident'}
-          </button>
-        </div>
-      </section>
+        <section className="rd-section">
+          <h5>ID</h5>
+          {documents.length === 0
+            ? <p className="rd-muted">No ID uploaded yet.</p>
+            : <div className="document-list">{documents.map((document) => <DocumentPreview key={document.id} document={document} />)}</div>}
+        </section>
+
+        <footer className="rd-actions">
+          {resident.status === 'Rejected' && rejection && <p className="rd-rejected">Rejected: {rejection}</p>}
+          {accountState !== 'Active' && <p className="rd-rejected rd-account">Account {accountState.toLowerCase()}.</p>}
+          {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore. Never deleted. */}
+          {accountState === 'Active' && <button type="button" className="danger-button" disabled={isProcessing} onClick={() => onAccount('deactivate')}>Deactivate account</button>}
+          {accountState === 'Deactivated' && <>
+            <button type="button" className="danger-button" disabled={isProcessing} onClick={() => onAccount('archive')}>Archive</button>
+            <button type="button" className="secondary-button" disabled={isProcessing} onClick={() => onAccount('reactivate')}>Reactivate</button>
+          </>}
+          {accountState === 'Archived' && <button type="button" className="secondary-button" disabled={isProcessing} onClick={() => onAccount('restore')}>Restore</button>}
+          {onResetPin && accountState !== 'Archived' && <button type="button" className="secondary-button" disabled={isProcessing}
+            title="Forgot PIN: set a new one after checking their ID" onClick={onResetPin}>Reset PIN</button>}
+          <span className="rd-actions-gap" />
+          <button type="button" className={resident.status === 'Verified' ? 'primary-button' : 'secondary-button'} disabled={isProcessing} onClick={onEdit}>Edit details</button>
+          {resident.status === 'Pending' && <button type="button" className="danger-button" disabled={isProcessing}
+            onClick={() => { setRejectReason(''); setShowRejectPopup(true) }}>Reject</button>}
+          {resident.status !== 'Verified' && <button type="button" className="primary-button" disabled={isProcessing} onClick={onVerify}>
+            {isProcessing ? 'Saving…' : 'Verify resident'}</button>}
+        </footer>
+      </div>
 
       {showRejectPopup && (
         <div className="reject-popup-backdrop">
           <section className="reject-popup-card">
-            <h3>Reject Verification Request</h3>
-            <p>
-              Please add a note explaining why this resident request is rejected. This reason will
-              be saved in the verification document record.
-            </p>
-
+            <h3>Reject verification</h3>
+            <p>Tell the resident why. They see this reason and can send a new ID.</p>
             <textarea
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
-              placeholder="Example: Submitted ID is blurry, address does not match, or required document is missing."
+              placeholder="Example: The ID photo is blurry, or the address does not match."
               autoFocus
             />
-
             <div className="reject-popup-actions">
-              <button className="secondary-button" onClick={handleCancelReject}>
-                Cancel
-              </button>
-
-              <button className="reject-button" disabled={isProcessing} onClick={handleSubmitReject}>
-                {isProcessing ? 'Rejecting...' : 'Submit Rejection'}
+              <button type="button" className="secondary-button" onClick={() => setShowRejectPopup(false)}>Cancel</button>
+              <button type="button" className="danger-button" disabled={isProcessing} onClick={handleSubmitReject}>
+                {isProcessing ? 'Rejecting…' : 'Reject'}
               </button>
             </div>
           </section>
         </div>
       )}
-    </div>
-  )
-}
-
-type DetailItemProps = {
-  label: string
-  value: string
-}
-
-// Rescue equipment suggested by the fixed equipment list for this resident and their household.
-function EquipmentNeeds({ resident }: { resident: Resident }) {
-  const needs = matchEquipment(resident)
-  const gaps = equipmentDataGaps(resident)
-  const text = needs.length
-    ? needs.map((n) => `${n.equipment} (${n.reasons.join('; ')})`).join(' · ')
-    : 'None suggested'
-  return <DetailItem label="Rescue Equipment Needs" value={gaps.length ? `${text} — not yet known: ${gaps.join(', ')}` : text} />
-}
-
-function DetailItem({ label, value }: DetailItemProps) {
-  return (
-    <div className="request-detail-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    </SidePanel>
   )
 }
 

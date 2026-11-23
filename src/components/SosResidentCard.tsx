@@ -14,7 +14,7 @@ const AGE: Record<string, string> = { infant: 'infant', child: 'child', adult: '
 
 type Extra = { contact: string | null; photoUrl: string | null }
 
-export function SosResidentCard({ residentUid, resident, headcount, note, visitingFrom, sentFrom, withMembers }: {
+export function SosResidentCard({ residentUid, resident, headcount, note, visitingFrom, sentFrom, withMembers, outsideCordova = false }: {
   residentUid: string
   resident?: Resident
   headcount?: number | null
@@ -22,6 +22,8 @@ export function SosResidentCard({ residentUid, resident, headcount, note, visiti
   visitingFrom?: string | null
   sentFrom?: string | null
   withMembers?: string[] | null
+  /** The phone sent the SOS from outside Cordova. */
+  outsideCordova?: boolean
 }) {
   const [extra, setExtra] = useState<Extra>({ contact: null, photoUrl: null })
   useEffect(() => {
@@ -52,13 +54,16 @@ export function SosResidentCard({ residentUid, resident, headcount, note, visiti
   return (
     <div className="sos-resident wide">
       <div className="sos-resident-main">
-        {visitingFrom && <p className="sos-visiting"><strong>Visiting:</strong> registered in Brgy. {visitingFrom}, but the phone sent this SOS
+        {outsideCordova && <p className="sos-visiting sos-outside"><strong>Outside Cordova:</strong> the phone sent this SOS from outside the
+          municipality, so it was filed under the resident's home barangay. Call the MDRRMO of the town where they are, then record
+          what was arranged on this ticket.</p>}
+        {visitingFrom && !outsideCordova && <p className="sos-visiting"><strong>Visiting:</strong> registered in Brgy. {visitingFrom}, but the phone sent this SOS
           from {sentFrom ? `Brgy. ${sentFrom}` : 'another barangay'}. Their household below may not be with them, so go by "People" and what the resident says.</p>}
         <p className="sos-note"><strong>Resident says:</strong>{' '}
           {note ? `"${note}"` : <em className="dispatch-muted">No details given with this SOS.</em>}</p>
         <dl className="sos-resident-facts">
           <div><dt>People</dt><dd>{people ?? '—'}{people ? (people === 1 ? ' person' : ' people') : ''}</dd></div>
-          <div><dt>Contact</dt><dd>{extra.contact ? <a href={`tel:${extra.contact}`}>{extra.contact}</a> : '—'}</dd></div>
+          <div><dt>Mobile number</dt><dd>{extra.contact ? <a href={`tel:${extra.contact}`}>{extra.contact}</a> : '—'}</dd></div>
           {resident?.emergencyContactNo && <div><dt>Emergency contact</dt><dd>{resident.emergencyContactName ? `${resident.emergencyContactName}: ` : ''}<a href={`tel:${resident.emergencyContactNo}`}>{resident.emergencyContactNo}</a></dd></div>}
           {resident && <div><dt>Home</dt><dd>{[resident.address, resident.sitio, `Brgy. ${resident.barangay}`].filter(Boolean).join(', ')}</dd></div>}
           {resident?.landmark && resident.landmark !== 'No landmark provided' && <div><dt>Landmark</dt><dd>{resident.landmark}</dd></div>}

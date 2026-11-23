@@ -1,0 +1,2 @@
+Operation page master-detail layout (2026-11-24).
+To undo: copy the two files in src/pages/ here back over src/pages/DispatchPage.tsx and DispatchPage.css.

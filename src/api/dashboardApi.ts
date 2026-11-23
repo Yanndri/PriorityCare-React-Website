@@ -386,7 +386,7 @@ export async function fetchDashboardDataFromSupabase(
   const { data: facilityCatalog, error: facilityCatalogError } = await supabase.rpc('get_evacuation_facility_catalog')
   if (facilityCatalogError && facilityCatalogError.code !== 'PGRST202') throw facilityCatalogError
   const catalog = (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number; households?: number; status?: string; closed_at?: string | null; closure_reason?: string | null; barangay_id?: number | null; barangay_name?: string | null; editable?: boolean }[]
-  // The catalog only lists centres this admin may see: their barangay's and the ones their shelter plan uses.
+  // The catalog lists this admin's own centers plus every open center in Cordova (read only).
   if (facilityCatalog) {
     const visible = new Set(catalog.map((entry) => String(entry.center_id)))
     evacuationCenters = evacuationCenters.filter((center) => visible.has(String(center.id)))
@@ -913,6 +913,9 @@ function mapEvacuationCenter(
       // A rescuer checked them in; no rescuer means they came on their own.
       rescued: Boolean(record.rescuer_uid),
       headcount,
+      kind: (record.walkin_name ? 'walkin' : record.member_id ? 'member' : 'resident') as 'walkin' | 'member' | 'resident',
+      since: (toScalar(record.evacuated_at) ?? toScalar(record.logged_at) ?? null) as string | null,
+      sitio: record.walkin_sitio ? String(record.walkin_sitio) : '',
     }
   })
 

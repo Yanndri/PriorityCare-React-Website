@@ -1,14 +1,14 @@
 // Data mining 1: Rescue Priority Zones (weighted K-means clustering).
 // Input: households whose VPI is ASSISTED or CRITICAL (score 40+) and that have a home pin.
 // 1. Each household is a point [x, y] in km (lat/lng projected around Cordova), weighted by its VPI.
-// 2. Weighted K-means groups the points into k zones; each zone's centre is the VPI-weighted mean.
+// 2. Weighted K-means groups the points into k zones; each zone's center is the VPI-weighted mean.
 // 3. k is picked with the elbow method: run k = 1..8 and stop at the first k where going to k+1
 //    lowers the error (SSE, weighted sum of squared km) by less than 25%. k is at most 8 and at most
 //    households / 3, so every zone holds a few households on average.
 // Plain TypeScript, no library. A fixed random seed keeps the result the same on every load.
 import type { Resident } from '../types/dashboard'
 import { scoreHouseholds } from './householdVpi'
-import { haversineKm } from './shelterCatchments'
+import { haversineKm } from './geo'
 import { VPI_ASSISTED_AT, VPI_CRITICAL_AT } from './vpi'
 
 export const MAX_K = 8
@@ -45,22 +45,22 @@ function seeded(seed: number) {
 
 const d2 = (a: { x: number; y: number }, b: { x: number; y: number }) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2
 
-// One weighted K-means run with k-means++ starting centres. Returns each point's zone and the SSE.
+// One weighted K-means run with k-means++ starting centers. Returns each point's zone and the SSE.
 function kmeansOnce(pts: Pt[], k: number, rand: () => number) {
-  const centres: { x: number; y: number }[] = [pts[Math.floor(rand() * pts.length)]]
-  while (centres.length < k) {
+  const centers: { x: number; y: number }[] = [pts[Math.floor(rand() * pts.length)]]
+  while (centers.length < k) {
     // k-means++: the next start is picked with chance proportional to weight x squared distance.
-    const far = pts.map((p) => p.w * Math.min(...centres.map((c) => d2(p, c))))
+    const far = pts.map((p) => p.w * Math.min(...centers.map((c) => d2(p, c))))
     let r = rand() * far.reduce((t, v) => t + v, 0)
     let i = 0
     while (i < pts.length - 1 && r > far[i]) { r -= far[i]; i++ }
-    centres.push({ x: pts[i].x, y: pts[i].y })
+    centers.push({ x: pts[i].x, y: pts[i].y })
   }
   let assign = new Array<number>(pts.length).fill(-1)
   for (let round = 0; round < 100; round++) {
     const next = pts.map((p) => {
       let best = 0
-      for (let c = 1; c < k; c++) if (d2(p, centres[c]) < d2(p, centres[best])) best = c
+      for (let c = 1; c < k; c++) if (d2(p, centers[c]) < d2(p, centers[best])) best = c
       return best
     })
     const moved = next.some((c, i) => c !== assign[i])
@@ -68,11 +68,11 @@ function kmeansOnce(pts: Pt[], k: number, rand: () => number) {
     for (let c = 0; c < k; c++) {
       const members = pts.filter((_, i) => assign[i] === c)
       const w = members.reduce((t, p) => t + p.w, 0)
-      if (w > 0) centres[c] = { x: members.reduce((t, p) => t + p.w * p.x, 0) / w, y: members.reduce((t, p) => t + p.w * p.y, 0) / w }
+      if (w > 0) centers[c] = { x: members.reduce((t, p) => t + p.w * p.x, 0) / w, y: members.reduce((t, p) => t + p.w * p.y, 0) / w }
     }
     if (!moved) break
   }
-  const sse = pts.reduce((t, p, i) => t + p.w * d2(p, centres[assign[i]]), 0)
+  const sse = pts.reduce((t, p, i) => t + p.w * d2(p, centers[assign[i]]), 0)
   return { assign, sse }
 }
 

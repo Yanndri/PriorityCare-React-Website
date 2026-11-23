@@ -5,7 +5,7 @@ import type { TriagePin } from '../utils/triagePins'
 import './TriagePinsLayer.css'
 import { Icon } from './Icon'
 
-// One cached DivIcon per colour / people-count / incomplete combination.
+// One cached DivIcon per color / people-count / incomplete combination.
 const iconCache = new Map<string, L.DivIcon>()
 function pinIcon(pin: TriagePin) {
   const people = pin.members.length
@@ -28,7 +28,7 @@ function pinIcon(pin: TriagePin) {
   return icon
 }
 
-// One pin per household, coloured by household VPI. The page decides which pins to pass.
+// One pin per household, colored by household VPI. The page decides which pins to pass.
 export function TriagePinsLayer({ pins }: { pins: TriagePin[] }) {
   return <>
     {pins.map(pin => <Marker key={pin.key} position={pin.position} icon={pinIcon(pin)}
@@ -54,7 +54,7 @@ export function TriagePinsLayer({ pins }: { pins: TriagePin[] }) {
           {pin.unmappedMembers > 0 && <div className="triage-muted">{pin.unmappedMembers} member(s) have no GPS of their own.</div>}
           <div className="triage-muted"><Icon name="marker" /> {pin.position[0].toFixed(5)}, {pin.position[1].toFixed(5)} ({pin.positionSource === 'head' ? 'household head' : 'member'} location)</div>
           {pin.contact && <div className="triage-muted"><Icon name="phone-call" /> {pin.contact}</div>}
-          <div className="triage-muted">Household VPI — supports, not replaces, responder judgement.</div>
+          <div className="triage-muted">Household VPI — supports, not replaces, responder judgment.</div>
         </div>
       </Popup>
     </Marker>)}

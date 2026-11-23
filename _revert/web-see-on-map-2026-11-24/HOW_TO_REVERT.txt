@@ -1,0 +1,1 @@
+Undo 'See on map opens the web Map': copy these files back over the same paths and delete src/lib/showOnMap.ts.

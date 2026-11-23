@@ -1,0 +1,1280 @@
+import { supabase } from '../lib/supabaseClient'
+import type {
+  AccountAction,
+  Alert,
+  EvacuationCenter,
+  EvacuationHistoryRecord,
+  Resident,
+  VerificationDocument,
+} from '../types/dashboard'
+
+export type DashboardData = {
+  residents: Resident[]
+  alerts: Alert[]
+  evacuationCenters: EvacuationCenter[]
+  evacuationHistory: EvacuationHistoryRecord[]
+}
+
+// A loosely-shaped database row; fields are narrowed where they are read.
+type AnyRow = Record<string, unknown>
+
+// Stand-in for a query that is skipped because there are no residents.
+const EMPTY_ROWS_RESULT: { data: AnyRow[]; error: null } = {
+  data: [],
+  error: null,
+}
+
+// Row Level Security hides rows outside the caller's barangay, so a blocked
+// change looks like "0 rows changed" rather than an error. Treat that as
+// a permission failure instead of reporting success.
+function requireChangedRow(
+  rows: unknown[] | null,
+  action: string,
+) {
+  if (!rows || rows.length === 0) {
+    throw new Error(
+      `Unable to ${action}: this resident is not in your authorized barangay, or no longer exists.`,
+    )
+  }
+}
+
+// Delete a resident's account, household and sign-in. The database refuses
+// residents with SOS, dispatch, evacuation or missing-person history.
+export async function deleteResidentProfile(
+  residentId: number | string,
+) {
+  const { error } = await supabase.rpc('delete_resident_account', { p_uid: residentId })
+
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Deleting residents needs the 20261019_13_delete_resident_account.sql database migration.'
+      : error.message)
+  }
+}
+
+// Deactivate, reactivate, archive or restore a resident account. Unlike delete,
+// this keeps the resident's SOS, evacuation and other records.
+export async function setResidentAccountState(
+  residentId: number | string,
+  action: AccountAction,
+  reason?: string,
+) {
+  const { error } = await supabase.rpc('set_resident_account_state', {
+    p_uid: residentId,
+    p_action: action,
+    p_reason: reason ?? null,
+  })
+
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Archiving and deactivating residents needs the 20261020_02_resident_archiving.sql database migration.'
+      : error.message)
+  }
+}
+
+// Approve a resident's verification.
+export async function verifyResidentUser(
+  residentId: number | string,
+) {
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update({ is_verified: true })
+    .eq('uid', residentId)
+    .select('uid')
+
+  if (error) throw error
+
+  requireChangedRow(updated, 'verify this resident')
+
+  await updateVerificationDocumentsStatus(
+    residentId,
+    ['approved', 'Approved'],
+  )
+}
+
+// Reject a resident's verification.
+export async function rejectResidentUser(
+  residentId: number | string,
+  reason = 'Rejected by administrator',
+) {
+  const { data: updated, error: userError } = await supabase
+    .from('users')
+    .update({ is_verified: false })
+    .eq('uid', residentId)
+    .select('uid')
+
+  if (userError) throw userError
+
+  requireChangedRow(updated, 'reject this resident')
+
+  await updateVerificationDocumentsStatus(
+    residentId,
+    ['rejected', 'Rejected'],
+    reason,
+  )
+}
+
+export const ALL_BARANGAYS = 'all'
+
+/**
+ * Fetch dashboard data for one barangay, or for every barangay (Super Admin).
+ *
+ * IMPORTANT:
+ * Admins must pass the barangay_id from their own profile; App.tsx never offers
+ * ALL_BARANGAYS to an Admin. The barangay filter here is for display only: what a
+ * user can actually read is decided by the database (RLS policies).
+ * Do not pass the Admin's uid as the barangay ID.
+ */
+export async function fetchDashboardDataFromSupabase(
+  assignedBarangayId: number | string,
+): Promise<DashboardData> {
+  const selectedBarangayId = String(
+    assignedBarangayId ?? '',
+  ).trim()
+  const allBarangays = selectedBarangayId === ALL_BARANGAYS
+
+  // Do not load dashboard data if the Admin has no assigned barangay.
+  if (!selectedBarangayId) {
+    throw new Error(
+      'Admin has no assigned barangay. Dashboard data was not loaded.',
+    )
+  }
+
+  // 1. Fetch residents assigned to this barangay only (or all barangays).
+  const residentsQuery = supabase
+    .from('residents')
+    .select('*')
+  const residentsResult = allBarangays
+    ? await residentsQuery
+    : await residentsQuery.eq('barangay_id', selectedBarangayId)
+
+  if (residentsResult.error) {
+    throw residentsResult.error
+  }
+
+  const residentsRows: AnyRow[] =
+    residentsResult.data ?? []
+
+  // Collect the IDs of residents belonging to this barangay.
+  const residentIds = residentsRows
+    .map((row) =>
+      getField(row, ['uid', 'id', 'resident_uid']),
+    )
+    .filter(
+      (id) => id !== null && id !== undefined,
+    )
+    .map(String)
+
+  // 2. Fetch related data.
+  // When there are no residents, use empty results for tables
+  // whose records are linked to residents.
+  const [
+    usersResult,
+    barangayResult,
+    documentsResult,
+    documentTypesResult,
+    centersResult,
+    recordsResult,
+  ] = await Promise.all([
+    residentIds.length > 0
+      ? supabase
+          .from('users')
+          // Explicit columns: never load PINs or other secrets into the browser.
+          .select('uid, role, email, f_name, m_name, l_name, contact_no, is_verified, created_at')
+          .in('uid', residentIds)
+      : Promise.resolve(EMPTY_ROWS_RESULT),
+
+    allBarangays
+      ? supabase.from('barangays').select('*')
+      : supabase
+          .from('barangays')
+          .select('*')
+          .eq('barangay_id', selectedBarangayId),
+
+    residentIds.length > 0
+      ? supabase
+          .from('verification_documents')
+          .select('*')
+          .in('uid', residentIds)
+      : Promise.resolve(EMPTY_ROWS_RESULT),
+
+    supabase
+      .from('document_types')
+      .select('*'),
+
+    supabase
+      .from('evacuation_centers')
+      .select('*'),
+
+    residentIds.length > 0
+      ? supabase
+          .from('evacuation_records')
+          .select('*')
+          .in('resident_uid', residentIds)
+      : Promise.resolve(EMPTY_ROWS_RESULT),
+  ])
+
+  // Do not silently treat database errors as empty data.
+  if (usersResult.error) throw usersResult.error
+  if (barangayResult.error) throw barangayResult.error
+  if (documentsResult.error) throw documentsResult.error
+  if (documentTypesResult.error) {
+    throw documentTypesResult.error
+  }
+  if (centersResult.error) throw centersResult.error
+  if (recordsResult.error) throw recordsResult.error
+
+  const usersRows: AnyRow[] =
+    usersResult.data ?? []
+
+  const barangaysRows: AnyRow[] =
+    barangayResult.data ?? []
+
+  const documentRows: AnyRow[] =
+    documentsResult.data ?? []
+
+  const documentTypeRows: AnyRow[] =
+    documentTypesResult.data ?? []
+
+  const centerRows: AnyRow[] =
+    centersResult.data ?? []
+
+  const recordRows: AnyRow[] =
+    recordsResult.data ?? []
+
+  // Family members and walk-ins have no resident_uid; staff can read the ones in their barangay.
+  const { data: otherRecordData, error: otherRecordError } = await supabase
+    .from('evacuation_records').select('*').is('resident_uid', null)
+  if (otherRecordError) throw otherRecordError
+  const otherRecordRows: AnyRow[] = otherRecordData ?? []
+  const memberIds = [...new Set(otherRecordRows.map((r) => r.member_id).filter(Boolean).map(String))]
+  const memberNames = new Map<string, string>()
+  if (memberIds.length > 0) {
+    const { data: memberData, error: memberError } = await supabase
+      .from('household_members').select('member_id, full_name').in('member_id', memberIds)
+    if (memberError) throw memberError
+    for (const m of memberData ?? []) memberNames.set(String(m.member_id), String(m.full_name ?? ''))
+  }
+
+  // 3. Build lookup maps for efficient mapping.
+  const usersByUid = toMap(
+    usersRows,
+    ['uid', 'id', 'user_id'],
+  )
+
+  const barangaysById = toMap(
+    barangaysRows,
+    ['barangay_id', 'id'],
+  )
+
+  const centersById = toMap(
+    centerRows,
+    ['center_id', 'id'],
+  )
+
+  const documentTypesById = toMap(
+    documentTypeRows,
+    ['type_id', 'id'],
+  )
+
+  const documentsByResidentId =
+    groupDocumentsByResidentId(
+      documentRows,
+      documentTypesById,
+    )
+  await signDocumentUrls(documentsByResidentId)
+  const accountStates = await fetchAccountStates(residentIds)
+
+  // 4. Map residents.
+  const residents = residentsRows.map(
+    (residentRow, index) => ({
+      ...mapResident(
+        residentRow,
+        usersByUid,
+        barangaysById,
+        documentsByResidentId,
+        index,
+      ),
+      ...accountStates.get(String(getField(residentRow, ['uid', 'id', 'resident_uid']))),
+    }),
+  )
+
+  if (residentIds.length > 0) {
+    const { data: disabilityRows, error: disabilityError } = await supabase
+      .from('resident_disabilities').select('resident_uid,disability_id').in('resident_uid', residentIds)
+    if (disabilityError) throw disabilityError
+    const counts = new Map<string, Set<number>>()
+    for (const row of disabilityRows ?? []) {
+      const key = String(row.resident_uid)
+      const ids = counts.get(key) ?? new Set<number>()
+      ids.add(row.disability_id)
+      counts.set(key, ids)
+    }
+    for (const resident of residents) resident.disabilityCount = counts.get(String(resident.id))?.size
+    // Disability names (Visual, Hearing, …) for equipment matching (Module 5.4).
+    if ((disabilityRows ?? []).length) {
+      const { data: typeRows } = await supabase.from('disability_types').select('disability_id,disability_name')
+      const names = new Map((typeRows ?? []).map((t) => [t.disability_id, t.disability_name as string]))
+      for (const resident of residents) {
+        const ids = counts.get(String(resident.id))
+        if (ids) resident.disabilityTypes = [...ids].map((id) => names.get(id) ?? `Type ${id}`)
+      }
+    }
+    const { data: details, error } = await supabase.from('resident_profile_details')
+      .select('resident_uid,address,landmark,is_pregnant,vulnerability_needs,household_id')
+      .in('resident_uid', residentIds)
+    // Older deployments may not yet have the new table. Other errors must surface.
+    if (error && !['PGRST205', '42P01'].includes(error.code)) throw error
+    const householdQuery = supabase.from('households')
+      .select('household_id,household_name,head_uid,house_type,household_members(member_id,name:full_name,relationship,birthdate,sex,is_pregnant,needs,mobility,age_group)')
+    const householdResult = allBarangays
+      ? await householdQuery
+      : await householdQuery.eq('barangay_id', selectedBarangayId)
+    if (householdResult.error && !['PGRST205', '42P01'].includes(householdResult.error.code)) throw householdResult.error
+    // Members are rows now; keep the old shape (blank strings for unknown values).
+    for (const household of householdResult.data ?? []) {
+      household.household_members = (household.household_members ?? []).map((member) => ({
+        ...member, birthdate: member.birthdate ?? '', sex: member.sex ?? '',
+      }))
+    }
+    for (const detail of details ?? []) {
+      const resident = residents.find((item) => String(item.id) === String(detail.resident_uid))
+      if (resident) {
+        resident.address = detail.address || resident.address
+        resident.landmark = detail.landmark || 'No landmark provided'
+        resident.isPregnant = detail.is_pregnant
+        resident.disabilityCount ??= 0 // A saved assessment with no selected categories.
+        resident.disabilityTypes ??= []
+        resident.vulnerabilityNeeds = detail.vulnerability_needs
+        const household = householdResult.data?.find((item) => item.household_id === detail.household_id)
+        resident.householdId = household?.household_id
+        resident.householdName = household?.household_name
+        resident.houseType = household?.house_type ?? null
+        resident.householdMembers = household?.household_members
+      }
+    }
+    // Household heads may have no profile-details row; link them through households.head_uid.
+    for (const household of householdResult.data ?? []) {
+      const head = residents.find((item) => String(item.id) === String(household.head_uid))
+      if (!head) continue
+      head.isHouseholdHead = true
+      if (!head.householdId) {
+        head.householdId = household.household_id
+        head.householdName = household.household_name
+        head.houseType = household.house_type ?? null
+        head.householdMembers = household.household_members
+      }
+    }
+  }
+
+  // 5. Map evacuation centers.
+  // Occupancy is based on the records fetched for this Admin's
+  // residents, not all residents in the system.
+  let evacuationCenters = centerRows.map(
+    (centerRow, index) =>
+      mapEvacuationCenter(
+        centerRow,
+        [...recordRows, ...otherRecordRows],
+        memberNames,
+        residentsRows,
+        usersByUid,
+        barangaysById,
+        index,
+      ),
+  )
+
+  const { data: facilityCatalog, error: facilityCatalogError } = await supabase.rpc('get_evacuation_facility_catalog')
+  if (facilityCatalogError && facilityCatalogError.code !== 'PGRST202') throw facilityCatalogError
+  const catalog = (facilityCatalog ?? []) as { center_id: number; capacity: number | null; occupied: number; households?: number; status?: string; closed_at?: string | null; closure_reason?: string | null; barangay_id?: number | null; barangay_name?: string | null; editable?: boolean }[]
+  // The catalog lists this admin's own centers plus every open center in Cordova (read only).
+  if (facilityCatalog) {
+    const visible = new Set(catalog.map((entry) => String(entry.center_id)))
+    evacuationCenters = evacuationCenters.filter((center) => visible.has(String(center.id)))
+  }
+  for (const entry of catalog) {
+    const center = evacuationCenters.find((item) => String(item.id) === String(entry.center_id))
+    if (center) {
+      center.capacity = entry.capacity ?? 0
+      center.capacityConfirmed = entry.capacity !== null
+      center.occupied = entry.occupied
+      center.occupancyKnown = true
+      center.status = entry.status ?? center.status
+      center.closedAt = entry.closed_at
+      center.closureReason = entry.closure_reason
+      center.barangayId = entry.barangay_id ?? null
+      center.barangayName = entry.barangay_name ?? null
+      center.editable = entry.editable ?? true
+      center.households = entry.households
+    }
+  }
+
+  // 6. Map evacuation history.
+  const evacuationHistory = recordRows.map(
+    (recordRow, index) =>
+      mapEvacuationHistory(
+        recordRow,
+        usersByUid,
+        barangaysById,
+        centersById,
+        residentsRows,
+        index,
+      ),
+  )
+
+  // 7. Calculate dashboard alerts using this barangay's data.
+  const pendingDocuments = documentRows.filter(
+    (row) => {
+      const status = String(
+        getField(row, [
+          'review_status',
+          'status',
+        ]) ?? '',
+      ).toLowerCase()
+
+      return status === 'pending'
+    },
+  ).length
+
+  const mappedResidents = residents.filter(
+    (resident) => resident.floodZone,
+  ).length
+
+  const alerts: Alert[] = [
+    {
+      id: 1,
+      title: `${pendingDocuments} registrations awaiting document verification`,
+      time: 'Live Supabase data',
+      priority: 'high',
+    },
+    {
+      id: 2,
+      title: `${mappedResidents} residents with mapped coordinates`,
+      time: 'Live Supabase data',
+      priority: 'medium',
+    },
+    {
+      id: 3,
+      title: 'Supabase connection active',
+      time: 'Live Supabase data',
+      priority: 'info',
+    },
+  ]
+
+  return {
+    residents,
+    alerts,
+    evacuationCenters,
+    evacuationHistory,
+  }
+}
+
+// Update a resident's verification documents.
+// Account state for each resident. Loaded separately so the dashboard still opens
+// if 20261020_02_resident_archiving.sql has not been applied.
+async function fetchAccountStates(residentIds: string[]) {
+  const states = new Map<string, Pick<Resident, 'accountState' | 'statusReason' | 'statusChangedAt'>>()
+  if (residentIds.length === 0) return states
+
+  const withArchive = await supabase
+    .from('users')
+    .select('uid, account_status, archived_at, status_reason, status_changed_at')
+    .in('uid', residentIds)
+  // 42703: columns missing; 42501: columns not granted. Either way, fall back.
+  const { data, error } = ['42703', '42501'].includes(withArchive.error?.code ?? '')
+    ? await supabase.from('users').select('uid, account_status').in('uid', residentIds)
+    : withArchive
+
+  if (error) throw error
+
+  for (const row of (data ?? []) as AnyRow[]) {
+    states.set(String(row.uid), {
+      accountState: row.archived_at
+        ? 'Archived'
+        : row.account_status === 'active' || row.account_status == null
+          ? 'Active'
+          : 'Deactivated',
+      statusReason: (row.status_reason as string | null | undefined) ?? null,
+      statusChangedAt: (row.status_changed_at as string | null | undefined) ?? null,
+    })
+  }
+
+  return states
+}
+
+async function updateVerificationDocumentsStatus(
+  residentId: number | string,
+  statusesToTry: string[],
+  rejectionReason?: string,
+) {
+  for (const status of statusesToTry) {
+    const updatePayload: AnyRow = {
+      review_status: status,
+      reviewed_at: new Date().toISOString(),
+    }
+
+    if (rejectionReason) {
+      updatePayload.rejection_reason =
+        rejectionReason
+    }
+
+    const { error } = await supabase
+      .from('verification_documents')
+      .update(updatePayload)
+      .eq('uid', residentId)
+
+    if (!error) {
+      return
+    }
+
+    console.warn(
+      `Unable to update document status to ${status}:`,
+      error,
+    )
+  }
+}
+
+// Map one resident database row into the dashboard format.
+function mapResident(
+  residentRow: AnyRow,
+  usersByUid: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
+  documentsByResidentId: Map<
+    string,
+    VerificationDocument[]
+  >,
+  index: number,
+): Resident {
+  const uid = toScalar(getField(
+    residentRow,
+    ['uid', 'id', 'resident_uid'],
+  ))
+
+  const user = usersByUid.get(String(uid))
+
+  const barangayId = getField(
+    residentRow,
+    ['barangay_id', 'barangayId'],
+  )
+
+  const barangay = barangaysById.get(String(barangayId))
+
+  const firstName = getField(
+    user,
+    ['f_name', 'first_name', 'firstname'],
+  )
+
+  const middleName = getField(
+    user,
+    ['m_name', 'middle_name', 'middlename'],
+  )
+
+  const lastName = getField(
+    user,
+    ['l_name', 'last_name', 'lastname'],
+  )
+
+  const fullNameFromUser = [
+    firstName,
+    middleName,
+    lastName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  const rowName = getField(
+    residentRow,
+    ['full_name', 'name', 'resident_name'],
+  )
+
+  const mobility = String(
+    getField(residentRow, [
+      'mobility_status',
+      'constraint',
+      'disability_type',
+    ]) ?? '',
+  )
+
+  const latitude = toScalar(getField(
+    residentRow,
+    ['GPS_Lat', 'gps_lat', 'latitude', 'lat'],
+  ))
+
+  const longitude = toScalar(getField(
+    residentRow,
+    [
+      'GPS_Long',
+      'gps_long',
+      'longitude',
+      'lng',
+      'long',
+    ],
+  ))
+
+  const isVerified =
+    getField(user, ['is_verified', 'verified']) ??
+    getField(residentRow, [
+      'is_verified',
+      'verified',
+    ])
+
+  const verificationStatus = String(
+    getField(residentRow, [
+      'verification_status',
+      'status',
+    ]) ?? '',
+  ).toLowerCase()
+
+  const documents =
+    documentsByResidentId.get(String(uid)) ?? []
+
+  const hasRejectedDocument = documents.some(
+    (document) =>
+      document.reviewStatus === 'Rejected',
+  )
+
+  return {
+    id: uid ?? `resident-${index + 1}`,
+
+    name:
+      fullNameFromUser ||
+      String(rowName ?? `Resident ${index + 1}`),
+
+    barangay: String(
+      getField(barangay, ['barangay_name', 'name']) ??
+        getField(residentRow, [
+          'barangay',
+          'barangay_name',
+        ]) ??
+        'Unknown Barangay',
+    ),
+
+    constraint: mapConstraint(mobility),
+    mobilityStatus: mobility,
+
+    status:
+      Boolean(Number(isVerified)) ||
+      verificationStatus === 'verified'
+        ? 'Verified'
+        : hasRejectedDocument ||
+            verificationStatus === 'rejected'
+          ? 'Rejected'
+          : 'Pending',
+
+    floodZone:
+      latitude !== null &&
+      latitude !== undefined &&
+      longitude !== null &&
+      longitude !== undefined,
+
+    lastUpdated: formatDate(
+      getField(residentRow, [
+        'last_heartbeat',
+        'updated_at',
+        'created_at',
+      ]),
+    ),
+
+    sex: String(
+      getField(residentRow, ['sex', 'gender']) ??
+        'Not specified',
+    ),
+
+    birthdate: String(
+      getField(residentRow, [
+        'birthdate',
+        'birth_date',
+        'birthday',
+      ]) ?? '',
+    ),
+
+    address: String(
+      getField(residentRow, [
+        'address',
+        'physical_address',
+        'household_address',
+        'home_address',
+      ]) ??
+        getField(barangay, [
+          'barangay_name',
+          'name',
+        ]) ??
+        'No address provided',
+    ),
+
+    sitio: String(getField(residentRow, ['sitio']) ?? '').trim(),
+
+    landmark: String(
+      getField(residentRow, [
+        'landmark',
+        'remarks',
+        'location_note',
+      ]) ?? 'No landmark provided',
+    ),
+
+    emergencyContactName: String(
+      getField(residentRow, [
+        'emerg_contact_name',
+        'emergency_contact_name',
+      ]) ?? 'Not provided',
+    ),
+
+    emergencyContactNo: String(
+      getField(residentRow, [
+        'emerg_contact_no',
+        'emergency_contact_no',
+      ]) ?? 'Not provided',
+    ),
+
+    gpsLat: latitude ?? null,
+    gpsLong: longitude ?? null,
+    documents,
+  }
+}
+
+// The verification-docs bucket is private: stored values are object paths
+// ("<uid>/<file>") or old public URLs. Swap each for a short-lived signed URL.
+const VERIFICATION_BUCKET = 'verification-docs'
+async function signDocumentUrls(documentsByResidentId: Map<string, VerificationDocument[]>) {
+  const documents = [...documentsByResidentId.values()].flat()
+  const marker = `/object/public/${VERIFICATION_BUCKET}/`
+  const pathOf = (value: string) => value.includes(marker)
+    ? decodeURIComponent(value.split(marker)[1])
+    : /^https?:/.test(value) ? '' : value.replace(new RegExp(`^${VERIFICATION_BUCKET}/`), '')
+  const paths = [...new Set(documents.map((document) => pathOf(document.fileUrl)).filter(Boolean))]
+  if (paths.length === 0) return
+  const { data, error } = await supabase.storage.from(VERIFICATION_BUCKET).createSignedUrls(paths, 60 * 60)
+  if (error) throw error
+  const signed = new Map((data ?? []).filter((item) => item.signedUrl).map((item) => [item.path, item.signedUrl]))
+  for (const document of documents) {
+    const path = pathOf(document.fileUrl)
+    if (path) document.fileUrl = signed.get(path) ?? ''
+  }
+}
+
+// Group documents by the resident they belong to.
+function groupDocumentsByResidentId(
+  rows: AnyRow[],
+  documentTypesById: Map<string, AnyRow>,
+): Map<string, VerificationDocument[]> {
+  const grouped = new Map<
+    string,
+    VerificationDocument[]
+  >()
+
+  rows.forEach((row, index) => {
+    const residentId = toScalar(getField(row, [
+      'uid',
+      'resident_uid',
+      'user_id',
+    ]))
+
+    const typeId = getField(row, [
+      'type_id',
+      'document_type_id',
+    ])
+
+    const typeRow =
+      documentTypesById.get(String(typeId))
+
+    const reviewStatus = mapReviewStatus(
+      String(
+        getField(row, [
+          'review_status',
+          'status',
+        ]) ?? 'Pending',
+      ),
+    )
+
+    if (
+      residentId === null ||
+      residentId === undefined
+    ) {
+      return
+    }
+
+    const document: VerificationDocument = {
+      id:
+        toScalar(getField(row, ['doc_id', 'id'])) ??
+        `document-${index + 1}`,
+
+      residentId,
+
+      typeName: String(
+        getField(typeRow, [
+          'type_name',
+          'name',
+        ]) ??
+          getField(row, [
+            'document_type',
+            'type_name',
+          ]) ??
+          'Submitted ID',
+      ),
+
+      fileUrl: String(
+        getField(row, [
+          'file_url',
+          'document_url',
+          'url',
+          'file_path',
+        ]) ?? '',
+      ),
+
+      reviewStatus,
+
+      uploadedAt: formatDate(
+        getField(row, [
+          'uploaded_at',
+          'created_at',
+        ]),
+      ),
+
+      rejectionReason:
+        toOptionalText(getField(row, [
+          'rejection_reason',
+          'remarks',
+        ])) ?? null,
+    }
+
+    const key = String(residentId)
+
+    grouped.set(key, [
+      ...(grouped.get(key) ?? []),
+      document,
+    ])
+  })
+
+  return grouped
+}
+
+function mapReviewStatus(
+  value: string,
+): VerificationDocument['reviewStatus'] {
+  const normalized = value.toLowerCase()
+
+  if (normalized.includes('approved')) {
+    return 'Approved'
+  }
+
+  if (normalized.includes('rejected')) {
+    return 'Rejected'
+  }
+
+  return 'Pending'
+}
+
+// Map an evacuation center and its assigned residents.
+function mapEvacuationCenter(
+  centerRow: AnyRow,
+  recordRows: AnyRow[],
+  memberNames: Map<string, string>,
+  residentRows: AnyRow[],
+  usersByUid: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
+  index: number,
+): EvacuationCenter {
+  const centerId = toScalar(getField(
+    centerRow,
+    ['center_id', 'id'],
+  ))
+
+  // People here = everyone whose latest record says they arrived at this center
+  // (same rule as the center's head count in the database).
+  const latestByPerson = new Map<string, AnyRow>()
+  const byNewest = [...recordRows].sort((a, b) =>
+    String(b.logged_at ?? '').localeCompare(String(a.logged_at ?? '')))
+  for (const record of byNewest) {
+    const key = String(record.resident_uid ?? record.member_id ?? record.record_id)
+    if (!latestByPerson.has(key)) latestByPerson.set(key, record)
+  }
+  const assignedRecords = [...latestByPerson.values()].filter((record) =>
+    String(record.evac_center_id) === String(centerId) &&
+    String(record.evac_status) === 'safely_evacuated')
+
+  const assignedResidents = assignedRecords.map((record, recordIndex) => {
+    const residentUid = toScalar(record.resident_uid)
+    const resident = residentRows.find((row) => String(getField(row, ['uid', 'id'])) === String(residentUid))
+    const user = usersByUid.get(String(residentUid))
+    const barangay = barangaysById.get(String(getField(resident, ['barangay_id']) ?? record.barangay_id))
+    const fullName = [getField(user, ['f_name']), getField(user, ['m_name']), getField(user, ['l_name'])]
+      .filter(Boolean).join(' ').trim()
+    const headcount = Number(record.headcount ?? 1) || 1
+    const name = record.walkin_name ? `${String(record.walkin_name)}${headcount > 1 ? ` (group of ${headcount})` : ''} · walk-in`
+      : record.member_id ? `${memberNames.get(String(record.member_id)) || 'Family member'} · family member`
+      : fullName || `Resident ${residentUid ?? recordIndex + 1}`
+
+    return {
+      id: String(record.record_id ?? `center-resident-${index + 1}-${recordIndex + 1}`),
+      name,
+      barangay: String(getField(barangay, ['barangay_name', 'name']) ?? 'Unknown Barangay'),
+      constraint: mapConstraint(String(getField(resident, ['mobility_status']) ?? '')),
+      evacuationStatus: String(record.evac_status ?? 'pending'),
+      // A rescuer checked them in; no rescuer means they came on their own.
+      rescued: Boolean(record.rescuer_uid),
+      headcount,
+    }
+  })
+
+  return {
+    id: centerId ?? `center-${index + 1}`,
+
+    name: String(
+      getField(centerRow, [
+        'center_name',
+        'name',
+      ]) ?? `Evacuation Center ${index + 1}`,
+    ),
+
+    capacity: Number(
+      getField(centerRow, [
+        'capacity',
+        'max_capacity',
+      ]) ?? 0,
+    ),
+
+    occupied: assignedResidents.length,
+    capacityConfirmed: Number(centerRow.capacity) > 0,
+    occupancyKnown: false,
+    closedAt: toOptionalText(centerRow.closed_at),
+    closureReason: toOptionalText(centerRow.closure_reason),
+    facilityType: toOptionalText(centerRow.center_type) ?? undefined,
+    gpsLat: Number(centerRow.gps_lat),
+    gpsLong: Number(centerRow.gps_long),
+
+    status: String(
+      getField(centerRow, [
+        'status',
+        'center_status',
+      ]) ?? 'Open',
+    ),
+
+    residents: assignedResidents,
+  }
+}
+
+// Map an evacuation history record.
+function mapEvacuationHistory(
+  recordRow: AnyRow,
+  usersByUid: Map<string, AnyRow>,
+  barangaysById: Map<string, AnyRow>,
+  centersById: Map<string, AnyRow>,
+  residentRows: AnyRow[],
+  index: number,
+): EvacuationHistoryRecord {
+  const residentUid = toScalar(getField(
+    recordRow,
+    ['resident_uid', 'uid'],
+  ))
+
+  const resident = residentRows.find(
+    (row) =>
+      String(getField(row, ['uid', 'id'])) ===
+      String(residentUid),
+  )
+
+  const user = usersByUid.get(
+    String(residentUid),
+  )
+
+  const barangay = barangaysById.get(
+    String(
+      getField(resident, [
+        'barangay_id',
+        'barangayId',
+      ]),
+    ),
+  )
+
+  const center = centersById.get(
+    String(
+      getField(recordRow, [
+        'evac_center_id',
+        'center_id',
+      ]),
+    ),
+  )
+
+  const firstName = getField(
+    user,
+    ['f_name', 'first_name', 'firstname'],
+  )
+
+  const middleName = getField(
+    user,
+    ['m_name', 'middle_name', 'middlename'],
+  )
+
+  const lastName = getField(
+    user,
+    ['l_name', 'last_name', 'lastname'],
+  )
+
+  const residentName = [
+    firstName,
+    middleName,
+    lastName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  const loggedAt = getField(
+    recordRow,
+    ['logged_at', 'created_at'],
+  )
+
+  const evacuatedAt = getField(
+    recordRow,
+    ['evacuated_at', 'updated_at'],
+  )
+
+  const responseMinutes = getResponseMinutes(
+    loggedAt,
+    evacuatedAt,
+  )
+
+  const latitude = getField(
+    resident,
+    ['GPS_Lat', 'gps_lat', 'latitude', 'lat'],
+  )
+
+  const longitude = getField(
+    resident,
+    [
+      'GPS_Long',
+      'gps_long',
+      'longitude',
+      'lng',
+      'long',
+    ],
+  )
+
+  return {
+    id:
+      toScalar(getField(recordRow, [
+        'record_id',
+        'id',
+      ])) ?? `evacuation-record-${index + 1}`,
+
+    residentName:
+      residentName ||
+      `Resident ${residentUid ?? index + 1}`,
+
+    barangay: String(
+      getField(barangay, [
+        'barangay_name',
+        'name',
+      ]) ??
+        getField(resident, [
+          'barangay',
+          'barangay_name',
+        ]) ??
+        'Unknown Barangay',
+    ),
+
+    constraint: mapConstraint(
+      String(
+        getField(resident, [
+          'mobility_status',
+          'constraint',
+          'disability_type',
+        ]) ?? '',
+      ),
+    ),
+
+    status: mapEvacuationStatus(
+      String(
+        getField(recordRow, [
+          'evac_status',
+          'status',
+        ]) ?? 'Pending',
+      ),
+    ),
+
+    evacuationCenter: String(
+      getField(center, [
+        'center_name',
+        'name',
+      ]) ?? 'Unassigned',
+    ),
+
+    disasterEvent: String(
+      getField(recordRow, [
+        'disaster_event',
+        'event_name',
+      ]) ?? 'Recorded Disaster Event',
+    ),
+
+    month: getMonthName(loggedAt),
+    year: getYear(loggedAt),
+    responseMinutes,
+
+    floodZone:
+      latitude !== null &&
+      latitude !== undefined &&
+      longitude !== null &&
+      longitude !== undefined,
+  }
+}
+
+// Create a map using one of the available keys.
+function toMap(
+  rows: AnyRow[],
+  keys: string[],
+) {
+  const map = new Map<string, AnyRow>()
+
+  rows.forEach((row) => {
+    const key = getField(row, keys)
+
+    if (
+      key !== null &&
+      key !== undefined
+    ) {
+      map.set(String(key), row)
+    }
+  })
+
+  return map
+}
+
+// Narrow a raw identifier or coordinate to the string | number the UI uses.
+// Strings and numbers pass through unchanged; null/undefined become undefined.
+function toScalar(value: unknown): string | number | undefined {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value === null || value === undefined) return undefined
+  return String(value)
+}
+
+// Narrow a raw optional text column, keeping null vs undefined as-is.
+function toOptionalText(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return value
+  return typeof value === 'string' ? value : String(value)
+}
+
+// Read the first available field from a database row.
+function getField(
+  row: AnyRow | undefined,
+  keys: string[],
+) {
+  if (!row) return undefined
+
+  for (const key of keys) {
+    if (row[key] !== undefined) {
+      return row[key]
+    }
+  }
+
+  return undefined
+}
+
+function mapConstraint(
+  value: string,
+): Resident['constraint'] {
+  // mobility_status: ambulatory | semi_ambulatory | non_ambulatory (older rows may say bedridden/wheelchair/assisted).
+  const normalized = value.toLowerCase()
+  if (normalized.startsWith('non') || normalized.includes('bed')) return 'Cannot walk'
+  if (normalized.startsWith('semi') || normalized.includes('wheel') || normalized.includes('assist')) return 'Needs help walking'
+  return 'Can walk'
+}
+
+function mapEvacuationStatus(
+  value: string,
+): EvacuationHistoryRecord['status'] {
+  const normalized = value.toLowerCase()
+
+  if (
+    normalized.includes('safe') ||
+    normalized.includes('evacuated')
+  ) {
+    return 'Safely Evacuated'
+  }
+
+  if (
+    normalized.includes('missing') ||
+    normalized.includes('relocated') ||
+    normalized.includes('failed')
+  ) {
+    return 'Missing / Relocated'
+  }
+
+  if (
+    normalized.includes('transit') ||
+    normalized.includes('extracted')
+  ) {
+    return 'In Transit'
+  }
+
+  return 'Pending'
+}
+
+function formatDate(value: unknown) {
+  if (!value) return 'No update'
+
+  const date = new Date(String(value))
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+
+  return date.toLocaleDateString(
+    undefined,
+    {
+      month: 'short',
+      day: 'numeric',
+    },
+  )
+}
+
+function getMonthName(value: unknown) {
+  const date = value
+    ? new Date(String(value))
+    : new Date()
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+
+  return date.toLocaleString(
+    undefined,
+    { month: 'long' },
+  )
+}
+
+function getYear(value: unknown) {
+  const date = value
+    ? new Date(String(value))
+    : new Date()
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().getFullYear()
+  }
+
+  return date.getFullYear()
+}
+
+function getResponseMinutes(
+  start: unknown,
+  end: unknown,
+) {
+  if (!start || !end) return 0
+
+  const startDate = new Date(String(start))
+  const endDate = new Date(String(end))
+
+  if (
+    Number.isNaN(startDate.getTime()) ||
+    Number.isNaN(endDate.getTime())
+  ) {
+    return 0
+  }
+
+  return Math.max(
+    0,
+    Math.round(
+      (endDate.getTime() - startDate.getTime()) /
+        60000,
+    ),
+  )
+}

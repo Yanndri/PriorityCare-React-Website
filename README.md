@@ -2,7 +2,7 @@
 
 PriorityCare is a web dashboard for disaster preparedness and response at the barangay level. Administrators use it to verify residents, map vulnerable households, declare disaster events, manage evacuation centers, and draft situation reports.
 
-The frontend is built with React, TypeScript, and Vite, and uses Supabase for authentication and data. A small Express API (`prioritycare-api/`) handles privileged Super Admin operations that need the Supabase service-role key.
+The frontend is built with React, TypeScript, and Vite, and uses Supabase for authentication and data. Privileged Super Admin operations (creating staff and responder accounts) run in the `super-admin` Supabase Edge Function, so no separate server is needed.
 
 > **Prototype notice:** Scoring (VPI) and the RDANA summaries are for demonstration only. They are **not** validated for real triage, rescue ordering, or official DSWD submissions. The docs in [`docs/`](docs/) cover the details.
 
@@ -28,7 +28,6 @@ src/
   pages/        Top-level dashboard sections
   utils/        Pure logic: VPI, RDANA, audit trail
   lib/          Supabase client
-prioritycare-api/   Express backend for Super Admin endpoints
 supabase/
   migrations/   SQL migrations to apply in the Supabase SQL editor
   *.md          Notes for each migration
@@ -54,7 +53,6 @@ Create `.env.local` in the project root. It is git-ignored.
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-publishable-key
-VITE_API_BASE_URL=http://localhost:3000      # Express backend (defaults to this)
 VITE_OPENWEATHER_API_KEY=your-openweather-key # optional, for Geo Map weather
 ```
 
@@ -73,7 +71,7 @@ The barangay is the operational unit (scoping, maps, reports). Sitio is only a f
 
 `20261019_04_households_and_accounts.sql` makes household dependents real rows (`household_members`, `member_disabilities`), links every `users` row to a Supabase Auth login, and makes the `verification-docs` and `house-facades` buckets private (files live under `<user id>/...`; the web shows them through signed URLs). `20261019_05_resident_signup_and_test_logins.sql` adds resident sign-up (contact number + 6-digit PIN, through the `register-resident` Edge Function in `supabase/functions/`), the app's self-service RPCs (`get_my_profile`, `update_my_household`, `set_my_house_photo`, `submit_my_verification_document`) and test logins for every role. `20261019_06_sos_hazards_evacuation.sql` makes `sos_alerts` the app's SOS record (resident uuid, household, GPS, type, headcount, cancel reason; `raise_sos`, `cancel_my_sos`, `get_my_sos`), adds `hazard_reports` (`report_hazard`, `review_hazard`), lets evacuation records cover household members and walk-in groups (`record_evacuation`, `admit_walk_in`, `set_my_member_missing`, `get_my_household_status`), and adds `get_rescuer_feed` and `get_public_map` for the app.
 
-For rescuer registration and accreditation renewal, apply [`20261019_11_responder_accreditation.sql`](supabase/migrations/20261019_11_responder_accreditation.sql), then [`20261020_03_responder_accreditation_service_role.sql`](supabase/migrations/20261020_03_responder_accreditation_service_role.sql). If registration already fails with “The accreditation record could not be saved” and the backend logs “permission denied for table responder_accreditations,” run the second migration in the Supabase project used by the backend and retry registration.
+For rescuer registration and accreditation renewal, apply [`20261019_11_responder_accreditation.sql`](supabase/migrations/20261019_11_responder_accreditation.sql), then [`20261020_03_responder_accreditation_service_role.sql`](supabase/migrations/20261020_03_responder_accreditation_service_role.sql). If registration already fails with “The accreditation record could not be saved” and the logs say “permission denied for table responder_accreditations,” run the second migration in the Supabase project and retry registration.
 
 The matching notes are in [`supabase/`](supabase/) and [`docs/disaster-events.md`](docs/disaster-events.md).
 
@@ -87,42 +85,6 @@ Then open the app:
 
 - `/admin/login`: admin login, which leads to the `/admin` dashboard
 - `/super-admin/login`: Super Admin login, which leads to the `/super-admin` dashboard
-
-### 4. Run the backend (Super Admin features)
-
-```bash
-cd prioritycare-api
-npm install
-```
-
-Create `prioritycare-api/.env`. **Never commit the service-role key or expose it to the frontend.**
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-PORT=3000
-
-# Optional MySQL connection (used by the legacy /api/residents endpoints)
-DB_HOST=
-DB_PORT=3306
-DB_USER=
-DB_PASSWORD=
-DB_NAME=
-```
-
-```bash
-npm run dev     # with nodemon
-npm start       # plain node
-```
-
-Main endpoints:
-
-- `GET /api/health`
-- `GET /api/super-admin/check`
-- `GET /api/super-admin/dashboard`
-- `POST /api/super-admin/admins`
-
-Every `/api/super-admin/*` route requires a Supabase bearer token from a Super Admin user.
 
 ## Scripts
 
@@ -157,7 +119,7 @@ Each push to `new-master` triggers [`.github/workflows/deploy-pages.yml`](.githu
 - `VITE_API_BASE_URL`
 - `VITE_OPENWEATHER_API_KEY`
 
-The Express backend has to be hosted separately. The `MYSQL*` env var names suggest Railway. Point `VITE_API_BASE_URL` at it.
+Super Admin account features use the `super-admin` Edge Function (deploy it with the Supabase CLI); nothing else needs hosting.
 
 ## Documentation
 

@@ -1505,3 +1505,215 @@ textarea {
 /* Residents: the Review ID button stands out on rows that need checking */
 .app .table-actions .review-button, .app .review-button { min-height: 38px; padding: 6px 14px; border: 0; border-radius: var(--radius-sm); background: #b45309; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .app .table-actions .review-button:hover, .app .review-button:hover { background: #92400e; }
+
+/* ---- Layout step 1 (23 Nov 2026): one top bar, red operation bar, menu counts ---- */
+
+/* The barangay (or the super admin's scope picker) now sits in the top bar. */
+.header-status {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+}
+
+.header-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.header-scope strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.header-scope select {
+  min-height: 34px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Shown on every page while a disaster is declared. */
+.operation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 16px;
+}
+
+.operation-bar-icon {
+  font-size: 18px;
+}
+
+.operation-bar-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.operation-bar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--danger);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.operation-bar-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Count or state next to a menu item. */
+.nav-button {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.nav-badge {
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.nav-badge-urgent {
+  background: var(--danger);
+  color: #fff;
+}
+
+.nav-badge-quiet {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Operation page when nothing is declared. */
+.operation-idle {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .nav-button { grid-template-columns: auto auto auto; }
+  .operation-bar { padding: 10px 16px; }
+  .header-status { order: 3; flex: 1 1 100%; margin-left: 0; }
+}
+
+/* ---------- One button style everywhere (2026-11-24) ----------
+   Main = solid blue (primary-button), Normal = white with gray border (secondary-button),
+   Danger = white with red words and border (danger-button). Same height and text size. */
+.app .danger-button,
+.app .super-admin-table .danger-button,
+.app .super-admin-table .secondary-button,
+.app .account-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid #b8c0cc;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  filter: none;
+}
+.app .super-admin-table .secondary-button:hover,
+.app .account-button:hover { background: var(--panel-2); }
+.app .danger-button,
+.app .super-admin-table .danger-button { border-color: #e8a3a3; color: var(--danger); }
+.app .danger-button:hover:not(:disabled),
+.app .super-admin-table .danger-button:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
+.app .danger-button:disabled, .app .account-button:disabled { opacity: 0.55; }
+/* Buttons in a table row sit side by side in one row. */
+.app .row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---------- Side panel for Add and Edit forms ---------- */
+.side-panel-backdrop { position: fixed; inset: 0; z-index: 2000; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, 0.35); }
+.side-panel { display: flex; flex-direction: column; width: min(600px, 100vw); height: 100%; background: var(--paper, #fff); box-shadow: -8px 0 24px rgba(15, 23, 42, 0.2); animation: side-panel-in 0.18s ease-out; }
+.side-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
+.side-panel-head h3 { margin: 0; font-size: 19px; }
+.side-panel-body { flex: 1; overflow-y: auto; padding: 18px 20px 28px; }
+.side-panel-body .panel, .side-panel-body .super-admin-section, .side-panel-body .unit-form { margin: 0; padding: 0; border: 0; box-shadow: none; background: none; }
+.side-panel-body .edit-form-grid, .side-panel-body .dispatch-form { grid-template-columns: 1fr; }
+.side-panel-body .edit-form-grid > :last-child { position: sticky; bottom: -28px; padding: 12px 0; background: var(--paper, #fff); }
+@keyframes side-panel-in { from { transform: translateX(40px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .side-panel { animation: none; } }
+
+/* ---------- Responder team members ---------- */
+.member-picker { display: grid; gap: 8px; }
+.member-list, .member-matches { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.member-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+.member-search { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.member-matches { max-height: 280px; overflow-y: auto; }
+.member-matches .secondary-button { width: 100%; justify-content: flex-start; }
+.member-summary { margin: 6px 0; font-size: 14px; }
+.member-summary summary { cursor: pointer; color: #1d4ed8; font-weight: 600; }
+.member-summary ul { margin: 6px 0 0; padding-left: 18px; color: #475569; }
+
+/* Side panels start below the top bar (wide screens). */
+@media (min-width: 1101px) { .side-panel-backdrop { top: var(--header-h); } }
+.reject-popup-backdrop { z-index: 2100; }
+
+/* ---------- Resident details (side panel) ---------- */
+.rd { display: grid; gap: 18px; }
+.rd-head h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 22px; }
+.rd-head p { margin: 4px 0 0; color: #475569; }
+.rd-status { border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: 700; }
+.rd-status.rd-verified { background: #dcfce7; color: #166534; }
+.rd-status.rd-pending { background: #fef3c7; color: #92400e; }
+.rd-status.rd-rejected { background: #fee2e2; color: #991b1b; }
+.rd-section h5 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: #334155; letter-spacing: 0.02em; }
+.rd-facts { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 0; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.rd-facts dt { color: #64748b; font-size: 14px; }
+.rd-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.rd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rd-chips span { background: #eef2ff; color: #3730a3; border-radius: 6px; padding: 2px 8px; font-size: 13px; }
+.rd-muted { display: block; color: #64748b; font-size: 13px; font-weight: 400; margin-top: 2px; }
+.rd-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rd-table th, .rd-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.rd-table th { color: #64748b; font-size: 13px; font-weight: 600; }
+.rd-actions { position: sticky; bottom: -28px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; padding: 12px 0; border-top: 1px solid #e2e8f0; background: var(--paper, #fff); }
+.rd-rejected { flex: 1 1 100%; margin: 0; color: #991b1b; font-size: 14px; }
+@media (max-width: 520px) { .rd-facts { grid-template-columns: 1fr; gap: 2px; } .rd-facts dd { margin-bottom: 8px; } }
+
+/* ---------- Residents list (2026-11-24) ---------- */
+.app .resident-status-chips .status-tab { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 16px; border: 1px solid #b8c0cc; border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.app .resident-status-chips .status-tab.is-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.status-tab-n { min-width: 24px; padding: 0 7px; border-radius: 999px; background: rgba(100, 116, 139, 0.15); font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; }
+.status-tab.is-on .status-tab-n { background: rgba(255, 255, 255, 0.25); }
+.status-tab.has-waiting:not(.is-on) .status-tab-n { background: #b45309; color: #fff; }
+.app tr.resident-row { cursor: pointer; }
+.app tr.resident-row:hover td { background: var(--panel-2, #f5f7fa); }
+.app .resident-row-action { text-align: right; width: 1%; white-space: nowrap; }
+.app .row-open { width: 40px; height: 40px; border: 1px solid #b8c0cc; border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); font-size: 22px; line-height: 1; cursor: pointer; }
+.app .row-open:hover { background: var(--panel-2, #f5f7fa); }
+.rd-actions-gap { flex: 1 1 auto; }
+.rd-actions { justify-content: flex-start; }
+.rd-account { color: #475569; }

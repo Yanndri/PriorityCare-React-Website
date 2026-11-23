@@ -1,3 +1,4 @@
+import { SidePanel } from '../components/SidePanel'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   createRescuer,
@@ -151,11 +152,11 @@ export function ResponderAccountsPage() {
     {error && <p role="alert" className="dashboard-error">{error}</p>}
     {notice && <p role="status" className="catchment-notice">{notice}</p>}
 
-    {form && <form className="edit-form-grid" onSubmit={(e) => void submit(e)}>
+    {form && <SidePanel title="Add responder" busy={busy} error={error} onClose={() => setForm(null)}><form className="edit-form-grid" onSubmit={(e) => void submit(e)}>
       {field('f_name', 'First name', { required: true, maxLength: 100 })}
       {field('m_name', 'Middle name', { maxLength: 100 })}
       {field('l_name', 'Last name', { required: true, maxLength: 100 })}
-      {field('contact_no', 'Contact number', { required: true, maxLength: 50 })}
+      {field('contact_no', 'Mobile number', { required: true, maxLength: 50 })}
       {field('email', 'Login email', { required: true, type: 'email', maxLength: 100 })}
       {field('password', 'Temporary password (8+ characters)', { required: true, type: 'password', minLength: 8, autoComplete: 'new-password' })}
       <label><span>Barangay</span><select required value={form.assigned_barangay_id} onChange={(e) => setForm({ ...form, assigned_barangay_id: e.target.value })}>
@@ -172,14 +173,13 @@ export function ResponderAccountsPage() {
         <button type="submit" className="verify-button" disabled={busy}>{busy ? 'Saving…' : 'Create Account'}</button>{' '}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => setForm(null)}>Cancel</button>
       </div>
-    </form>}
+    </form></SidePanel>}
 
-    {editing && <form className="edit-form-grid" onSubmit={(e) => void saveDetails(e)}>
-      <p><strong>Edit details for {editing.draft.f_name || 'responder'} {editing.draft.l_name}</strong></p>
+    {editing && <SidePanel title={`Edit details: ${editing.draft.f_name} ${editing.draft.l_name}`.trim()} busy={busy} error={error} onClose={() => setEditing(null)}><form className="edit-form-grid" onSubmit={(e) => void saveDetails(e)}>
       {editField('f_name', 'First name', { required: true, maxLength: 100 })}
       {editField('m_name', 'Middle name', { maxLength: 100 })}
       {editField('l_name', 'Last name', { required: true, maxLength: 100 })}
-      {editField('contact_no', 'Contact number', { required: true, maxLength: 50 })}
+      {editField('contact_no', 'Mobile number', { required: true, maxLength: 50 })}
       {editField('email', 'Login email', { required: true, type: 'email', maxLength: 100 })}
       <label><span>Barangay</span><select required value={editing.draft.assigned_barangay_id} onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, assigned_barangay_id: e.target.value } })}>
         <option value="">Select…</option>
@@ -191,10 +191,9 @@ export function ResponderAccountsPage() {
         <button type="submit" className="verify-button" disabled={busy}>{busy ? 'Saving…' : 'Save Details'}</button>{' '}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
       </div>
-    </form>}
+    </form></SidePanel>}
 
-    {renewing && <form className="edit-form-grid" onSubmit={(e) => void renew(e)}>
-      <p><strong>Accreditation for {renewing.name}</strong></p>
+    {renewing && <SidePanel title={`Accreditation: ${renewing.name}`} busy={busy} error={error} onClose={() => setRenewing(null)}><form className="edit-form-grid" onSubmit={(e) => void renew(e)}>
       {(['organization', 'accreditation_no', 'accredited_on', 'valid_until', 'trainings', 'insurance_ref'] as const).map((key) =>
         <label key={key}><span>{{ organization: 'Fielding organization', accreditation_no: 'CDV accreditation / ID number', accredited_on: 'Accredited on', valid_until: 'Valid until', trainings: 'Trainings (comma-separated)', insurance_ref: 'Accident insurance policy no. (optional)' }[key]}</span>
           <input required={key !== 'trainings' && key !== 'insurance_ref'} type={key.endsWith('_on') || key === 'valid_until' ? 'date' : 'text'} value={renewing.draft[key]}
@@ -203,7 +202,7 @@ export function ResponderAccountsPage() {
         <button type="submit" className="verify-button" disabled={busy}>Save Accreditation</button>{' '}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => setRenewing(null)}>Cancel</button>
       </div>
-    </form>}
+    </form></SidePanel>}
 
     {loading ? <p role="status">Loading responders…</p> : <div className="catchment-table-wrap"><table className="catchment-table">
       <thead><tr><th>Responder</th><th>Barangay</th><th>Accreditation</th><th>Units</th><th>Account</th><th /></tr></thead>
@@ -216,7 +215,7 @@ export function ResponderAccountsPage() {
             <span className={`catchment-load ${label.tone}`}>{label.text}</span></td>
           <td>{r.units.length ? r.units.join(', ') : '—'}</td>
           <td>{r.account_status === 'active' ? 'Active' : 'Suspended'}{!r.deployable && <div className="catchment-muted"><small>Not deployable</small></div>}</td>
-          <td>
+          <td><div className="row-actions">
             <button type="button" className="secondary-button" disabled={busy} onClick={() => {
               setForm(null); setRenewing(null); setNotice('')
               setEditing({ uid: r.uid, oldEmail: r.email, draft: {
@@ -229,7 +228,7 @@ export function ResponderAccountsPage() {
               accredited_on: r.accredited_on ?? today(), valid_until: r.valid_until && r.valid_until > today() ? r.valid_until : inYears(today(), 2),
               trainings: (r.trainings ?? []).join(', '), insurance_ref: r.insurance_ref ?? '',
             } })}>{r.valid_until ? 'Renew' : 'Add accreditation'}</button>{' '}
-            <button type="button" className="secondary-button" disabled={busy}
+            <button type="button" className={r.account_status === 'active' ? 'danger-button' : 'secondary-button'} disabled={busy}
               onClick={() => void run(() => updateRescuer(r.uid, { account_status: r.account_status === 'active' ? 'suspended' : 'active' }),
                 `${r.name} ${r.account_status === 'active' ? 'suspended' : 'reactivated'}.`)}>
               {r.account_status === 'active' ? 'Suspend' : 'Reactivate'}</button>{' '}
@@ -242,7 +241,7 @@ export function ResponderAccountsPage() {
                   window.alert(`New password for ${r.name} (${r.email}): ${secret}\n\nGive it to them in person. It is not shown again.`)
                 }, `Password reset for ${r.name}.`)
               }}>Reset password</button>
-          </td>
+          </div></td>
         </tr>
       })}</tbody>
     </table>

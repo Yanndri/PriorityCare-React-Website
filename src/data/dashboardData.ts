@@ -6,25 +6,25 @@ import type { MenuItem, MenuKey } from '../types/dashboard'
 // what each role may read or change.
 
 // Operational modules shared by Admin (assigned barangay) and Super Admin
-// (all barangays or the barangay chosen in the scope selector). They are
-// grouped by when a barangay officer uses them, with plain-language labels.
-const BEFORE = 'Before a disaster'
-const DURING = 'During a disaster'
-const AFTER = 'After a disaster'
+// (all barangays or the barangay chosen in the scope selector). The groups
+// follow the order of the work: respond to an alarm and run the operation,
+// keep records ready before one, then review afterwards.
+const RESPOND = 'Respond'
+const PREPARE = 'Prepare'
+const REVIEW = 'Review'
 
 // Each tab matches a sub-module in Appendix N (numbers in the comments).
+// Pages that are a tab of another menu item are listed in menuParent below.
 const operationalItems: MenuItem[] = [
-  { key: 'population', label: 'Sitios & Population', group: BEFORE },
-  { key: 'verification', label: 'Residents', group: BEFORE }, // 1.1, 1.2
-  { key: 'evacCenters', label: 'Evacuation Centers', group: BEFORE }, // 2.1, 2.3
-  { key: 'disasterEvents', label: 'Declare a Disaster', group: DURING }, // 3.1
-  { key: 'geoMap', label: 'Map', group: DURING }, // 3.2
-  { key: 'dispatch', label: 'SOS & Rescue', group: DURING }, // 1.3, 2.2
-  { key: 'preemptiveEvacuation', label: 'Evacuations', group: DURING }, // 1.3
-  { key: 'rescueReconciliation', label: 'Missing Persons', group: DURING }, // 4.1
-  { key: 'reports', label: 'Reports', group: AFTER }, // 4.2
-  { key: 'dataMining', label: 'Data Mining', group: AFTER }, // UC-13: priority zones, center demand, response time
-  { key: 'activityLogs', label: 'Activity Logs', group: AFTER }, // 4.4
+  { key: 'disasterEvents', label: 'Alarms', group: RESPOND }, // 3.1 hazard reports -> Yes/No -> declare
+  { key: 'dispatch', label: 'Operation', group: RESPOND }, // 1.3, 2.2, 4.1 (tabs: rescue, evacuation, missing)
+  { key: 'geoMap', label: 'Map', group: RESPOND }, // 3.2
+  { key: 'verification', label: 'Residents', group: PREPARE }, // 1.1, 1.2 (tabs: residents, sitios)
+  { key: 'evacCenters', label: 'Evacuation centers', group: PREPARE }, // 2.1, 2.3
+  { key: 'responderTeams', label: 'Responder teams', group: PREPARE },
+  { key: 'reports', label: 'Situation report', group: REVIEW }, // 4.2
+  { key: 'dataMining', label: 'Data mining', group: REVIEW }, // UC-13: priority zones, center demand, response time
+  { key: 'activityLogs', label: 'Activity log', group: REVIEW }, // 4.4
 ]
 
 export const adminMenuItems: MenuItem[] = [
@@ -34,22 +34,39 @@ export const adminMenuItems: MenuItem[] = [
 
 export const superAdminMenuItems: MenuItem[] = [
   { key: 'home', label: 'Today' },
-  { key: 'adminAccounts', label: 'Accounts & Barangays', group: 'Municipal admin' }, // 4.3
   ...operationalItems,
+  { key: 'adminAccounts', label: 'Accounts & barangays', group: 'Municipal admin' }, // 4.3
 ]
+
+// Pages shown as a tab of another menu item: the sidebar highlights the parent.
+export const menuParent: Partial<Record<MenuKey, MenuKey>> = {
+  preemptiveEvacuation: 'dispatch',
+  rescueReconciliation: 'dispatch',
+  population: 'verification',
+}
+
+// Tab names inside the merged pages.
+export const tabLabels: Partial<Record<MenuKey, string>> = {
+  dispatch: 'Rescue requests',
+  preemptiveEvacuation: 'Who has evacuated',
+  rescueReconciliation: 'Missing persons',
+  verification: 'Residents',
+  population: 'Sitios & population',
+}
 
 // One plain sentence under each page title: what the page is for.
 export const pageDescriptions: Record<MenuKey, string> = {
-  home: 'What needs your attention right now. Click a card to go straight to it.',
+  home: 'How things stand right now, and what to do next.',
   population: 'Your official sitio list, and how many people live in each sitio: children, seniors, pregnant, and those who cannot walk.',
   verification: 'Register residents, check their IDs, and keep household details up to date.',
   evacCenters: 'Your evacuation centers: how full they are and who is inside.',
   preemptiveEvacuation: 'Which households are staying home, leaving, or safe, and where they went. Residents report from the app; staff can log for them.',
-  disasterEvents: 'Declare a flood, fire, earthquake or landslide when it happens, and close it when it is over.',
+  disasterEvents: 'Hazards reported from the app. Check each one outside the system, answer Yes or No, and declare a disaster when it is real.',
   geoMap: 'See residents by priority, evacuation centers and SOS calls on the map, plus the vulnerability heatmap.',
-  dispatch: 'Answer SOS calls: open a rescue request and send a rescue team.',
+  dispatch: 'Everything during a declared disaster: rescue requests, who has evacuated, and missing persons.',
   rescueReconciliation: 'Record people reported missing, mark them found, and search the rescued list to tell families where a relative is.',
   reports: 'Make the 24/48-hour situation report (RDANA).',
+  responderTeams: 'Responder teams that can be sent to rescue requests, and who is in each team.',
   dataMining: 'Find where the households that need help are grouped, which evacuation centers may run out of space, and how fast rescues are.',
   barangayOverview: 'Every barangay at a glance. Click one to open its dashboard.',
   adminAccounts: 'Every barangay at a glance, plus barangay admin and responder accounts.',
@@ -65,9 +82,10 @@ export const menuIcons: Record<MenuKey, string> = {
   geoMap: 'map-marker',
   evacCenters: 'building',
   preemptiveEvacuation: 'home',
-  disasterEvents: 'siren-on',
+  disasterEvents: 'bell',
   rescueReconciliation: 'search-location',
   dispatch: 'ambulance',
+  responderTeams: 'users-alt',
   reports: 'file-chart-line',
   dataMining: 'chart-histogram',
   barangayOverview: 'map-location-track',

@@ -35,3 +35,20 @@ export async function sendCenterHome(id: number | string, recordId?: string) {
   if (error) throw new Error(error.code === 'PGRST202' ? 'This needs the STEP17 database update first.' : error.message)
   return Number(data ?? 0)
 }
+
+// Name, type and map location (STEP37). Capacity is saved with setFacilityCapacity.
+export async function updateFacilityDetails(id: number | string, input: { name: string; type: string; latitude: number; longitude: number }) {
+  const { error } = await supabase.rpc('update_evacuation_facility_details', {
+    p_center_id: id, p_name: input.name.trim(), p_type: input.type, p_lat: input.latitude, p_long: input.longitude,
+  })
+  if (error) throw new Error(error.code === 'PGRST202' ? 'Editing the name and location needs STEP37 to be run in the Supabase SQL Editor.' : error.message)
+}
+
+// Check in people who came on their own: one record per person (same as the responder app).
+export async function admitWalkIn(input: { centerId: number | string; name: string; barangayId: number | null; sitio: string; needs: string }) {
+  const { error } = await supabase.rpc('admit_walk_in', {
+    p_center_id: input.centerId, p_name: input.name.trim(), p_barangay_id: input.barangayId,
+    p_sitio: input.sitio.trim(), p_headcount: 1, p_needs: input.needs.trim(),
+  })
+  if (error) throw new Error(error.message)
+}

@@ -1,27 +1,30 @@
-import type { EvacuationCenter, MenuKey, Resident, StatCardData } from '../types/dashboard'
-import { StatsGrid } from '../components/StatsGrid'
+import type { EvacuationCenter, MenuKey, Resident } from '../types/dashboard'
+import type { OperationStatus } from '../lib/useOperationStatus'
 import { TodayTasks } from '../components/TodayTasks'
 
 type HomePageProps = {
-  stats: StatCardData[]
   evacuationCenters: EvacuationCenter[]
   scopeBarangayId: number | null
+  scopeLabel: string
+  isSuperAdmin: boolean
   allResidents: Resident[]
   onOpen: (menu: MenuKey) => void
+  operation: OperationStatus
 }
 
-// Today page: what needs doing, then the headline numbers. Everything else
-// lives on its own page so this one stays short.
-export function HomePage({ stats, evacuationCenters, scopeBarangayId, allResidents, onOpen }: HomePageProps) {
+// Today page: how things stand, four numbers, then what needs doing.
+// Everything else lives on its own page so this one stays short.
+export function HomePage({ evacuationCenters, scopeBarangayId, scopeLabel, isSuperAdmin, allResidents, onOpen, operation }: HomePageProps) {
   return (
-    <>
-      <TodayTasks
-        scopeBarangayId={scopeBarangayId}
-        residents={allResidents}
-        centers={evacuationCenters}
-        onOpen={onOpen}
-      />
-      <StatsGrid stats={stats} />
-    </>
+    <TodayTasks
+      scopeBarangayId={scopeBarangayId}
+      scopeLabel={scopeLabel}
+      isSuperAdmin={isSuperAdmin}
+      residents={allResidents}
+      centers={evacuationCenters}
+      onOpen={onOpen}
+      waitingAlarms={operation.waitingAlarms}
+      activeEvents={operation.active}
+    />
   )
 }

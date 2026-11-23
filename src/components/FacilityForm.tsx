@@ -3,6 +3,8 @@ import type { EvacuationCenter } from '../types/dashboard'
 import { registerFacility, setFacilityCapacity } from '../api/facilityApi'
 import { FACILITY_TYPES, facilityTypeLabel, validateCapacity, validateFacility } from '../utils/facility'
 import { FacilityLocationPicker } from './FacilityLocationPicker'
+import { SidePanel } from './SidePanel'
+import '../pages/DispatchPage.css'
 
 type Props = {
   center: EvacuationCenter | null
@@ -40,31 +42,30 @@ export function FacilityForm({ center, existingCenters = [], barangayOptions, sc
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save this facility.') }
     finally { setSaving(false) }
   }
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="facility-form-title">
-    <section className="edit-modal"><div className="request-modal-header"><div><h3 id="facility-form-title">{center ? 'Set Maximum Safe Capacity' : 'Register Evacuation Facility'}</h3><p>{center?.name ?? 'Add a predefined or temporary evacuation facility.'}</p></div><button type="button" className="modal-close-button" disabled={saving} aria-label="Close facility form" onClick={onClose}>×</button></div>
-      {error && <p role="alert" className="dashboard-error">{error}</p>}
-      <form onSubmit={submit}><fieldset disabled={saving || saved} className="resident-edit-fields"><div className="edit-form-grid">
+  return <SidePanel title={center ? `Room for at ${center.name}` : 'Add a center'} onClose={onClose} error={error} busy={saving}>
+      <form onSubmit={submit} className="ec-form"><fieldset disabled={saving || saved} className="ec-fieldset ec-plain">
         {!center && <>
-          <label><span>Facility name</span><input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label><span>Facility type</span><select value={type} onChange={(e) => setType(e.target.value as typeof type)}>{FACILITY_TYPES.map((item) => <option key={item} value={item}>{item === 'makeshift' ? 'Temporary shelter (this disaster only)' : facilityTypeLabel(item)}</option>)}</select></label>
-          {barangayOptions && <label><span>Barangay</span><select value={barangay} onChange={(e) => setBarangay(e.target.value)}>
+          <label>Name<input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label>Type<select value={type} onChange={(e) => setType(e.target.value as typeof type)}>{FACILITY_TYPES.map((item) => <option key={item} value={item}>{item === 'makeshift' ? 'Temporary evacuation center (this disaster only)' : facilityTypeLabel(item)}</option>)}</select></label>
+          {barangayOptions && <label>Barangay<select value={barangay} onChange={(e) => setBarangay(e.target.value)}>
             <option value="">Municipal (all barangays)</option>
             {barangayOptions.map((option) => <option key={option.barangay_id} value={option.barangay_id}>{option.barangay_name}</option>)}
           </select></label>}
-          <label><span>GPS latitude</span><input required type="number" step="any" min={-90} max={90} value={latitude} onChange={(e) => setLatitude(e.target.value)} /></label>
-          <label><span>GPS longitude</span><input required type="number" step="any" min={-180} max={180} value={longitude} onChange={(e) => setLongitude(e.target.value)} /></label>
-          <FacilityLocationPicker
-            latitude={latitude}
-            longitude={longitude}
-            centers={existingCenters}
-            focusBarangayId={barangay ? Number(barangay) : scopeBarangayId}
-            disabled={saving || saved}
-            onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng) }}
-          />
+          <div className="ec-picker">
+            <span className="ec-label">Location: click the map or drag the pin</span>
+            <FacilityLocationPicker
+              latitude={latitude}
+              longitude={longitude}
+              centers={existingCenters}
+              focusBarangayId={barangay ? Number(barangay) : scopeBarangayId}
+              disabled={saving || saved}
+              onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng) }}
+            />
+          </div>
         </>}
-        <label><span>Maximum safe capacity (people)</span><input required type="number" min={1} max={1_000_000} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
-      </div></fieldset><p>Enter the limit approved for this facility. The website records this value; it does not assess structural safety.</p>
-      <div className="request-modal-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>{saved ? 'Close' : 'Cancel'}</button><button type="submit" className="verify-button large" disabled={saving || saved}>{saving ? 'Saving…' : center ? 'Save Capacity' : 'Register Facility'}</button></div></form>
-    </section>
-  </div>
+        <label>Room for (people)<input required type="number" min={1} max={1_000_000} step={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
+        <p className="ec-hint">The safe limit approved for this place. The website records it; it does not check the building.</p>
+      </fieldset>
+      <div className="row-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>{saved ? 'Close' : 'Cancel'}</button><button type="submit" className="primary-button" disabled={saving || saved || (!center && (!latitude || !longitude))}>{saving ? 'Saving…' : center ? 'Save' : 'Add center'}</button></div></form>
+  </SidePanel>
 }

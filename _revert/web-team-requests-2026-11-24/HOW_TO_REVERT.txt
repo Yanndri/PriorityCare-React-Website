@@ -1,0 +1,1 @@
+Undo 'Ask the municipality for a team': copy these files back over the same paths, and run STEP32_undo.sql in the Supabase SQL Editor.

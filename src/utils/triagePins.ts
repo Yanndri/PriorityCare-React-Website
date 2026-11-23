@@ -62,7 +62,7 @@ export function personTags(p: VpiPerson, asOf = vpiToday()) {
 const bandColour = { CRITICAL: 'red', ASSISTED: 'yellow', LOW: 'green' } as const
 
 /**
- * One pin per household (or per resident with no household), coloured by the household VPI:
+ * One pin per household (or per resident with no household), colored by the household VPI:
  * Red = Critical (70+), Yellow = Assisted (40–69), Green = Low.
  */
 export function buildTriagePins(residents: Resident[], asOf = vpiToday()) {

@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Resident } from '../types/dashboard'
+import { supabase } from '../lib/supabaseClient'
+import { useSitios } from '../api/sitiosApi'
 import { fetchResidentProfile, fetchHousehold, type HouseholdMember, type MemberMobility, type ResidentProfileDetails, type ResidentProfileInput } from '../api/residentProfileApi'
 
 type Props = {
@@ -20,6 +22,19 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [householdLoading, setHouseholdLoading] = useState(false)
+  // Sitio is picked from the barangay's official list (Sitios & population), never typed.
+  const [home, setHome] = useState<{ barangayId: number | null; sitio: string } | null>(null)
+  const [sitio, setSitio] = useState('')
+  const { sitios } = useSitios(home?.barangayId ?? null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('residents').select('sitio, barangay_id').eq('uid', String(resident.id)).maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setHome({ barangayId: data.barangay_id ?? null, sitio: data.sitio ?? '' }); setSitio(data.sitio ?? '')
+      })
+    return () => { cancelled = true }
+  }, [resident.id])
 
   useEffect(() => {
     let cancelled = false
@@ -63,7 +78,13 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
       return
     }
     setError('')
-    try { await onSave(resident.id, profile) }
+    try {
+      if (home && sitio !== home.sitio) {
+        const { error: sitioError } = await supabase.from('residents').update({ sitio }).eq('uid', String(resident.id))
+        if (sitioError) throw new Error(`Could not save the sitio: ${sitioError.message}`)
+      }
+      await onSave(resident.id, profile)
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save. Your changes remain in this form.') }
   }
 
@@ -86,15 +107,20 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
               {textField('f_name', 'First name')}
               {textField('m_name', 'Middle name (optional)', false)}
               {textField('l_name', 'Last name')}
-              {textField('contact_no', 'Contact number', true, 'tel')}
+              {textField('contact_no', 'Mobile number', true, 'tel')}
               <label><span>Sex</span><select value={profile.sex} onChange={(e) => setField('sex', e.target.value as ResidentProfileInput['sex'])}><option value="male">Male</option><option value="female">Female</option></select></label>
               {textField('birthdate', 'Birthdate', true, 'date')}
+              {home && <label><span>Sitio</span><select value={sitio} onChange={(e) => setSitio(e.target.value)}>
+                <option value="">{sitios.length ? 'Not listed / not set' : 'No sitio list for this barangay yet'}</option>
+                {home.sitio && !sitios.some((s) => s.sitio_name === home.sitio) && <option value={home.sitio}>{home.sitio} (not on the list)</option>}
+                {sitios.map((s) => <option key={s.sitio_id} value={s.sitio_name}>{s.sitio_name}</option>)}
+              </select></label>}
               {textField('address', 'Submitted address', false)}
               {textField('landmark', 'Landmark', false)}
               <label><span>GPS latitude</span><input required type="number" step="any" min={-90} max={90} value={profile.gps_lat} onChange={(e) => setField('gps_lat', Number(e.target.value))} /></label>
               <label><span>GPS longitude</span><input required type="number" step="any" min={-180} max={180} value={profile.gps_long} onChange={(e) => setField('gps_long', Number(e.target.value))} /></label>
               {textField('emerg_contact_name', 'Emergency contact name')}
-              {textField('emerg_contact_no', 'Emergency contact number', true, 'tel')}
+              {textField('emerg_contact_no', 'Emergency contact mobile number', true, 'tel')}
             </div>
           </fieldset>
           <fieldset disabled={isSaving || householdLoading} className="resident-edit-fields">

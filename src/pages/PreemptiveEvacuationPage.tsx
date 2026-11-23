@@ -1,3 +1,4 @@
+import { SidePanel } from '../components/SidePanel'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useLiveSignal } from '../lib/useLiveSignal'
 import {
@@ -14,7 +15,7 @@ import {
   type PreemptiveResident,
   type PreemptiveStatus,
 } from '../api/preemptiveEvacuationApi'
-import '../components/ShelterCatchmentPanel.css'
+import '../components/CatchmentTable.css'
 import { listResponders, type Responder } from '../api/superAdminApi'
 
 // Module: Log Resident Pre-emptive Evacuation Status & Intended Destination.
@@ -232,7 +233,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
       />
     </div>
 
-    {draft && board && <form className="edit-form-grid" onSubmit={(e) => void submit(e)}>
+    {draft && board && <SidePanel title="Log evacuation status" busy={busy} onClose={() => setDraft(null)}><form className="edit-form-grid" onSubmit={(e) => void submit(e)}>
       <p><strong>Log evacuation status: {draft.resident.name}</strong>
         <br /><small className="catchment-muted">{draft.resident.household_name ?? 'No household'} · {draft.resident.barangay_name}</small></p>
       <label><span>Status</span>
@@ -277,7 +278,7 @@ export function PreemptiveEvacuationPage({ scopeBarangayId }: Props) {
         <button type="submit" className="verify-button" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>{' '}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
       </div>
-    </form>}
+    </form></SidePanel>}
 
     {history && <div className="catchment-table-wrap">
       <h4 className="catchment-subhead">History: {history.name}{' '}

@@ -1,5 +1,4 @@
 import type React from 'react'
-import { useEffect } from 'react'
 import type { AccountAction, AccountFilter, Resident, Status } from '../types/dashboard'
 import { residentVpi } from '../utils/householdVpi'
 import { VPI_LABELS } from '../utils/vpi'
@@ -7,6 +6,8 @@ import { VPI_LABELS } from '../utils/vpi'
 type ResidentTableProps = {
   title: string
   residents: Resident[]
+  // How many residents each status tab holds.
+  statusCounts?: Record<'All' | Status, number>
   searchTerm: string
   statusFilter: 'All' | Status
   onSearchChange: (value: string) => void
@@ -23,12 +24,13 @@ type ResidentTableProps = {
 }
 
 const STATUS_CHIPS: ['All' | Status, string][] = [
-  ['All', 'Everyone'], ['Pending', 'Needs review'], ['Verified', 'Verified'], ['Rejected', 'Rejected'],
+  ['Pending', 'Needs review'], ['Verified', 'Verified'], ['Rejected', 'Rejected'], ['All', 'Everyone'],
 ]
 
 export function ResidentTable({
   title,
   residents,
+  statusCounts,
   searchTerm,
   statusFilter,
   onSearchChange,
@@ -45,17 +47,6 @@ export function ResidentTable({
     onViewResidentRequest || onEditResident || onChangeAccountState || onResetPin,
   )
 
-  // Clicking anywhere else closes an open "More" menu.
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      document.querySelectorAll('details.row-more[open]').forEach((d) => {
-        if (!d.contains(e.target as Node)) d.removeAttribute('open')
-      })
-    }
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [])
-
   return (
     <section className="panel table-panel">
       <div className="section-header">
@@ -66,8 +57,8 @@ export function ResidentTable({
       <div className="table-actions resident-status-chips" role="group" aria-label="Filter by status">
         {STATUS_CHIPS.map(([value, label]) => (
           <button key={value} type="button" aria-pressed={statusFilter === value}
-            className={statusFilter === value ? 'verify-button' : 'secondary-button'}
-            onClick={() => onStatusFilterChange(value)}>{label}</button>
+            className={`status-tab${statusFilter === value ? ' is-on' : ''}${value === 'Pending' && statusCounts?.Pending ? ' has-waiting' : ''}`}
+            onClick={() => onStatusFilterChange(value)}>{label}{statusCounts && <span className="status-tab-n">{statusCounts[value]}</span>}</button>
         ))}
       </div>
 
@@ -75,7 +66,7 @@ export function ResidentTable({
         <input
           type="search"
           value={searchTerm}
-          placeholder="Search name, barangay or need…"
+          placeholder="Search name, household, barangay or sitio…"
           aria-label="Search residents"
           onChange={(event) => onSearchChange(event.target.value)}
         />
@@ -100,7 +91,7 @@ export function ResidentTable({
             <tr>
               <th>Name</th>
               <th>Barangay</th>
-              <th>Needs</th>
+              <th>Mobility</th>
               <th title="One score out of 100 for the whole household: mobility, pregnancy, children, seniors and house type. Critical 70+, Assisted 40+.">Priority (VPI)</th>
               <th>Status</th>
               {hasActions && <th>Actions</th>}
@@ -118,10 +109,11 @@ export function ResidentTable({
                 const accountState = resident.accountState ?? 'Active'
 
                 return (
-                  <tr key={resident.id}>
+                  <tr key={resident.id} className={onViewResidentRequest ? 'resident-row' : undefined}
+                    onClick={onViewResidentRequest ? () => onViewResidentRequest(resident) : undefined}>
                     <td><strong>{resident.name}</strong>
                       {resident.householdName && <div className="resident-sub">{resident.householdName}</div>}</td>
-                    <td>{resident.barangay}</td>
+                    <td>{resident.barangay}{resident.sitio && <div className="resident-sub">Sitio {resident.sitio}</div>}</td>
                     <td>
                       <span className={`badge ${getConstraintClassName(resident.constraint)}`}>
                         {resident.constraint}
@@ -134,52 +126,22 @@ export function ResidentTable({
                     </td>
                     <td>
                       <span className={`status ${resident.status.toLowerCase()}`}>
-                        {resident.status}
+                        {resident.status === 'Pending' ? 'Needs review' : resident.status}
                       </span>
-                      {resident.accountState && resident.accountState !== 'Active' && (
-                        <span
-                          className={`status account-${resident.accountState.toLowerCase()}`}
-                          title={describeAccountState(resident)}
-                        >
-                          {resident.accountState}
+                      {accountState !== 'Active' && (
+                        <span className={`status account-${accountState.toLowerCase()}`} title={describeAccountState(resident)}>
+                          {accountState}
                         </span>
                       )}
                     </td>
 
+                    {/* One button per row. Edit, Reset PIN and account changes are in the Details panel. */}
                     {hasActions && (
-                      <td>
-                        <div className="table-actions">
-                          {onViewResidentRequest && (resident.status === 'Pending' ? (
-                            <button className="review-button" onClick={() => onViewResidentRequest(resident)}>Review ID</button>
-                          ) : (
-                            <button className="view-request-button" onClick={() => onViewResidentRequest(resident)}>Details</button>
-                          ))}
-                          {(onEditResident || onResetPin || onChangeAccountState) && (
-                            <details className="row-more">
-                              <summary aria-label={`More actions for ${resident.name}`}>More ▾</summary>
-                              <div className="row-more-menu">
-                                {onEditResident && (
-                                  <button onClick={(e) => { closeMenu(e); onEditResident(resident) }}>Edit details</button>
-                                )}
-                                {onResetPin && accountState !== 'Archived' && (
-                                  <button title="Forgot PIN: set a new one after checking their ID" onClick={(e) => { closeMenu(e); onResetPin(resident) }}>Reset PIN</button>
-                                )}
-                                {/* Account: Active -> Deactivate. Deactivated -> Reactivate or Archive. Archived -> Restore.
-                                    Residents are never deleted; their records stay for the audit trail. */}
-                                {onChangeAccountState && accountState === 'Active' && (
-                                  <button className="danger" onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'deactivate') }}>Deactivate account</button>
-                                )}
-                                {onChangeAccountState && accountState === 'Deactivated' && <>
-                                  <button onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'reactivate') }}>Reactivate</button>
-                                  <button className="danger" onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'archive') }}>Archive</button>
-                                </>}
-                                {onChangeAccountState && accountState === 'Archived' && (
-                                  <button onClick={(e) => { closeMenu(e); onChangeAccountState(resident, 'restore') }}>Restore</button>
-                                )}
-                              </div>
-                            </details>
-                          )}
-                        </div>
+                      <td className="resident-row-action">
+                        {onViewResidentRequest && (resident.status === 'Pending'
+                          ? <button type="button" className="review-button" onClick={(e) => { e.stopPropagation(); onViewResidentRequest(resident) }}>Review ID</button>
+                          : <button type="button" className="row-open" aria-label={`Open details for ${resident.name}`}
+                              onClick={(e) => { e.stopPropagation(); onViewResidentRequest(resident) }}>›</button>)}
                       </td>
                     )}
                   </tr>
@@ -194,11 +156,6 @@ export function ResidentTable({
 }
 
 
-
-// Closes the row's "More" menu after a choice.
-function closeMenu(e: { currentTarget: HTMLElement }) {
-  e.currentTarget.closest('details')?.removeAttribute('open')
-}
 
 // Hover text for a Deactivated / Archived tag: why and when.
 function describeAccountState(resident: Resident) {

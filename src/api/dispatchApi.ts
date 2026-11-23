@@ -38,16 +38,21 @@ export const saveRescueUnit = (u: { unitId: number | null; name: string; baranga
   call<number>('save_rescue_unit', { p_unit_id: u.unitId, p_name: u.name.trim(), p_barangay: u.barangayId, p_capabilities: u.capabilities, p_member_uids: u.memberUids, p_active: u.active })
 
 // Backup a responder unit asked for from the app (STEP20). Staff mark it handled here.
-export type BackupNeed = 'boat' | 'ambulance' | 'stretcher' | 'road_clearing' | 'more_people' | 'shelter'
+// 'team' = a barangay admin asked the municipality to send a team (STEP32).
+export type BackupNeed = 'boat' | 'ambulance' | 'stretcher' | 'road_clearing' | 'more_people' | 'shelter' | 'team'
 export const BACKUP_NEED_LABELS: Record<BackupNeed, string> = {
   boat: 'Rescue boat', ambulance: 'Ambulance', stretcher: 'Stretcher', road_clearing: 'Road clearing', more_people: 'More people',
   shelter: 'An evacuation center (none nearby has room)',
+  team: 'A responder team from the municipality',
 }
 export type BackupRequest = {
   request_id: string; ticket_id: string; ticket_no: number; barangay_id: number; need: BackupNeed
   note: string | null; requested_at: string; requested_by_name: string | null; unit_name: string | null
 }
 export const getBackupRequests = () => call<BackupRequest[]>('get_backup_requests')
+// Barangay admin: no free team of their own, so ask the municipal admin to send one (STEP32).
+export const requestTeam = (ticketId: string, note: string) =>
+  call<string>('request_team', { p_ticket_id: ticketId, p_note: note.trim() })
 export const closeBackupRequest = (requestId: string, action: 'handled' | 'cancel') =>
   call<void>('close_backup_request', { p_request_id: requestId, p_action: action })
 

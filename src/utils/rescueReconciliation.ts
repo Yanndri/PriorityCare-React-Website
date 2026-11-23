@@ -17,6 +17,26 @@ export type RegistryResident = {
   evacuated_at: string | null
   center_id: number | null
   center_name: string | null
+  /** Who this is: an account holder (default), a household member, or a walk-in checked in by a responder. */
+  kind?: 'resident' | 'member' | 'walkin'
+  /** Check-in record (members and walk-ins only), used to close a report against it. */
+  record_id?: string
+  member_id?: string | null
+}
+
+/** A household member or walk-in who is safe at a center (STEP36). */
+export type CenterCheckIn = {
+  kind: 'member' | 'walkin'
+  record_id: string
+  member_id: string | null
+  name: string
+  sex: string | null
+  birthdate: string | null
+  barangay_id: number | null
+  evacuated_at: string | null
+  logged_at: string | null
+  center_id: number | null
+  center_name: string | null
 }
 
 export type MissingPersonReport = {
@@ -24,6 +44,8 @@ export type MissingPersonReport = {
   barangay_id: number
   event_id: string | null
   resident_uid: string | null
+  /** Set when the household flagged this member missing from the resident app. */
+  member_id?: string | null
   full_name: string
   sex: 'male' | 'female' | null
   approx_age: number | null
@@ -54,18 +76,23 @@ export type ReconciliationData = {
   events: ReconciliationEvent[]
   reports: MissingPersonReport[]
   residents: RegistryResident[]
+  /** Household members and walk-ins safe at a center. Missing until STEP36 is run. */
+  checkins?: CenterCheckIn[]
 }
 
 export type MatchCandidate = {
   resident: RegistryResident
-  score: number
+  /** true when sex and age were both given and both agree; false when one of them was not given */
+  full: boolean
+  /** true when the report names this exact person record (no name guessing). */
+  exact?: boolean
   reasons: string[]
 }
 
 export type MatchClass =
   | 'linked-rescued'   // report is linked to a registered resident who is in the rescued directory
-  | 'probable'         // best name/sex/age match scores >= PROBABLE_SCORE
-  | 'possible'         // best match scores >= POSSIBLE_SCORE
+  | 'probable'         // a rescued resident passes all four checks (last name, first name, sex, age)
+  | 'possible'         // name checks pass, but the report left out the sex or the age
   | 'no-match'         // nobody in the rescued directory resembles the report
 
 export type ReconciledReport = {
@@ -79,7 +106,6 @@ export type ReconciliationResult = {
   rescued: RegistryResident[]
   open: ReconciledReport[]
   closed: MissingPersonReport[]
-  unaccounted: RegistryResident[]
   summary: {
     rescued: number
     openReports: number
@@ -89,12 +115,9 @@ export type ReconciliationResult = {
     noMatch: number
     found: number
     withdrawn: number
-    unaccounted: number
   }
 }
 
-export const PROBABLE_SCORE = 85
-export const POSSIBLE_SCORE = 60
 const MAX_CANDIDATES = 3
 
 export function fullName(r: Pick<RegistryResident, 'f_name' | 'm_name' | 'l_name'>) {
@@ -133,24 +156,6 @@ export function jaroWinkler(a: string, b: string) {
   return jaro + prefix * 0.1 * (1 - jaro)
 }
 
-/**
- * Name similarity tolerant of word order, middle names and small typos.
- * Each token of the shorter name is paired with its best token in the other name.
- */
-export function nameSimilarity(a: string, b: string) {
-  const ta = normalizeName(a).split(' ').filter(Boolean)
-  const tb = normalizeName(b).split(' ').filter(Boolean)
-  if (!ta.length || !tb.length) return 0
-  const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta]
-  const tokenScore = short.reduce((sum, s) => sum + Math.max(...long.map(l =>
-    // Initials ("J." vs "Juan") count as a partial match.
-    s.length === 1 || l.length === 1 ? (s[0] === l[0] ? 0.8 : 0) : jaroWinkler(s, l))), 0) / short.length
-  const whole = jaroWinkler([...ta].sort().join(' '), [...tb].sort().join(' '))
-  // A single-word report ("Juan") should not look as strong as a full-name match.
-  const coverage = short.length === 1 && long.length > 1 ? 0.85 : 1
-  return Math.max(tokenScore, whole) * coverage
-}
-
 export function ageOn(birthdate: string | null, asOf: Date) {
   if (!birthdate || !/^\d{4}-\d{2}-\d{2}/.test(birthdate)) return null
   const [y, m, d] = birthdate.slice(0, 10).split('-').map(Number)
@@ -160,68 +165,109 @@ export function ageOn(birthdate: string | null, asOf: Date) {
   return age >= 0 && age <= 130 ? age : null
 }
 
-export function scoreCandidate(report: MissingPersonReport, resident: RegistryResident, asOf: Date): MatchCandidate | null {
-  if (report.resident_uid) {
-    return report.resident_uid === resident.uid
-      ? { resident, score: 100, reasons: ['Report is linked to this registered resident'] }
+// The matching rule, in plain words. A rescued resident is a match for a report when:
+//   1. the last name is the same (ignoring capitals and accents),
+//   2. the first name is the same or nearly the same (a small typo such as "Jon" for "John"),
+//   3. the sex is the same (skipped if the report left it out),
+//   4. the age is within 5 years (skipped if the report left it out).
+// The admin still confirms every match. Nothing is closed automatically.
+export const MAX_AGE_GAP = 5
+const FIRST_NAME_SIMILAR = 0.85 // Jaro-Winkler similarity, a standard measure for comparing names
+
+const words = (name: string | null) => normalizeName(name ?? '').split(' ').filter(Boolean)
+
+export function checkCandidate(report: MissingPersonReport, resident: RegistryResident, asOf: Date): MatchCandidate | null {
+  const kind = resident.kind ?? 'resident'
+  // A report about a known person: only that person's own record is an exact match.
+  // A walk-in can still be them, so walk-ins go through the name checks below.
+  if (report.member_id && kind !== 'walkin') {
+    return kind === 'member' && resident.member_id === report.member_id
+      ? { resident, full: true, exact: true, reasons: [`Same household member, checked in at ${resident.center_name ?? 'a center'}`] }
       : null
   }
-  const similarity = nameSimilarity(report.full_name, fullName(resident))
-  if (similarity < 0.75) return null
-  const reasons = [`Name ${Math.round(similarity * 100)}% similar`]
-  let score = similarity * 70
+  if (report.resident_uid && kind !== 'walkin') {
+    return report.resident_uid === resident.uid
+      ? { resident, full: true, exact: true, reasons: ['The report names this registered resident'] }
+      : null
+  }
+  const reported = words(report.full_name)
+  if (reported.length < 2) return null // a first name alone is not enough to suggest anyone
+  const reportedLast = reported[reported.length - 1]
+  const reportedFirst = reported[0]
+  const last = words(resident.l_name)
+  const first = words(resident.f_name)
+  if (!last.length || !first.length) return null
+
+  // 1. Same last name.
+  if (last.join(' ') !== reportedLast && last[last.length - 1] !== reportedLast) return null
+  const reasons = ['Same last name']
+
+  // 2. Same or nearly the same first name.
+  const firstSame = first.includes(reportedFirst)
+  if (!firstSame && Math.max(...first.map(f => jaroWinkler(f, reportedFirst))) < FIRST_NAME_SIMILAR) return null
+  reasons.push(firstSame ? 'Same first name' : `First name nearly the same (${resident.f_name} / ${reported[0]})`)
+
+  // 3. Same sex.
+  let full = true
   if (report.sex && resident.sex) {
     if (report.sex !== resident.sex) return null
-    score += 10; reasons.push('Same sex')
-  }
+    reasons.push('Same sex')
+  } else full = false
+
+  // 4. Age within 5 years.
   const age = ageOn(resident.birthdate, asOf)
   if (report.approx_age !== null && age !== null) {
-    const diff = Math.abs(report.approx_age - age)
-    if (diff > 10) return null
-    if (diff <= 2) { score += 20; reasons.push(`Age ${age} (reported ~${report.approx_age})`) }
-    else if (diff <= 5) { score += 10; reasons.push(`Age ${age} (reported ~${report.approx_age})`) }
-    else { score -= 10; reasons.push(`Age ${age} differs from reported ~${report.approx_age}`) }
-  }
-  if (report.barangay_id === resident.barangay_id) reasons.push('Same barangay')
-  return { resident, score: Math.max(0, Math.min(99, Math.round(score))), reasons }
+    if (Math.abs(report.approx_age - age) > MAX_AGE_GAP) return null
+    reasons.push(`Age ${age}, reported about ${report.approx_age}`)
+  } else full = false
+
+  if (!full) reasons.push('Sex or age not given, check carefully')
+  return { resident, full, reasons }
 }
 
 export const isRescued = (r: RegistryResident) => r.latest_status === 'safely_evacuated'
 
+/** Turns a center check-in into the same shape as a registered resident, so one list holds everyone who is safe. */
+export function checkInAsResident(c: CenterCheckIn, fallbackBarangay: number): RegistryResident {
+  const parts = c.name.trim().split(/\s+/)
+  const last = parts.length > 1 ? parts.pop()! : null
+  return {
+    uid: `rec:${c.record_id}`, barangay_id: c.barangay_id ?? fallbackBarangay,
+    f_name: parts.join(' '), m_name: null, l_name: last,
+    sex: c.sex, birthdate: c.birthdate,
+    latest_status: 'safely_evacuated', latest_logged_at: c.logged_at, evacuated_at: c.evacuated_at,
+    center_id: c.center_id, center_name: c.center_name,
+    kind: c.kind, record_id: c.record_id, member_id: c.member_id,
+  }
+}
+
 export function reconcile(data: ReconciliationData, asOf = new Date()): ReconciliationResult {
-  const rescued = data.residents.filter(isRescued)
+  const rescued = [...data.residents.filter(isRescued),
+    ...(data.checkins ?? []).map(c => checkInAsResident(c, data.barangays[0]?.barangay_id ?? 0))]
   const byUid = new Map(data.residents.map(r => [r.uid, r]))
   const openReports = data.reports.filter(r => r.status === 'missing')
 
   const open: ReconciledReport[] = openReports.map(report => {
     const linkedResident = report.resident_uid ? byUid.get(report.resident_uid) ?? null : null
     const candidates = rescued
-      .map(r => scoreCandidate(report, r, asOf))
-      .filter((c): c is MatchCandidate => c !== null && c.score >= POSSIBLE_SCORE)
-      .sort((a, b) => b.score - a.score || fullName(a.resident).localeCompare(fullName(b.resident)))
+      .map(r => checkCandidate(report, r, asOf))
+      .filter((c): c is MatchCandidate => c !== null)
+      .sort((a, b) => Number(b.full) - Number(a.full) || fullName(a.resident).localeCompare(fullName(b.resident)))
       .slice(0, MAX_CANDIDATES)
-    const best = candidates[0]?.score ?? 0
     const classification: MatchClass =
-      linkedResident && isRescued(linkedResident) ? 'linked-rescued'
-        : best >= PROBABLE_SCORE ? 'probable'
-          : best >= POSSIBLE_SCORE ? 'possible' : 'no-match'
+      (linkedResident && isRescued(linkedResident)) || candidates[0]?.exact ? 'linked-rescued'
+        : candidates[0]?.full ? 'probable'
+          : candidates.length ? 'possible' : 'no-match'
     return { report, classification, candidates, linkedResident }
   })
   const order: Record<MatchClass, number> = { 'linked-rescued': 0, probable: 1, possible: 2, 'no-match': 3 }
   open.sort((a, b) => order[a.classification] - order[b.classification]
     || a.report.reported_at.localeCompare(b.report.reported_at))
 
-  // Registered residents in barangays with an active disaster event who are neither
-  // confirmed rescued nor already on the open manifest.
-  const activeBarangays = new Set(data.events.filter(e => e.status === 'active').map(e => e.barangay_id))
-  const onManifest = new Set(openReports.map(r => r.resident_uid).filter(Boolean))
-  const unaccounted = data.residents.filter(r =>
-    activeBarangays.has(r.barangay_id) && !isRescued(r) && !onManifest.has(r.uid))
-
   const closed = data.reports.filter(r => r.status !== 'missing')
   const count = (c: MatchClass) => open.filter(o => o.classification === c).length
   return {
-    rescued, open, closed, unaccounted,
+    rescued, open, closed,
     summary: {
       rescued: rescued.length,
       openReports: open.length,
@@ -231,15 +277,14 @@ export function reconcile(data: ReconciliationData, asOf = new Date()): Reconcil
       noMatch: count('no-match'),
       found: closed.filter(r => r.status === 'found').length,
       withdrawn: closed.filter(r => r.status === 'withdrawn').length,
-      unaccounted: unaccounted.length,
     },
   }
 }
 
 export const matchLabels: Record<MatchClass, string> = {
-  'linked-rescued': 'Confirmed in rescued directory',
-  probable: 'Probable match',
-  possible: 'Possible match',
+  'linked-rescued': 'Checked in at a center',
+  probable: 'Likely match',
+  possible: 'Partial match',
   'no-match': 'Still missing',
 }
 
@@ -255,24 +300,20 @@ function csvCell(value: unknown) {
 }
 
 export function reconciliationCsv(result: ReconciliationResult, barangayName: (id: number) => string) {
-  const header = ['Section', 'Report ID', 'Name', 'Barangay', 'Sex', 'Age', 'Reconciliation', 'Best match', 'Match score',
+  const header = ['Section', 'Report ID', 'Name', 'Barangay', 'Sex', 'Age', 'Reconciliation', 'Best match', 'Why it matches',
     'Evacuation center', 'Last seen', 'Reporter', 'Reported at', 'Note']
   const rows: unknown[][] = []
   for (const o of result.open) {
     const best = o.linkedResident && o.classification === 'linked-rescued'
-      ? { resident: o.linkedResident, score: 100 } : o.candidates[0]
+      ? { resident: o.linkedResident, reasons: ['The report names this registered resident'] } : o.candidates[0]
     rows.push(['Open manifest', o.report.report_id, o.report.full_name, barangayName(o.report.barangay_id), o.report.sex ?? '',
-      o.report.approx_age ?? '', matchLabels[o.classification], best ? fullName(best.resident) : '', best?.score ?? '',
+      o.report.approx_age ?? '', matchLabels[o.classification], best ? fullName(best.resident) : '', best?.reasons.join('; ') ?? '',
       best?.resident.center_name ?? '', o.report.last_seen_location, o.report.reporter_name, o.report.reported_at, o.report.notes])
   }
   for (const r of result.closed) {
     rows.push(['Closed report', r.report_id, r.full_name, barangayName(r.barangay_id), r.sex ?? '', r.approx_age ?? '',
       r.status === 'found' ? 'Found' : 'Withdrawn', '', '', '', r.last_seen_location, r.reporter_name, r.reported_at,
       r.reconciliation_note ?? ''])
-  }
-  for (const r of result.unaccounted) {
-    rows.push(['Unaccounted (not reported)', '', fullName(r), barangayName(r.barangay_id), r.sex ?? '', '',
-      r.latest_status ? statusLabels[r.latest_status] : 'No evacuation record', '', '', r.center_name ?? '', '', '', '', ''])
   }
   for (const r of result.rescued) {
     rows.push(['Master rescued directory', '', fullName(r), barangayName(r.barangay_id), r.sex ?? '', '',

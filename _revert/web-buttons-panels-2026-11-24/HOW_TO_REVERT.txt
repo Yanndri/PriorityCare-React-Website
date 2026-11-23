@@ -1,0 +1,2 @@
+Buttons, side panel for Add/Edit, member search (2026-11-24).
+To undo: copy everything under src/ here back over src/, and delete src/components/SidePanel.tsx and src/components/MemberPicker.tsx.

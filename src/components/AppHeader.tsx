@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Icon } from './Icon'
 import logo from '../assets/prioritycare-logo.png'
 
@@ -5,9 +6,11 @@ type AppHeaderProps = {
   name: string
   roleLabel: string
   onSignOut: () => void
+  // The barangay being viewed (Admin) or the scope picker (Super Admin).
+  scope?: ReactNode
 }
 
-export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
+export function AppHeader({ name, roleLabel, onSignOut, scope }: AppHeaderProps) {
   // This is the fixed top header for the whole dashboard.
   return (
     <header className="app-header">
@@ -20,10 +23,8 @@ export function AppHeader({ name, roleLabel, onSignOut }: AppHeaderProps) {
         </div>
       </div>
 
-      <div className="header-status">
-        <span className="live-dot" />
-        <span>Live system</span>
-      </div>
+      {/* One bar for everything: which barangay you are looking at sits here, not in a second banner. */}
+      <div className="header-status">{scope}</div>
 
       <div className="admin-box">
         <div>

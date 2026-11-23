@@ -34,7 +34,7 @@ function validate(form: FormState, barangays: Barangay[]): string | null {
     !form.l_name.trim() ||
     !form.contact_no.trim()
   ) {
-    return 'Email, first name, last name, and contact number are required.'
+    return 'Email, first name, last name, and mobile number are required.'
   }
 
   if (!EMAIL_PATTERN.test(form.email.trim())) {
@@ -66,7 +66,7 @@ function validate(form: FormState, barangays: Barangay[]): string | null {
     contactDigits.length < 7 ||
     contactDigits.length > 15
   ) {
-    return 'Contact number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).'
+    return 'Mobile number must contain 7 to 15 digits (an optional leading +, spaces, and hyphens are allowed).'
   }
 
   const barangayId = Number(form.assigned_barangay_id)
@@ -228,13 +228,13 @@ export function CreateAdminForm({ barangays, onCreated }: CreateAdminFormProps) 
         </label>
 
         <label className="create-admin-field">
-          <span>Contact No. *</span>
+          <span>Mobile number *</span>
           <input
             type="tel"
             value={form.contact_no}
             onChange={update('contact_no')}
             maxLength={50}
-            placeholder="e.g. 09171234567"
+            placeholder="e.g. 0917 123 4567 or +63 917 123 4567"
             required
           />
         </label>

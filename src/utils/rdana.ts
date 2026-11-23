@@ -132,7 +132,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     lines.push(`Shared facilities: ${centers.length}; active ${active.length}; closed ${centers.filter((center) => center.status === 'closed').length}; unknown lifecycle status ${centers.filter((center) => !['active','closed'].includes(center.status ?? '')).length}.`)
     lines.push(`Current recorded occupancy in active facilities: ${active.reduce((sum, center) => sum + center.occupied, 0)}; reviewed capacity across known active facilities: ${known.reduce((sum, center) => sum + center.capacity!, 0)}; known available slots: ${known.reduce((sum, center) => sum + Math.max(0, center.capacity! - center.occupied), 0)}.`)
     lines.push(`Active facilities with capacity not set: ${active.length - known.length}; at or above capacity: ${known.filter((center) => center.occupied >= center.capacity!).length}.`)
-  } else lines.push(`Shelter snapshot: ${unavailable(data.shelters.reason)}.`)
+  } else lines.push(`Evacuation center snapshot: ${unavailable(data.shelters.reason)}.`)
   lines.push('', '5. DAMAGE, NEEDS, AND VALIDATION GAPS')
   if (data.missingReports?.available) {
     const manifest = manifestActivity(data.missingReports.data, data.window)
@@ -147,7 +147,7 @@ export function buildRdanaSummary(data: RdanaData, context = '') {
     '', '6. METHOD AND REVIEW',
     'Activity is based on stored creation, logging, or completion timestamps. Records without the relevant timestamp are excluded from window totals.',
     'Statuses are current recorded values, not a reconstruction of status changes during the reporting period.',
-    'Population scope follows current barangay registration. Shelter figures are facility-wide and must not be added to registered population totals.',
+    'Population scope follows current barangay registration. Evacuation center figures are facility-wide and must not be added to registered population totals.',
     'Data is retrieved in multiple read-only queries, not one transactional snapshot. Later transfers, profile edits, and status changes can affect the next generated draft.',
     '',
     '7. DATA SOURCES',

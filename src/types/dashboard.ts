@@ -13,6 +13,7 @@ export type MenuKey =
   | 'dataMining'
   | 'evacCenters'
   | 'preemptiveEvacuation'
+  | 'responderTeams'
   // Super Admin only
   | 'barangayOverview'
   | 'adminAccounts'
@@ -103,6 +104,9 @@ export type EvacuationCenterResident = {
   evacuationStatus: string
   rescued?: boolean // true = a rescuer brought them; false = came on their own
   headcount?: number
+  kind?: 'resident' | 'member' | 'walkin'
+  since?: string | null
+  sitio?: string
 }
 
 export type EvacuationCenter = {
@@ -113,7 +117,7 @@ export type EvacuationCenter = {
   facilityType?: string
   barangayId?: number | null
   barangayName?: string | null
-  // False when this admin can see the centre (their shelter plan uses it) but not change it.
+  // False when this admin can see the center (an open center in another barangay) but not change it.
   editable?: boolean
   households?: number
   gpsLat?: number
