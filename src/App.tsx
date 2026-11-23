@@ -29,7 +29,6 @@ import { SubTabs } from './components/SubTabs'
 import { EvacCentersPage } from './pages/EvacCentersPage'
 import { ResponderAccountsPage } from './pages/ResponderAccountsPage'
 import { PreemptiveEvacuationPage } from './pages/PreemptiveEvacuationPage'
-import { DevicesPage } from './pages/DevicesPage'
 import { DataMiningPage } from './pages/DataMiningPage'
 import { EditResidentModal } from './components/EditResidentModal'
 import { RegisterResidentModal } from './components/RegisterResidentModal'
@@ -630,14 +629,6 @@ function App({ profile }: AppProps) {
               scopeBarangayId={
                 assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null
               }
-            />
-          )}
-
-          {activeMenu === 'devices' && (
-            <DevicesPage
-              isSuperAdmin={isSuperAdmin}
-              barangayOptions={isSuperAdmin ? barangayOptions : undefined}
-              scopeBarangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
             />
           )}
 

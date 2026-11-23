@@ -3,11 +3,11 @@ import { hasSupabaseConfig, supabase } from './supabaseClient'
 
 // Topics bumped by the database (migration 20261102_01_live_signals) whenever a table changes:
 // events, centers, shelter_plans, sos, tickets, units, evacuation, hazards, missing, preemptive,
-// residents, accounts, devices (20261118_01_esp32_device_management). The signal only says *that* something changed; the page reloads through its
+// residents, accounts. The signal only says *that* something changed; the page reloads through its
 // own scoped queries, so no row data travels over the live channel.
 export type LiveTopic =
   | 'events' | 'centers' | 'shelter_plans' | 'sos' | 'tickets' | 'units' | 'evacuation'
-  | 'hazards' | 'missing' | 'preemptive' | 'residents' | 'accounts' | 'devices'
+  | 'hazards' | 'missing' | 'preemptive' | 'residents' | 'accounts'
 
 let channelSeq = 0
 

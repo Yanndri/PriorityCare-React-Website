@@ -17,7 +17,6 @@ const operationalItems: MenuItem[] = [
   { key: 'population', label: 'Sitios & Population', group: BEFORE },
   { key: 'verification', label: 'Residents', group: BEFORE }, // 1.1, 1.2
   { key: 'evacCenters', label: 'Evacuation Centers', group: BEFORE }, // 2.1, 2.3
-  { key: 'devices', label: 'ESP32 Devices', group: BEFORE }, // offline SOS hotspots
   { key: 'disasterEvents', label: 'Declare a Disaster', group: DURING }, // 3.1
   { key: 'geoMap', label: 'Map', group: DURING }, // 3.2
   { key: 'dispatch', label: 'SOS & Rescue', group: DURING }, // 1.3, 2.2
@@ -45,7 +44,6 @@ export const pageDescriptions: Record<MenuKey, string> = {
   population: 'Your official sitio list, and how many people live in each sitio: children, seniors, pregnant, and those who cannot walk.',
   verification: 'Register residents, check their IDs, and keep household details up to date.',
   evacCenters: 'Your evacuation centers: how full they are and who is inside.',
-  devices: 'The ESP32 SOS hotspots that let residents with no load send an SOS: connect, check and manage them.',
   preemptiveEvacuation: 'Which households are staying home, leaving, or safe, and where they went. Residents report from the app; staff can log for them.',
   disasterEvents: 'Declare a flood, fire, earthquake or landslide when it happens, and close it when it is over.',
   geoMap: 'See residents by priority, evacuation centers and SOS calls on the map, plus the vulnerability heatmap.',
@@ -66,7 +64,6 @@ export const menuIcons: Record<MenuKey, string> = {
   population: 'users',
   geoMap: 'map-marker',
   evacCenters: 'building',
-  devices: 'wifi',
   preemptiveEvacuation: 'home',
   disasterEvents: 'siren-on',
   rescueReconciliation: 'search-location',
