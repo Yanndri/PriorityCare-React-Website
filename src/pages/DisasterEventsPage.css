@@ -20,3 +20,9 @@
 .disaster-map-label { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
 .disaster-form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .disaster-hint { color: #526174; margin: 0 0 16px; }
+
+/* "Advice to residents" when ending a disaster */
+.end-advice { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; margin: 0; display: grid; gap: 6px; }
+.end-advice legend { font-weight: 700; padding: 0 4px; }
+.ticket-action-form .end-advice-option { display: flex; flex-direction: row; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; }
+.ticket-action-form .end-advice-option input { width: 18px; height: 18px; margin: 0; flex: none; }

@@ -34,6 +34,9 @@ const RESOLUTION_REASONS = [
   'Moved under a municipal or wider declaration',
 ]
 const OTHER_REASON = 'Other'
+// What residents are told when a disaster ends. The resident app reads it back from the
+// saved reason ("Advice to residents: <advice>. Reason: <reason>") and shows it to them.
+const ADVICE_OPTIONS = ['Safe to go home', 'Stay at the evacuation center for now']
 const WAITING = new Set(['unverified', 'under_review'])
 
 type Group = 'waiting' | 'confirmed' | 'active' | 'closed'
@@ -73,6 +76,7 @@ export function DisasterEventsPage() {
   const [declaring, setDeclaring] = useState<{ id: string; name: string; location: string } | null>(null)
   const [resolving, setResolving] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [advice, setAdvice] = useState('')
   const [reasonChoice, setReasonChoice] = useState('')
   // "Declare without a report" form (side panel).
   const [showForm, setShowForm] = useState(false)
@@ -256,6 +260,7 @@ export function DisasterEventsPage() {
   // ---------------------------------------------------------------- a declared disaster
   const fullReason = reasonChoice === OTHER_REASON ? reason.trim()
     : reason.trim() ? `${reasonChoice}: ${reason.trim()}` : reasonChoice
+  const savedReason = advice && fullReason ? `Advice to residents: ${advice}. Reason: ${fullReason}` : ''
   function renderEvent(ev: DisasterEvent) {
     const linked = (rows ?? []).filter((h) => h.event_id === ev.event_id)
     return <>
@@ -274,19 +279,24 @@ export function DisasterEventsPage() {
       {smallMap(ev.latitude, ev.longitude)}
       {ev.status === 'active' && (resolving === ev.event_id
         ? <form className="ticket-action-form" onSubmit={(e: FormEvent) => { e.preventDefault()
-            void run(async () => { await resolveEvent(ev.event_id, fullReason); setReason(''); setReasonChoice('') }, 'Disaster ended. The declaration and its history are kept.') }}>
+            void run(async () => { await resolveEvent(ev.event_id, savedReason); setReason(''); setReasonChoice(''); setAdvice('') }, `Disaster ended. Residents of the barangay were told: ${advice}.`) }}>
             <h4>End this disaster</h4>
             <label>Reason<select required value={reasonChoice} onChange={(e) => setReasonChoice(e.target.value)}>
               <option value="">Choose a reason</option>{RESOLUTION_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}<option value={OTHER_REASON}>{OTHER_REASON}</option></select></label>
             {reasonChoice && <label>{reasonChoice === OTHER_REASON ? 'Describe the reason' : 'Details (optional)'}
               <textarea required={reasonChoice === OTHER_REASON} maxLength={900} value={reason} onChange={(e) => setReason(e.target.value)} /></label>}
-            <p className="dispatch-muted">This ends the declaration and clears its hazard reports. Its history is kept.</p>
+            <fieldset className="end-advice">
+              <legend>Advice to residents</legend>
+              {ADVICE_OPTIONS.map((a) => <label key={a} className="end-advice-option">
+                <input type="radio" name="end-advice" required value={a} checked={advice === a} onChange={() => setAdvice(a)} /> {a}</label>)}
+            </fieldset>
+            <p className="dispatch-muted">Residents of the barangay see this advice in the app right away. This ends the declaration and clears its hazard reports. Its history is kept.</p>
             <div className="ticket-actions">
-              <button type="submit" className="verify-button" disabled={busy || !fullReason}>End disaster</button>
+              <button type="submit" className="verify-button" disabled={busy || !savedReason}>End disaster and advise residents</button>
               <button type="button" className="secondary-button" disabled={busy} onClick={() => setResolving(null)}>Back</button>
             </div>
           </form>
-        : <button type="button" className="op-next" disabled={busy} onClick={() => { setResolving(ev.event_id); setReason(''); setReasonChoice('') }}>End this disaster</button>)}
+        : <button type="button" className="op-next" disabled={busy} onClick={() => { setResolving(ev.event_id); setReason(''); setReasonChoice(''); setAdvice('') }}>End this disaster</button>)}
       <div className="op-small">{bigMapButton(ev.latitude, ev.longitude, ev.name)}</div>
     </>
   }
