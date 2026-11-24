@@ -408,7 +408,7 @@ export function DispatchPage({ residents, onOpenMissing, view = 'board' }: { res
       <div className="op-detail-body">
         <dl className="op-facts">
           {sosNote && <><dt>Resident says</dt><dd>"{sosNote}"</dd></>}
-          <dt>What is needed</dt><dd>{t.subject}</dd>
+          <dt>Situation</dt><dd>{t.subject}</dd>
           {resident && <><dt>Resident</dt><dd>{resident.name}{resident.sitio ? ` · Sitio ${resident.sitio}` : ''}{resident.mobilityStatus ? ` · ${resident.mobilityStatus.replace('_', '-')}` : ''}</dd></>}
           {t.location_note && <><dt>Landmark</dt><dd>{t.location_note}</dd></>}
           {t.equipment.length > 0 && <><dt>Bring</dt><dd className="ticket-equip">{t.equipment.map(e => <span key={e}>{e}</span>)}</dd></>}
@@ -492,7 +492,7 @@ export function DispatchPage({ residents, onOpenMissing, view = 'board' }: { res
             <option value="">None</option>{b.events.filter(ev => String(ev.barangay_id) === d.barangay).map(ev => <option key={ev.event_id} value={ev.event_id}>{ev.name}</option>)}</select></label>
           {d.source !== 'sos' && <label className="wide">Resident (optional)<select value={d.resident} onChange={e => pickResident(e.target.value)}>
             <option value="">No specific resident</option>{draftResidents.map(r => <option key={r.id} value={r.id}>{r.name}{r.mobilityStatus ? ` · ${r.mobilityStatus.replace('_', '-')}` : ''}</option>)}</select></label>}
-          {d.source !== 'sos' && <label className="wide">What is needed<input required maxLength={200} value={d.subject} onChange={e => setDraft({ ...d, subject: e.target.value })} placeholder="e.g. Evacuate bedridden elder, Purok 2" /></label>}
+          {d.source !== 'sos' && <label className="wide">Situation<input required maxLength={200} value={d.subject} onChange={e => setDraft({ ...d, subject: e.target.value })} placeholder="e.g. Bedridden elder needs evacuation, Purok 2" /></label>}
           <label>Priority<select value={d.priority} onChange={e => setDraft({ ...d, priority: e.target.value as TicketPriority })}>
             {(['critical', 'high', 'normal'] as const).map(p => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}</select>
             {draftSuggestion && draftSuggestion.reasons.length > 0 && <small className="dispatch-muted">Suggested {PRIORITY_LABELS[draftSuggestion.priority]}: {draftSuggestion.reasons.join(', ')}</small>}</label>
