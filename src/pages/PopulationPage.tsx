@@ -20,10 +20,25 @@ type Props = {
   constraintStats?: ConstraintStat[] // no longer used: the mobility chart is worked out here
   barangayId: number | null // the barangay in scope; null = super admin viewing all barangays
   barangayName: string
+  // Super admin viewing all barangays: pick one here to see and manage its sitios.
+  barangayOptions?: { barangay_id: number; barangay_name: string }[]
 }
 
-export function PopulationPage({ residents, barangayId, barangayName }: Props) {
+export function PopulationPage({ residents: allResidents, barangayId: scopeBarangayId, barangayName: scopeBarangayName, barangayOptions = [] }: Props) {
   const [filter, setFilter] = useState('all')
+  // Barangay picked on this page when the header is on "All barangays".
+  const [picked, setPicked] = useState<number | null>(null)
+  const barangayId = scopeBarangayId ?? picked
+  const barangayName = scopeBarangayId !== null
+    ? scopeBarangayName
+    : barangayOptions.find((b) => b.barangay_id === picked)?.barangay_name ?? ''
+  const residents = useMemo(
+    () => (scopeBarangayId === null && picked !== null ? allResidents.filter((r) => r.barangay === barangayName) : allResidents),
+    [allResidents, scopeBarangayId, picked, barangayName],
+  )
+  function pickBarangay(id: number | null) {
+    setPicked(id); setFilter('all'); setEditing(null); setError('')
+  }
   const { sitios, error: loadError, reload } = useSitios(barangayId)
   const [newName, setNewName] = useState('')
   const [editing, setEditing] = useState<{ id: number; name: string } | null>(null)
@@ -110,6 +125,14 @@ export function PopulationPage({ residents, barangayId, barangayName }: Props) {
   return (
     <section className="population-page">
       <div className="population-filter">
+        {scopeBarangayId === null && (
+          <label>Barangay
+            <select value={picked ?? ''} onChange={e => pickBarangay(e.target.value === '' ? null : Number(e.target.value))}>
+              <option value="">All barangays</option>
+              {barangayOptions.map(b => <option key={b.barangay_id} value={b.barangay_id}>{b.barangay_name}</option>)}
+            </select>
+          </label>
+        )}
         <label>Show
           <select value={filter} onChange={e => setFilter(e.target.value)}>
             <option value="all">{canManage ? 'All sitios' : 'All barangays'}</option>
@@ -131,7 +154,7 @@ export function PopulationPage({ residents, barangayId, barangayName }: Props) {
         <p className="population-note">
           {canManage
             ? 'Residents pick their sitio from this list when they register in the app. Click a row to see only its numbers.'
-            : 'To see a barangay\'s sitios (and add or rename them), choose that barangay in Scope at the top. Click a row to see only its numbers.'}
+            : 'Pick a barangay in the Barangay box above, or click its row, to see its sitios and add, rename or remove them.'}
         </p>
 
         {canManage && (
@@ -165,7 +188,13 @@ export function PopulationPage({ residents, barangayId, barangayName }: Props) {
                   )
                 }
                 return (
-                  <tr key={r.name} className={`population-row ${filter === r.name ? 'selected' : ''}`} onClick={() => setFilter(filter === r.name ? 'all' : r.name)}>
+                  <tr key={r.name} className={`population-row ${filter === r.name ? 'selected' : ''}`} onClick={() => {
+                    if (!canManage) {
+                      const b = barangayOptions.find((o) => o.barangay_name === r.name)
+                      if (b) { pickBarangay(b.barangay_id); return }
+                    }
+                    setFilter(filter === r.name ? 'all' : r.name)
+                  }}>
                     <td>{r.name}{canManage && r.sitioId === undefined && r.name !== NO_SITIO && <small className="sitio-unlisted"> not on the list</small>}</td>
                     <td>{t.households}</td><td>{t.people}</td><td>{t.children}</td><td>{t.seniors}</td>
                     <td>{t.pregnant}</td><td>{t.cannotWalk}</td><td>{t.critical}</td>

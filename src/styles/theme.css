@@ -1465,7 +1465,8 @@ textarea {
 .sitios-add input { flex: 1; min-width: 200px; border: 1px solid #c5cfdb; border-radius: 8px; padding: 10px 12px; font: inherit; }
 
 /* Population page */
-.population-filter label { display: grid; gap: 6px; max-width: 320px; font-weight: 600; margin-bottom: 16px; }
+.population-filter { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.population-filter label { flex: 1 1 220px; display: grid; gap: 6px; max-width: 320px; font-weight: 600; margin-bottom: 16px; }
 .population-filter select { min-height: 40px; border: 1px solid #c5cfdb; border-radius: 8px; padding: 6px 10px; font: inherit; background: #fff; }
 .population-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .population-card { display: grid; gap: 4px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }

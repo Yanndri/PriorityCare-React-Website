@@ -135,7 +135,7 @@ function VerificationRequestModal({
   const hasGps = resident.gpsLat != null && resident.gpsLong != null && Number(resident.gpsLat) !== 0
   const needs = matchEquipment(resident)
   const gaps = equipmentDataGaps(resident)
-  const rejection = documents.find((d) => d.rejectionReason)?.rejectionReason
+  const rejection = resident.rejectionReason ?? documents.find((d) => d.rejectionReason)?.rejectionReason
   const members = resident.householdMembers ?? []
   const accountState = resident.accountState ?? 'Active'
   const contact = [resident.emergencyContactName, resident.emergencyContactNo].filter(Boolean).join(' · ')

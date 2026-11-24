@@ -130,3 +130,34 @@ export async function resetLogin(uid: string) {
   if (!data?.secret) throw new Error(data?.error ?? 'The login could not be reset.')
   return data
 }
+
+// ID checked in person by staff (Register resident on the website).
+// Migration 20261124_02_staff_id_documents.sql: staff may upload into the resident's
+// verification-docs folder and save the ID record through staff_add_verification_document.
+export type DocumentType = { type_id: number; type_name: string; code: string }
+
+export async function fetchDocumentTypes() {
+  const { data, error } = await supabase.from('document_types').select('type_id,type_name,code').order('type_id')
+  if (error) throw error
+  // Medical certificates are out of scope (no medical conditions are recorded).
+  return ((data ?? []) as DocumentType[]).filter((t) => t.code !== 'medical')
+}
+
+export async function addStaffIdDocument(uid: string, typeId: number, idNumber: string, photo: File | null, approved: boolean) {
+  let path = ''
+  if (photo) {
+    const ext = photo.type === 'image/png' ? 'png' : 'jpg'
+    path = `${uid}/id-${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('verification-docs')
+      .upload(path, photo, { contentType: photo.type || 'image/jpeg', upsert: false })
+    if (uploadError) throw new Error(`The ID photo could not be uploaded (${uploadError.message}).`)
+  }
+  const { error } = await supabase.rpc('staff_add_verification_document', {
+    p_uid: uid, p_type_id: typeId, p_id_number: idNumber.trim(), p_path: path, p_approved: approved,
+  })
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Saving the ID needs the 20261124_02_staff_id_documents.sql database migration.'
+      : error.message)
+  }
+}

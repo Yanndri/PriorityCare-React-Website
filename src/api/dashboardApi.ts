@@ -90,6 +90,13 @@ export async function verifyResidentUser(
     residentId,
     ['approved', 'Approved'],
   )
+
+  // Clear an earlier rejection (migration 20261124_01). Ignored if the column is missing.
+  const { error: clearError } = await supabase
+    .from('residents')
+    .update({ verification_rejected_reason: null, verification_rejected_at: null })
+    .eq('uid', residentId)
+  if (clearError && clearError.code !== '42703') throw clearError
 }
 
 // Reject a resident's verification.
@@ -112,6 +119,22 @@ export async function rejectResidentUser(
     ['rejected', 'Rejected'],
     reason,
   )
+
+  // Also keep the rejection on the resident row, so it is saved even when the
+  // resident has no ID uploaded (migration 20261124_01_resident_rejection.sql).
+  const { data: rejected, error: rejectError } = await supabase
+    .from('residents')
+    .update({ verification_rejected_reason: reason, verification_rejected_at: new Date().toISOString() })
+    .eq('uid', residentId)
+    .select('uid')
+
+  if (rejectError) {
+    throw new Error(rejectError.code === '42703'
+      ? 'Rejecting needs the 20261124_01_resident_rejection.sql database migration.'
+      : rejectError.message)
+  }
+
+  requireChangedRow(rejected, 'reject this resident')
 }
 
 export const ALL_BARANGAYS = 'all'
@@ -633,6 +656,10 @@ function mapResident(
       document.reviewStatus === 'Rejected',
   )
 
+  // Rejection saved on the resident row (works with no ID uploaded).
+  const rowRejectionReason = toOptionalText(residentRow.verification_rejected_reason) ?? null
+  const rowRejected = Boolean(residentRow.verification_rejected_at)
+
   return {
     id: uid ?? `resident-${index + 1}`,
 
@@ -657,9 +684,12 @@ function mapResident(
       verificationStatus === 'verified'
         ? 'Verified'
         : hasRejectedDocument ||
+            rowRejected ||
             verificationStatus === 'rejected'
           ? 'Rejected'
           : 'Pending',
+
+    rejectionReason: rowRejected ? rowRejectionReason : null,
 
     floodZone:
       latitude !== null &&

@@ -210,7 +210,7 @@ export function DispatchPage({ residents, onOpenMissing, view = 'board' }: { res
   }
   async function submitDraft(e: FormEvent) {
     e.preventDefault()
-    if (!draft) return
+    if (!draft || draftSosGone) return
     const lat = draft.lat.trim() ? Number(draft.lat) : null
     const lng = draft.lng.trim() ? Number(draft.lng) : null
     if ((lat === null) !== (lng === null) || (lat !== null && (!Number.isFinite(lat) || !Number.isFinite(lng!)))) { setError('Enter both coordinates as numbers, or leave both blank.'); return }
@@ -250,6 +250,10 @@ export function DispatchPage({ residents, onOpenMissing, view = 'board' }: { res
     || barangayName(u.barangay_id).toLowerCase().includes(unitNeedle)
     || u.capabilities.some(c => c.toLowerCase().includes(unitNeedle)) || memberHits(u).length > 0)
   const ranked = draft ? rankUnits(ownUnits, draft.equipment) : []
+  // The SOS behind an open "Create ticket" form was canceled, closed or ticketed meanwhile
+  // (the board refreshes live). The database refuses it too (20261124_03).
+  const draftSosGone = !!(draft && draft.source === 'sos' && draft.sourceRef && rawBoard
+    && ![...rawBoard.intake_sos, ...(rawBoard.away_sos ?? [])].some((a) => a.alert_id === draft.sourceRef))
   const draftSuggestion = draft ? suggestForResident(residentOnScene(residentById.get(draft.resident), draft.withMembers, !!draft.visitingFrom), draft.sosLevel, vpiToday()) : null
 
   // ---------------------------------------------------------------- one list + one detail panel
@@ -510,7 +514,8 @@ export function DispatchPage({ residents, onOpenMissing, view = 'board' }: { res
             <small className="dispatch-muted">Pre-filled from the resident's profile (mobility, disabilities, pregnancy, age, household members). Responders confirm on site.</small></div>
           <label className="wide">Instructions for the team<textarea rows={3} maxLength={2000} value={d.instructions} onChange={e => setDraft({ ...d, instructions: e.target.value })} /></label>
           <div className="wide">
-            <button type="submit" className="op-next">{busy ? 'Saving…' : d.unit ? 'Create ticket and send this team' : 'Create ticket'}</button>
+            {draftSosGone && <p role="alert" className="dashboard-error">This SOS was canceled by the resident, or already closed or given a ticket. Discard this form; if they still need help they will send a new SOS.</p>}
+            <button type="submit" className="op-next" disabled={busy || draftSosGone}>{busy ? 'Saving…' : d.unit ? 'Create ticket and send this team' : 'Create ticket'}</button>
             <div className="op-small"><button type="button" className="secondary-button" onClick={() => setDraft(null)}>Discard</button></div>
           </div>
         </fieldset>

@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { Resident } from '../types/dashboard'
 import { supabase } from '../lib/supabaseClient'
 import { useSitios } from '../api/sitiosApi'
+import { FacilityLocationPicker } from './FacilityLocationPicker'
+import '../pages/DispatchPage.css'
 import { fetchResidentProfile, fetchHousehold, type HouseholdMember, type MemberMobility, type ResidentProfileDetails, type ResidentProfileInput } from '../api/residentProfileApi'
 
 type Props = {
@@ -121,6 +123,19 @@ function ResidentEditor({ resident, isSaving, onClose, onSave }: Omit<Props, 're
               <label><span>GPS longitude</span><input required type="number" step="any" min={-180} max={180} value={profile.gps_long} onChange={(e) => setField('gps_long', Number(e.target.value))} /></label>
               {textField('emerg_contact_name', 'Emergency contact name')}
               {textField('emerg_contact_no', 'Emergency contact mobile number', true, 'tel')}
+            </div>
+            <div className="ec-picker">
+              <span className="ec-label">House location: click the map or drag the pin</span>
+              <FacilityLocationPicker
+                latitude={profile.gps_lat ? String(profile.gps_lat) : ''}
+                longitude={profile.gps_long ? String(profile.gps_long) : ''}
+                centers={[]}
+                focusBarangayId={home?.barangayId ?? null}
+                disabled={isSaving}
+                subject="house"
+                pinLabel="House"
+                onChange={(lat, lng) => { setField('gps_lat', Number(lat)); setField('gps_long', Number(lng)) }}
+              />
             </div>
           </fieldset>
           <fieldset disabled={isSaving || householdLoading} className="resident-edit-fields">

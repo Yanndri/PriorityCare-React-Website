@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { fetchDisabilityTypes, registerResident, type ResidentRegistrationInput } from '../api/residentProfileApi'
+import { addStaffIdDocument, fetchDisabilityTypes, fetchDocumentTypes, registerResident, type DocumentType, type ResidentRegistrationInput } from '../api/residentProfileApi'
 import { useSitios } from '../api/sitiosApi'
+import { FacilityLocationPicker } from './FacilityLocationPicker'
+import '../pages/DispatchPage.css'
 
 // Staff register a resident who cannot sign up in the app themselves
 // (no phone, elderly, PWD). The resident gets the same login as an app
@@ -34,6 +36,11 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
   const [form, setForm] = useState(() => emptyForm(defaultBarangayId ?? (barangays.length === 1 ? barangays[0].barangay_id : null)))
   const [pin, setPin] = useState('')
   const [markVerified, setMarkVerified] = useState(false)
+  // ID checked in person: type, number and an optional photo.
+  const [docTypes, setDocTypes] = useState<DocumentType[]>([])
+  const [idTypeId, setIdTypeId] = useState('')
+  const [idNumber, setIdNumber] = useState('')
+  const [idPhoto, setIdPhoto] = useState<File | null>(null)
   const [disabilityTypes, setDisabilityTypes] = useState<{ disability_id: number; disability_name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -45,6 +52,9 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
     fetchDisabilityTypes()
       .then((types) => { if (!cancelled) setDisabilityTypes(types) })
       .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load disability categories.') })
+    fetchDocumentTypes()
+      .then((types) => { if (!cancelled) setDocTypes(types) })
+      .catch(() => { /* the ID fields stay empty; registration still works */ })
     return () => { cancelled = true }
   }, [])
 
@@ -58,10 +68,21 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
     if (form.barangay_id === '') { setError('Select the barangay.'); return }
     if (!/^\d{6}$/.test(pin)) { setError('The PIN must be 6 digits.'); return }
     if ((form.gps_lat === '') !== (form.gps_long === '')) { setError('Enter both GPS coordinates, or leave both blank.'); return }
+    if (markVerified && (idTypeId === '' || idNumber.trim() === '')) { setError('To mark as verified, enter the ID type and ID number you checked.'); return }
+    if ((idPhoto || idNumber.trim()) && idTypeId === '') { setError('Select the ID type.'); return }
+    if (idPhoto && idPhoto.size > 10 * 1024 * 1024) { setError('The ID photo is too large (10 MB at most).'); return }
     setError('')
     setSaving(true)
     try {
       const result = await registerResident({ ...form, barangay_id: form.barangay_id }, pin)
+      if (idTypeId !== '') {
+        try {
+          await addStaffIdDocument(result.uid, Number(idTypeId), idNumber, idPhoto, markVerified)
+        } catch (reason) {
+          // The resident already exists; say what was not saved and carry on.
+          window.alert(`The resident was registered, but the ID was not saved: ${reason instanceof Error ? reason.message : 'unknown error'}`)
+        }
+      }
       await onRegistered(result.uid, markVerified)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to register. The form is kept so you can try again.')
@@ -114,7 +135,20 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
               <label><span>GPS latitude (optional)</span><input type="number" step="any" min={-90} max={90} value={form.gps_lat} onChange={(e) => setField('gps_lat', e.target.value)} /></label>
               <label><span>GPS longitude (optional)</span><input type="number" step="any" min={-180} max={180} value={form.gps_long} onChange={(e) => setField('gps_long', e.target.value)} /></label>
             </div>
-            <p>Without GPS, the house pin starts at the barangay center. Move it later with Edit.</p>
+            <div className="ec-picker">
+              <span className="ec-label">House location: click the map or drag the pin</span>
+              <FacilityLocationPicker
+                latitude={form.gps_lat}
+                longitude={form.gps_long}
+                centers={[]}
+                focusBarangayId={form.barangay_id === '' ? null : Number(form.barangay_id)}
+                disabled={saving}
+                subject="house"
+                pinLabel="House"
+                onChange={(lat, lng) => { setField('gps_lat', lat); setField('gps_long', lng) }}
+              />
+            </div>
+            <p>If you don't place the pin, the house starts at the barangay center. You can move it later with Edit.</p>
           </fieldset>
           <fieldset disabled={saving} className="resident-edit-fields">
             <legend>Vulnerability & assistance needs</legend>
@@ -132,9 +166,15 @@ function RegisterResidentForm({ barangays, defaultBarangayId, onClose, onRegiste
             <legend>Household and verification</legend>
             <div className="edit-form-grid">
               <label><span>Household name (optional)</span><input maxLength={200} placeholder={form.l_name ? `${form.l_name} Household` : 'Dela Cruz Household'} value={form.household.household_name} onChange={(e) => setField('household', { household_name: e.target.value })} /></label>
+              <label><span>ID type{markVerified ? '' : ' (optional)'}</span><select required={markVerified} value={idTypeId} onChange={(e) => setIdTypeId(e.target.value)}>
+                <option value="">Select ID type…</option>
+                {docTypes.map((t) => <option key={t.type_id} value={t.type_id}>{t.type_name}</option>)}
+              </select></label>
+              <label><span>ID number{markVerified ? '' : ' (optional)'}</span><input required={markVerified} maxLength={100} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} /></label>
+              <label><span>ID photo (optional)</span><input type="file" accept="image/jpeg,image/png" onChange={(e) => setIdPhoto(e.target.files?.[0] ?? null)} /></label>
               <label className="resident-check"><input type="checkbox" checked={markVerified} onChange={(e) => setMarkVerified(e.target.checked)} /><span>I checked their ID in person: mark as verified</span></label>
             </div>
-            <p>The resident becomes head of a new household. Add dependents afterwards with Edit.</p>
+            <p>The resident becomes head of a new household. Add dependents afterwards with Edit. The ID details are kept as proof of the in-person check and show under Review ID.</p>
           </fieldset>
           <div className="request-modal-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Cancel</button><button type="submit" className="verify-button large" disabled={saving}>{saving ? 'Registering…' : 'Register Resident'}</button></div>
         </form>

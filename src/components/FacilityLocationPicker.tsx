@@ -30,6 +30,8 @@ type Props = {
   pinLabel?: string
   // The center being edited, left out of the "existing" dots.
   excludeId?: number | string
+  // What the pin marks, used in the hint ("facility", "house").
+  subject?: string
 }
 
 function toPoint(latitude: string, longitude: string): [number, number] | null {
@@ -51,7 +53,7 @@ function ClickToPlace({ disabled, onPlace }: { disabled?: boolean; onPlace: (lat
   return null
 }
 
-export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange, pinLabel = 'New facility', excludeId }: Props) {
+export function FacilityLocationPicker({ latitude, longitude, centers, focusBarangayId = null, disabled, onChange, pinLabel = 'New facility', excludeId, subject = 'facility' }: Props) {
   const view = useBarangayView(focusBarangayId)
   const point = toPoint(latitude, longitude)
   const borders = useBarangayBorders()
@@ -86,7 +88,7 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
       <p className="facility-picker-hint">
         {point
           ? 'Drag the pin to adjust the location, or click the map to move it.'
-          : 'Click the map, or drag the pin, to set the facility location.'}
+          : `Click the map, or drag the pin, to set the ${subject} location.`}
       </p>
       {outside && <p className="facility-picker-hint" role="alert">{OUTSIDE_CORDOVA}</p>}
       <div className="facility-picker-map">
@@ -115,10 +117,10 @@ export function FacilityLocationPicker({ latitude, longitude, centers, focusBara
           </Marker>
         </MapContainer>
       </div>
-      <p className="facility-picker-legend">
+      {existing.length > 0 && <p className="facility-picker-legend">
         <span><i className="legend-new" /> {pinLabel}</span>
         <span><i className="legend-existing" /> Existing facilities</span>
-      </p>
+      </p>}
     </div>
   )
 }

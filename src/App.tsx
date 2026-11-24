@@ -295,7 +295,9 @@ function App({ profile }: AppProps) {
       console.error('Failed to reject resident:', error)
 
       window.alert(
-        'Unable to reject this resident. Check your access permissions and try again.',
+        error instanceof Error && error.message
+          ? `Unable to reject this resident: ${error.message}`
+          : 'Unable to reject this resident. Check your access permissions and try again.',
       )
     } finally {
       setVerifyingResidentId(null)
@@ -625,7 +627,8 @@ function App({ profile }: AppProps) {
               { key: 'population', label: tabLabels.population!, content: (
                 <PopulationPage key={assignedBarangayId ?? 'all'} residents={liveResidents} constraintStats={constraintStats}
                   barangayId={assignedBarangayId && assignedBarangayId !== ALL_BARANGAYS ? Number(assignedBarangayId) : null}
-                  barangayName={assignedBarangayName} />
+                  barangayName={assignedBarangayName}
+                  barangayOptions={isSuperAdmin ? barangayOptions : undefined} />
               ) },
             ]} />
           })()}

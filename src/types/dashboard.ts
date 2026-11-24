@@ -84,6 +84,8 @@ export type Resident = {
   gpsLat?: number | string | null
   gpsLong?: number | string | null
   documents?: VerificationDocument[]
+  // Reason saved on the resident row when staff reject (also when no ID was uploaded).
+  rejectionReason?: string | null
   accountState?: AccountState
   statusReason?: string | null
   statusChangedAt?: string | null
