@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { addStaffIdDocument, fetchDocumentTypes, removeIdDocument, type DocumentType } from '../api/residentProfileApi'
 import type { AccountAction, AccountFilter, Resident, Status, VerificationDocument } from '../types/dashboard'
 import { ResidentTable } from '../components/ResidentTable'
 import { SidePanel } from '../components/SidePanel'
+import { supabase } from '../lib/supabaseClient'
 import { useShowOnMap } from '../lib/showOnMap'
 import { equipmentDataGaps, matchEquipment } from '../utils/equipmentMatch'
 
@@ -21,6 +23,8 @@ type VerificationPageProps = {
   accountFilter: AccountFilter
   onAccountFilterChange: (value: AccountFilter) => void
   onRegisterResident?: () => void
+  // Reloads the resident list after staff add an ID.
+  onReload?: () => Promise<void> | void
 }
 
 export function VerificationPage({
@@ -39,6 +43,7 @@ export function VerificationPage({
   accountFilter,
   onAccountFilterChange,
   onRegisterResident,
+  onReload,
 }: VerificationPageProps) {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
 
@@ -76,6 +81,7 @@ export function VerificationPage({
           onEdit={() => { const r = selectedResidentFromLatestData; setSelectedResident(null); onEditResident(r) }}
           onResetPin={onResetPin ? () => onResetPin(selectedResidentFromLatestData) : undefined}
           onAccount={(action) => onChangeAccountState(selectedResidentFromLatestData, action)}
+          onReload={onReload}
         />
       )}
     </>
@@ -91,6 +97,7 @@ type VerificationRequestModalProps = {
   onEdit: () => void
   onResetPin?: () => void
   onAccount: (action: AccountAction) => void
+  onReload?: () => Promise<void> | void
 }
 
 function ageFrom(birthdate?: string) {
@@ -114,6 +121,7 @@ function VerificationRequestModal({
   onEdit,
   onResetPin,
   onAccount,
+  onReload,
 }: VerificationRequestModalProps) {
   const documents = resident.documents ?? []
   const [showRejectPopup, setShowRejectPopup] = useState(false)
@@ -162,6 +170,7 @@ function VerificationRequestModal({
                   showOnMap({ lat: Number(resident.gpsLat), lng: Number(resident.gpsLong), label: resident.name }); onClose()
                 }}>See on map</button>
               : 'Not pinned yet'}</dd>
+            <dt>House photo</dt><dd><HousePhoto key={String(resident.id)} residentUid={String(resident.id)} /></dd>
           </dl>
         </section>
 
@@ -201,7 +210,8 @@ function VerificationRequestModal({
           <h5>ID</h5>
           {documents.length === 0
             ? <p className="rd-muted">No ID uploaded yet.</p>
-            : <div className="document-list">{documents.map((document) => <DocumentPreview key={document.id} document={document} />)}</div>}
+            : <div className="document-list">{documents.map((document) => <DocumentPreview key={document.id} document={document} onRemoved={onReload} />)}</div>}
+          <AddIdForm key={String(resident.id)} residentUid={String(resident.id)} hasIds={documents.length > 0} onAdded={onReload} />
         </section>
 
         <footer className="rd-actions">
@@ -249,12 +259,114 @@ function VerificationRequestModal({
   )
 }
 
-type DocumentPreviewProps = {
-  document: VerificationDocument
+// Staff add an ID for a resident who already has an account (e.g. they showed it in person,
+// or registered without one). Same database call as Register resident.
+function AddIdForm({ residentUid, hasIds, onAdded }: { residentUid: string; hasIds: boolean; onAdded?: () => Promise<void> | void }) {
+  const [open, setOpen] = useState(false)
+  const [types, setTypes] = useState<DocumentType[]>([])
+  const [typeId, setTypeId] = useState('')
+  const [idNumber, setIdNumber] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [approved, setApproved] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!open || types.length) return
+    fetchDocumentTypes().then(setTypes).catch(() => setError('Could not load the ID types.'))
+  }, [open, types.length])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!typeId) { setError('Select the ID type.'); return }
+    if (!photo && !idNumber.trim()) { setError('Add the ID photo or the ID number.'); return }
+    if (photo && photo.size > 10 * 1024 * 1024) { setError('The ID photo is too large (10 MB at most).'); return }
+    setSaving(true); setError('')
+    try {
+      await addStaffIdDocument(residentUid, Number(typeId), idNumber, photo, approved)
+      setSaved(true); setOpen(false); setTypeId(''); setIdNumber(''); setPhoto(null)
+      await onAdded?.()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The ID could not be saved.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return <>
+      {saved && <p className="rd-muted" role="status">ID saved.</p>}
+      <button type="button" className="secondary-button" onClick={() => { setOpen(true); setSaved(false) }}>{hasIds ? 'Add another ID' : 'Add ID'}</button>
+    </>
+  }
+  return (
+    <form onSubmit={submit} className="resident-edit-fields">
+      {error && <p role="alert" className="dashboard-error">{error}</p>}
+      <fieldset disabled={saving} className="resident-edit-fields">
+        <div className="edit-form-grid">
+          <label><span>ID type</span><select required value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+            <option value="">Select ID type…</option>
+            {types.map((t) => <option key={t.type_id} value={t.type_id}>{t.type_name}</option>)}
+          </select></label>
+          <label><span>ID number</span><input maxLength={100} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} /></label>
+          <label><span>ID photo</span><input type="file" accept="image/jpeg,image/png" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></label>
+          <label className="resident-check"><input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span>I checked this ID in person</span></label>
+        </div>
+      </fieldset>
+      <div className="request-modal-actions">
+        <button type="button" className="secondary-button" disabled={saving} onClick={() => { setOpen(false); setError('') }}>Cancel</button>
+        <button type="submit" className="verify-button" disabled={saving}>{saving ? 'Saving…' : 'Save ID'}</button>
+      </div>
+    </form>
+  )
 }
 
-function DocumentPreview({ document }: DocumentPreviewProps) {
+// The front-of-house photo the resident took in the app (bucket house-facades), same as on the SOS card.
+function HousePhoto({ residentUid }: { residentUid: string }) {
+  const [state, setState] = useState<{ loading: boolean; url: string | null }>({ loading: true, url: null })
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: r } = await supabase.from('residents').select('house_photo_url').eq('uid', residentUid).maybeSingle()
+      let url: string | null = null
+      if (r?.house_photo_url) {
+        const { data } = await supabase.storage.from('house-facades').createSignedUrl(String(r.house_photo_url), 60 * 30)
+        url = data?.signedUrl ?? null
+      }
+      if (!cancelled) setState({ loading: false, url })
+    })().catch(() => { if (!cancelled) setState({ loading: false, url: null }) })
+    return () => { cancelled = true }
+  }, [residentUid])
+  if (state.loading) return <span className="rd-muted">Loading…</span>
+  if (!state.url) return <span>No house photo yet</span>
+  return <a href={state.url} target="_blank" rel="noreferrer" title="Open full size">
+    <img src={state.url} alt="Front of the house"
+      style={{ display: 'block', width: '100%', maxWidth: 260, height: 170, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+  </a>
+}
+
+type DocumentPreviewProps = {
+  document: VerificationDocument
+  onRemoved?: () => Promise<void> | void
+}
+
+function DocumentPreview({ document, onRemoved }: DocumentPreviewProps) {
   const isImage = isImageUrl(document.fileUrl)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
+
+  async function remove() {
+    if (!window.confirm(`Remove this ${document.typeName}? The ID and its photo are deleted. The Activity Log keeps who removed it.`)) return
+    setRemoving(true); setRemoveError('')
+    try {
+      await removeIdDocument(document.id)
+      await onRemoved?.()
+    } catch (reason) {
+      setRemoveError(reason instanceof Error ? reason.message : 'The ID could not be removed.')
+      setRemoving(false)
+    }
+  }
 
   return (
     <article className="document-card">
@@ -262,6 +374,8 @@ function DocumentPreview({ document }: DocumentPreviewProps) {
         <strong>{document.typeName}</strong>
         <span>Status: {document.reviewStatus}</span>
         <small>Uploaded: {document.uploadedAt}</small>
+        <button type="button" className="link-button" disabled={removing} onClick={() => void remove()}>{removing ? 'Removing…' : 'Remove'}</button>
+        {removeError && <small role="alert" className="dashboard-error">{removeError}</small>}
       </div>
 
       {document.fileUrl ? (

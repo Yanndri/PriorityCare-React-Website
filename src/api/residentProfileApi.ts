@@ -161,3 +161,17 @@ export async function addStaffIdDocument(uid: string, typeId: number, idNumber: 
       : error.message)
   }
 }
+
+// Remove an ID added by mistake: the record and its photo (migration 20261125_01_staff_remove_id_document.sql).
+// The removal (who, when, which ID) stays in the Activity Log.
+export async function removeIdDocument(docId: number | string) {
+  const { data, error } = await supabase.rpc('staff_remove_verification_document', { p_doc_id: Number(docId) })
+  if (error) {
+    throw new Error(error.code === 'PGRST202'
+      ? 'Removing an ID needs the 20261125_01_staff_remove_id_document.sql database migration.'
+      : error.message)
+  }
+  const path = typeof data === 'string' ? data : ''
+  // The record is already gone; a photo left behind is only unused storage, so don't fail on it.
+  if (path) await supabase.storage.from('verification-docs').remove([path]).catch(() => undefined)
+}

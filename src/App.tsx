@@ -622,6 +622,7 @@ function App({ profile }: AppProps) {
                   accountFilter={accountFilter}
                   onAccountFilterChange={setAccountFilter}
                   onRegisterResident={registrationBarangays.length > 0 ? () => setRegisteringResident(true) : undefined}
+                  onReload={reloadDashboardData}
                 />
               ) },
               { key: 'population', label: tabLabels.population!, content: (
